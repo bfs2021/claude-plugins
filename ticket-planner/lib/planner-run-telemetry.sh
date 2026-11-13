@@ -235,11 +235,13 @@ _prt_phase_records() {
     def target($a):
       ($a.description | capture("^Run planner phase: (?<p>[A-Za-z]+) for (?<i>\\S+)$")) as $m
         | if $m.i == $init then $m.p else null end;
-    # A goldfish lens (`lens: <INIT>`, planner-goldfish-review) runs before
-    # the Review agent and belongs to Review.
+    # A goldfish lens (`lens: <INIT>`, planner-goldfish-review) and a panel
+    # seat (`panel: <INIT>:<seat>`, planner-persona-panel) run before the
+    # Review agent and belong to Review.
     def spawn_target($a):
-      ($a.description | capture("^(?<k>scan|audit|revise|lens): (?<id>\\S+)$")) as $m
+      ($a.description | capture("^(?<k>scan|audit|revise|lens|panel): (?<id>\\S+)$")) as $m
         | if $m.k == "lens" then (if $m.id == $init then "Review" else null end)
+          elif $m.k == "panel" then (if ($m.id | startswith($init + ":")) then "Review" else null end)
           elif ($tids | index($m.id)) then "Refinement"
           elif ($slugs | index($m.id)) then "DraftReadiness" else null end;
     # Each transcript names its phase; it belongs to the latest attempt of that
@@ -249,7 +251,7 @@ _prt_phase_records() {
     # end, less the same grace.
     [ $agents[] | select(.usage != null)
       | . + {phase: ((try target(.) catch null) // (try spawn_target(.) catch null)),
-             lens: (.description | startswith("lens: "))}
+             lens: ((.description | startswith("lens: ")) or (.description | startswith("panel: ")))}
       | select(.phase != null) ] as $tagged
     | [ $tagged[] | . as $t
         | (if $t.lens then

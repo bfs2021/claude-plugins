@@ -256,6 +256,16 @@ _eq "the Review retry gets no lens transcript" "$(jq -c 'select(.phase == "Revie
 _eq "scan attribution unchanged" "$(jq -c 'select(.phase == "Refinement") | {agents, agent_types}' <<<"$recs")" \
   '{"agents":1,"agent_types":["ticket-auto-pipeline:dor-semantic-agent"]}'
 
+# A review-panel seat (planner-persona-panel) is attributed the same way.
+shift_tx 13 "panel: ${INIT}:security" ticket-planner:panel-review-agent pn
+shift_tx 13 "panel: INIT-other:security" ticket-planner:panel-review-agent pn-other
+shift_tx 13 "panel: ${INIT}x:security" ticket-planner:panel-review-agent pn-prefix
+recs=$(_prt_phase_records "$INIT" "$WORK/tdir" '[]')
+_eq "a panel seat's transcript goes to the first Review attempt after it; other initiatives' seats are ignored" \
+  "$(jq -c 'select(.phase == "Review" and .attempt == 1) | {agents, agent_types}' <<<"$recs")" \
+  '{"agents":3,"agent_types":["general-purpose","ticket-planner:goldfish-review-agent","ticket-planner:panel-review-agent"]}'
+_eq "the Review retry gets no panel transcript" "$(jq -c 'select(.phase == "Review" and .attempt == 2) | .agents' <<<"$recs")" "0"
+
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"
 [ "$FAIL" -eq 0 ]

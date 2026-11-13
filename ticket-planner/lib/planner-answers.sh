@@ -140,6 +140,12 @@ declare -f planner_specify_substitute >/dev/null 2>&1 ||
   source "${_PLANNER_ANSWERS_DIR}/planner-specify-decisions.sh"
 declare -f planner_params_substitute >/dev/null 2>&1 ||
   source "${_PLANNER_ANSWERS_DIR}/planner-specify-params.sh"
+# planner-persona-panel: an upheld panel objection reopens Consensus. Optional:
+# an install without the panel lib answers exactly as before.
+if ! declare -f planner_panel_reopen_on_uphold >/dev/null 2>&1 &&
+  [ -f "${_PLANNER_ANSWERS_DIR}/planner-panel.sh" ]; then
+  source "${_PLANNER_ANSWERS_DIR}/planner-panel.sh"
+fi
 
 # Answers-file format version this consumer reads (major).
 PLANNER_ANSWERS_SCHEMA_MAJOR=1
@@ -928,6 +934,15 @@ _planner_answers_apply_locked() {
       echo "planner-answers: could not write ${proposal}" >&2
       return 1
     }
+  fi
+
+  # planner-persona-panel: an owner who upheld a security or product-owner
+  # objection sends the plan back to Consensus (planner_panel_reopen_on_uphold
+  # checks the position and writes at most once per finding).
+  if declare -f planner_panel_reopen_on_uphold >/dev/null 2>&1; then
+    local _reopened
+    _reopened=$(planner_panel_reopen_on_uphold "$init" 2>/dev/null) || true
+    [ -n "$_reopened" ] && applied+=("panel-uphold:${_reopened// /,}")
   fi
 
   planner_state_write "$init" "META" "human-hold" "done" "round=${round} sha=${sha}" || return 1

@@ -17,6 +17,20 @@ marketplace. Where a release also moved `ticket-planner`, `fleet-controller`, or
 > - **0.19.0 never existed.** `plugin.json` went 0.18.0 → 0.20.0. The Phase 2
 >   commit message claims `0.19.0→0.20.0`, but no 0.19.0 was ever committed.
 
+## ticket-planner 0.45.0 (2026-11-13) — personas and the review panel wired (off by default)
+
+planner-persona-panel PR B of 2. ticket-auto-pipeline and fleet-controller unchanged.
+
+### Changed
+
+- **Authoring phases read as a job function.** With `PLANNER_PHASE_PERSONAS=true`, `planner_prompt_for_phase` adds a `## Your perspective` block before the `## Constraints` heading of the Appraisal, Discovery, Architecture, Specify, Epic Generation and Ticket Generation prompts. Review, Consensus and Completed get none. A prompt function called directly is unchanged, so every prompt pin keeps its value.
+- **Review panel wired.** With `PLANNER_PERSONA_PANEL=true`, the Review `pre` gate asks SKILL.md to spawn one reviewer per seat before the Review agent (`SPAWN NEXT=planner_panel_next APPLY=planner_panel_apply TIMEOUT=<ms>`; one combined `planner_review_lenses_next` line when the goldfish lens is due too). For an initiative whose panel ran, the Consensus prompt gets a `## Review panel` section: status lines, one disposition per blocker or major finding, conflicts between seats, and a `## Review Trail` section in each spec an accepted finding changed, which reaches the ticket body outside the Planner Context block.
+- **Only security and the product owner can stop the plan.** A `SEC-` or `PO-` blocker that Consensus does not accept in full becomes a `panel.<ID>` row of proposal.md's `## Parameters` table, so the existing stop before Crosscheck asks a person (`specify-param:panel.<ID>`). `overrule: <reason>` continues; `uphold` sends the plan back to Consensus once (`Review|panel-uphold` lines, written by answer intake).
+- **Crosscheck.** New family `planner_crosscheck_panel`: `PANEL_UNADDRESSED` (warn only) and `PANEL_STOP_SKIPPED` (blocking, released with `--accept`). Silent when no panel seat ran.
+- Run telemetry counts a seat's transcript (`panel: <INIT>:<seat>`) under Review. The router and answer intake source `planner-panel.sh`.
+
+With both flags off (the default), prompts, stdout and halt goldens are unchanged; each proposal version gets one `META|panel|skip … DISABLED` line and no `panel/` directory is written.
+
 ## ticket-planner 0.44.0 (2026-11-13) — persona lookups and review panel, dormant
 
 planner-persona-panel PR A of 2. ticket-auto-pipeline and fleet-controller unchanged (two catalog entries in `features.json`).

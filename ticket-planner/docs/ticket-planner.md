@@ -908,6 +908,119 @@ disposition is the first word of a ` — ` segment after the id: `accepted`, `re
 and nit findings are never checked. Without any terminal goldfish line the family is silent,
 so legacy initiatives and the halt goldens are unchanged. It never blocks.
 
+### Personas and the review panel
+
+planner-persona-panel. Two flags, both **opt-in** (default `false`) and independent of each
+other. With both off the planner's prompts, artifacts and halts are what they were.
+
+**Where the personas come from.** The persona files belong to `ticket-auto-pipeline`
+(`personas/base/*.md`, `personas/specializers/<group>/*.md`). `planner_persona_root`
+(`lib/planner-personas.sh`) looks for that plugin in `TICKET_AUTO_PLUGIN_ROOT`, then beside
+the planner's own plugin root, then at the installed plugin path. Bash reads the files and
+puts their text into the prompt, so no agent opens a file of the other plugin. When no
+`personas/base` is found, one `META|persona|skip|NOT_AVAILABLE` line is written per
+initiative and the planner runs as with the flags off.
+
+**`PLANNER_PHASE_PERSONAS=true`: an authoring phase reads as one job function.**
+
+| Phase | Persona |
+|---|---|
+| Appraisal | `product-owner` |
+| Discovery | `analyzer` |
+| Architecture | `architect`, plus `architect/microservices` or `architect/monolith` for the first affected repository |
+| Specify | `backend-developer` or `frontend-developer` with its stack specializer, for the first affected repository |
+| Epic Generation, Ticket Generation | `technical-writer` |
+| Review, Consensus, Completed | none |
+
+`planner_prompt_for_phase` builds the phase's prompt as before and then adds a
+`## Your perspective` block before its `## Constraints` heading (`planner_persona_apply`).
+The block says that the phase's task and constraints decide what is produced. The persona
+text is the file without its front matter and without `## Preferred Tools` and
+`## Composition Note`. The affected repository is the first git repository under
+`REPOS_ROOT` that `proposal.md`, else `appraisal.md`, names (`planner_persona_repos`). A
+prompt function called directly (`planner_prompt_specify …`) is unchanged, so every
+strip-and-hash pin holds.
+
+**`PLANNER_PERSONA_PANEL=true`: a panel reads the proposal before Review.**
+`planner_dispatch_gate pre <INIT> Review` calls `planner_panel_due` (`lib/planner-panel.sh`)
+beside the goldfish check. With a seat due it prints
+`SPAWN NEXT=planner_panel_next APPLY=planner_panel_apply TIMEOUT=<ms>`; when the goldfish
+lens is due too, one line names `planner_review_lenses_next` / `planner_review_lenses_apply`,
+which hand out both lists together, so SKILL.md step 1e starts every reviewer in one
+response. `PLANNER_PANEL_TIMEOUT` (seconds, default 600) bounds each spawn.
+
+**Seats** (`planner_panel_seats`, written to `panel/seats.txt` with the reason for each):
+
+| Seat | Prefix | Sits |
+|---|---|---|
+| `product-owner` | `PO` | always |
+| `architect` | `ARCH` | always |
+| `qa-engineer` | `QA` | always |
+| `security` | `SEC` | when `persona-select.sh` auto-includes it for the proposal text, or the text holds one of the security persona's `auto-include-when` words |
+| `developer` | `DEV` | the backend or frontend developer, with its specializer, for the first repository the proposal names |
+
+At most five seats. `PLANNER_PANEL_SEATS` (seat names, comma or space separated) narrows the
+panel and cannot add a seat.
+
+**What a reviewer sees and writes.** Agent `ticket-planner:panel-review-agent` (Read, Grep,
+Glob, Write), one spawn per seat. Its prompt holds the seat's persona text and names only
+`panel/input/` (a copy of `proposal.md`, `specs/*.md` and the idea as `intent.txt`), the git
+repositories under `REPOS_ROOT` and its own result path `panel/review-<seat>.md`. It never
+names `review.md`, the goldfish result or another seat's file; the Review prompt is
+unchanged and does not read the panel files. The result has a `**Proposal:** <sha12>` line,
+`## Findings` with at most 6 headings `### <PREFIX>-<n> — <blocker|major|minor|nit> — <title>`
+(or `None.`), and `## Files Read`.
+
+**One run per proposal version; not run is recorded.** Every decision is a `META|panel` line
+bound to `sha12`: `skip|<sha12> DISABLED | NOT_AVAILABLE | NO_PROPOSAL | NO_SEATS`,
+`start|<sha12> <seat> attempt=<n>`, `warn|<sha12> <seat> attempt=<n> <reason>`,
+`done|<sha12> <seat> findings=<N> bm=<ids> blockers=<ids>[ capped]` and
+`fail|<sha12> <seat> NOT_RUN <reason>`. A valid result on disk is reused without a spawn. A
+missing, malformed or contaminated result (a `## Files Read` path under `.ticket-auto/`
+outside `panel/input/`, or another seat's finding id that the input does not itself hold) is
+deleted and the seat is tried once more, then recorded as `NOT_RUN`. A seat that did not run
+never fails Review, and the other seats continue.
+
+**Consensus settles.** For an initiative whose panel ran, `planner_prompt_for_phase` adds a
+`## Review panel` section to the Consensus prompt (`planner_panel_consensus_rule`). Under a
+`## Panel` heading in consensus.md, Consensus copies the `planner_panel_status` lines (one
+per seat), writes one `### <ID> — <severity> — <title> — <disposition>` heading per blocker
+or major finding (`accepted`, `accepted in part (…)`, `rejected (…)` or `deferred (…)`), may
+batch minor and nit findings per seat, and lists under `### Conflicts` the findings of
+different seats that ask for opposite things, with the direction taken.
+
+**Only security and the product owner can stop the plan.** A `SEC-` or `PO-` blocker that
+Consensus does not mark `accepted` is not Consensus's to settle. It adds one row to
+proposal.md's `## Parameters` table: key `panel.<ID>`, kind `policy`, its own proposal as
+the Default, and Value `NEEDS_HUMAN_DECISION — <the objection and the proposal, in plain
+words>`. That is an ordinary open parameter row, so the existing second stop halts the loop
+before Crosscheck, the stop describer asks it as `specify-param:panel.<ID>`, and
+`resume --answers` records the answer; no halt, binding or card is new. The person answers
+`overrule: <reason>` (the plan continues and the reason stays in the row) or `uphold`. On
+`uphold`, answer intake calls `planner_panel_reopen_on_uphold`, which writes
+`Review|panel-uphold|start` and `…|done`: the latest completed phase is then Review, so the
+loop runs Consensus again, and its prompt says an upheld finding must end as `accepted`.
+This happens once per finding. A parameter row cannot be deferred; answer `overrule:` with
+the reason to decide later.
+
+**The trail reaches the tickets.** Consensus keeps a `## Review Trail` section in each spec
+it changed for an accepted finding (`- QA-2 (qa-engineer): added acceptance criterion 4`).
+`planner_ticket_body_compose` copies spec sections into the ticket body, so the list is in
+the ticket, before and outside the Planner Context block.
+
+**Crosscheck** (`planner_crosscheck_panel`, `lib/planner-crosscheck-panel.sh`, after the
+goldfish family; silent when no seat ran):
+
+- `PANEL_UNADDRESSED` (warn only): a blocker or major finding of the latest panel run with
+  no disposition heading under `## Panel`, or a seat with no status line.
+- `PANEL_STOP_SKIPPED` (blocking): a security or product-owner blocker that is neither
+  `accepted` nor carried by a `panel.<ID>` row, or one the owner upheld that is still not
+  `accepted`. Release with `resume <INIT> --accept PANEL_STOP_SKIPPED:"reason"`.
+
+**Telemetry.** A seat's transcript (`panel: <INIT>:<seat>`) counts under Review, like the
+goldfish lens. Seats run and findings per seat are the `META|panel|done` lines; a panel stop
+is a `META|specify-param|step|panel.<ID> answered` line.
+
 ### Resolving against the ref Discovery explored, not whatever REPOS_ROOT is now ([#217](https://github.com/willard-pro/claude-plugins/issues/217))
 
 REPOS_ROOT is a shared checkout — it can move to a different branch between

@@ -56,6 +56,21 @@
 #   planner_review_lenses_next <INIT> / planner_review_lenses_apply <INIT>
 #                                     the goldfish lens and the panel as one
 #                                     spawn list, for a Review that has both
+#   planner_panel_ran <INIT>          rc 0 when the latest run has a seat line
+#   planner_panel_dispositions <consensus.md>
+#                                     `status <seat>` and `disp <ID> <word>`
+#                                     lines of the `## Panel` section
+#   planner_panel_stop_rows <INIT>    the `panel.<ID>` rows of `## Parameters`:
+#                                     <ID>\t<open|uphold|overrule|other>
+#   planner_panel_reopen_on_uphold <INIT>
+#                                     send an upheld objection back to
+#                                     Consensus (answer intake calls it)
+#   planner_panel_consensus_rule <INIT> <state_dir>
+#                                     the Consensus prompt's panel section
+#   planner_panel_prompt_apply <phase> <INIT> <state_dir>
+#                                     filter: add that section to the
+#                                     Consensus prompt of an initiative whose
+#                                     panel ran
 #
 # Flag: PLANNER_PERSONA_PANEL (default false), read by planner_panel_due only
 # and recorded once per proposal version, so a resume never re-decides it.
@@ -762,4 +777,202 @@ planner_review_lenses_next() {
 planner_review_lenses_apply() {
   declare -f planner_goldfish_apply >/dev/null 2>&1 && planner_goldfish_apply "$1"
   planner_panel_apply "$1"
+}
+
+# ── Consensus and the owner's ruling (design D5 to D7) ───────────────────────
+
+# planner_panel_ran <INIT> — rc 0 when the latest panel run has at least one
+# seat line (done or fail). A disabled or unavailable panel has none.
+planner_panel_ran() {
+  local res
+  res=$(planner_panel_results "$1")
+  [ -n "$res" ] || return 1
+  case "$res" in "-"$'\t'*) return 1 ;; esac
+  return 0
+}
+
+# planner_panel_dispositions <consensus.md> — what the `## Panel` section of
+# consensus.md settles, fence-aware:
+#   status <seat>           a line beginning `Panel <seat> (`
+#   disp <ID> <word>        a `### <ID> — … — <disposition>` heading; <word> is
+#                           accepted, partial (`accepted in part`), rejected
+#                           or deferred
+# Headings outside the section do not count.
+planner_panel_dispositions() {
+  [ -f "$1" ] || return 0
+  # shellcheck disable=SC2016  # awk program, not shell
+  _planner_panel_awk '
+    BEGIN { sep = " \342\200\224 " }
+    { sub(/\r$/, "") }
+    /^(```|~~~)/ { fence = !fence; next }
+    fence { next }
+    /^## / { s = $0; sub(/[ \t]+$/, "", s); insec = (s == "## Panel"); next }
+    !insec { next }
+    /^Panel [a-z-]+ \(/ { seat = $2; print "status " seat; next }
+    /^### [A-Z]+-[0-9]/ {
+      h = substr($0, 5)
+      i = index(h, sep)
+      if (i == 0) next
+      id = substr(h, 1, i - 1)
+      if (id !~ /^[A-Z]+-[0-9]+$/) next
+      rest = substr(h, i + length(sep))
+      while (rest != "") {
+        j = index(rest, sep)
+        if (j == 0) { seg = rest; rest = "" } else { seg = substr(rest, 1, j - 1); rest = substr(rest, j + length(sep)) }
+        sub(/^[ \t*_]+/, "", seg)
+        low = tolower(seg)
+        w = low; sub(/[^a-z].*$/, "", w)
+        if (w == "accepted") {
+          if (low ~ /^accepted[ \t-]+in[ \t-]+part/) print "disp " id " partial"
+          else print "disp " id " accepted"
+          break
+        }
+        if (w == "rejected" || w == "deferred") { print "disp " id " " w; break }
+      }
+    }
+  ' "$1" 2>/dev/null
+}
+
+# planner_panel_stop_rows <INIT> — the `panel.<ID>` rows of proposal.md's
+# `## Parameters` table, one line per row: <ID>\t<open|uphold|overrule|other>.
+# `open` is a row still waiting for a person; the other three are a person's
+# answer (Source `human:…`), by its first word.
+planner_panel_stop_rows() {
+  local init="$1"
+  declare -f planner_params_rows >/dev/null 2>&1 || {
+    [ -f "${_PLANNER_PANEL_LIB_DIR}/planner-specify-params.sh" ] || return 0
+    source "${_PLANNER_PANEL_LIB_DIR}/planner-specify-params.sh"
+  }
+  # Columns: <line>\t<key>\t<kind>\t<name>\t<default>\t<value>\t<source>;
+  # cells may be empty, so awk -F, never `IFS=$'\t' read`.
+  # shellcheck disable=SC2016  # awk program, not shell
+  planner_params_rows "$init" 2>/dev/null | _planner_panel_awk -F'\t' '
+    index($2, "panel.") != 1 { next }
+    {
+      id = substr($2, 7)
+      if (id !~ /^[A-Z]+-[0-9]+$/) next
+      v = tolower($6); sub(/^[ \t"\047]+/, "", v)
+      if (index($7, "human:") != 1) state = "open"
+      else if (index(v, "uphold") == 1) state = "uphold"
+      else if (index(v, "overrule") == 1) state = "overrule"
+      else state = "other"
+      print id "\t" state
+    }'
+}
+
+# planner_panel_reopen_on_uphold <INIT> — a person upheld a security or
+# product-owner objection (`uphold` in its `panel.<ID>` row) that consensus.md
+# does not mark `accepted`: Consensus must run again with it as a constraint.
+# The planner has no backward transition, so this records
+# `Review|panel-uphold|start` and `…|done`: the latest completed phase is then
+# Review and planner_position_derive returns Consensus. Only when the
+# position is Crosscheck, and once per finding id: a Consensus that still
+# does not accept it is left to Crosscheck (PANEL_STOP_SKIPPED).
+# Prints the ids it reopened for; rc 0.
+planner_panel_reopen_on_uphold() {
+  local init="$1" dir log rows disp id state ids=""
+  dir=$(planner_initiative_dir "$init" 2>/dev/null) || return 0
+  log=$(planner_state_log "$init" 2>/dev/null) || return 0
+  [ -f "$log" ] || return 0
+  [ "$(planner_position_derive "$init" 2>/dev/null)" = "Crosscheck" ] || return 0
+  rows=$(planner_panel_stop_rows "$init")
+  [ -n "$rows" ] || return 0
+  disp=$(planner_panel_dispositions "${dir}/artifacts/consensus.md")
+  while IFS=$'\t' read -r id state; do
+    [ "$state" = "uphold" ] || continue
+    grep -qxF "disp ${id} accepted" <<<"$disp" && continue
+    grep -qE "^[^|]*\|Review\|panel-uphold\|done\|(.* )?${id}( |\$)" "$log" 2>/dev/null && continue
+    ids="${ids:+${ids} }${id}"
+  done <<<"$rows"
+  [ -n "$ids" ] || return 0
+  planner_state_write "$init" Review panel-uphold start "${ids}" >/dev/null 2>&1 || return 0
+  planner_state_write "$init" Review panel-uphold done \
+    "${ids} upheld by the owner: Consensus runs again with the objection as a constraint" >/dev/null 2>&1
+  printf '%s\n' "$ids"
+}
+
+# planner_panel_consensus_rule <INIT> <state_dir> — the Consensus prompt's
+# panel section. Only a prompt of an initiative whose panel ran gets it
+# (planner_panel_prompt_apply), so a flag-off Consensus prompt is unchanged.
+planner_panel_consensus_rule() {
+  local init="$1" state_dir="$2"
+  cat <<RULE
+## Review panel (planner-persona-panel)
+
+Before Review, a panel read the proposal: one reviewer per job function, each
+on its own. Their files are ${state_dir}/panel/review-<seat>.md. Settle them in
+consensus.md under a \`## Panel\` heading, in this order:
+
+1. **Status lines.** Copy verbatim what this prints (source
+   \`lib/planner-panel.sh\` as in the State log block):
+   \`planner_panel_status "${init}"\`. Read the file of every seat whose line
+   says \`ran\`. A seat that says \`NOT RUN\` has unknown findings, not zero:
+   never call the proposal panel-clean for it.
+2. **One heading per blocker or major finding**, by its id:
+   \`### <ID> — <severity> — <title> — <disposition>\`, then what you changed.
+   A disposition is \`accepted\` (the proposal and specs now do all the finding
+   asks), \`accepted in part (<what you left out and why>)\`,
+   \`rejected (<why>, citing proposal § | spec <slug> | upstream artifact § | code path)\`
+   or \`deferred (<to which later ticket or decision>)\`. Findings that say the
+   same thing each keep their own heading; the text may point at the other id.
+3. **Minor and nit findings** may share one line per seat:
+   \`Minor/nit QA-3, QA-4: deferred\`.
+4. **\`### Conflicts\`** — every pair of findings from different seats that ask
+   for opposite things: both ids, which way it went and why. \`None.\` when
+   there is none.
+5. **Security and the product owner can stop the plan.** A \`SEC-\` or \`PO-\`
+   finding of severity blocker that you do not mark \`accepted\` is not yours
+   to settle. Add one row for it to proposal.md's \`## Parameters\` table
+   (replace \`None.\` with the table when needed), with the key in backticks
+   as in every other row:
+
+       | Panel objection <ID> | panel.<ID> | policy | <what you propose, one line> | NEEDS_HUMAN_DECISION — The <security reviewer or product owner> objects: <the objection in plain words, one line>. The plan proposes: <one line>. Answer "uphold" to follow the objection, or "overrule: <reason>" to keep the plan. | — |
+
+   The run then stops before Crosscheck until a person answers. Findings from
+   every other seat never stop the plan: you settle them.
+6. **A \`panel.<ID>\` row with a \`human:\` Source was answered by a person.**
+   Never change the row. When its Value starts with \`uphold\`, the objection
+   stands: accept that finding in full now, change the proposal and the specs,
+   and write its disposition as \`accepted\`. When it starts with \`overrule\`,
+   keep the plan and end that finding's heading with
+   \` — overruled by the owner: <their reason>\`.
+7. **The trail reaches the tickets.** In every spec whose scope or acceptance
+   criteria you changed for a finding you marked \`accepted\` or
+   \`accepted in part\`, keep a \`## Review Trail\` section directly before
+   \`## Labels\`: one line per finding,
+   \`- <ID> (<seat>): <what changed in this ticket>\`, for example
+   \`- QA-2 (qa-engineer): added acceptance criterion 4\`. Bash copies the
+   section into the ticket, outside the Planner Context block. A spec that no
+   accepted finding changed gets no such section, and a line never names an
+   id without a heading under \`## Panel\`.
+RULE
+}
+
+# planner_panel_prompt_apply <phase> <INIT> <state_dir> — stdin to stdout. For
+# an initiative whose panel ran, the Consensus prompt gets the panel section
+# before its last `## Constraints` heading. Every other prompt, and every
+# prompt of an initiative with no panel run, passes through byte for byte.
+# (Ticket Generation needs no rule: its bodies are composed in bash, which
+# carries a spec's `## Review Trail` section into the ticket.)
+planner_panel_prompt_apply() {
+  local phase="$1" init="$2" state_dir="$3" prompt block
+  prompt=$(cat && printf x)
+  prompt="${prompt%x}"
+  if [ "$phase" != "Consensus" ] || ! planner_panel_ran "$init"; then
+    printf '%s' "$prompt"
+    return 0
+  fi
+  block=$(planner_panel_consensus_rule "$init" "$state_dir")
+  # shellcheck disable=SC2016  # awk program, not shell
+  printf '%s' "$prompt" | PPN_BLOCK="$block" _planner_panel_awk '
+    { line[NR] = $0 }
+    /^(```|~~~)/ { fence = !fence; next }
+    !fence && /^## Constraints[ \t]*$/ { at = NR }
+    END {
+      for (i = 1; i <= NR; i++) {
+        if (i == at) { print ENVIRON["PPN_BLOCK"]; print "" }
+        print line[i]
+      }
+    }
+  '
 }

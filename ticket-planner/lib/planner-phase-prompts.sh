@@ -53,6 +53,15 @@ _source_if_missing "planner_acpre_prompt_rules" \
 _source_if_missing "planner_goldfish_consensus_rule" \
   "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/planner-goldfish.sh"
 
+# The persona block of the authoring phases and the Consensus panel section
+# (planner-persona-panel). Both are added by planner_prompt_for_phase after a
+# prompt is built, never inside a prompt's own text, so a prompt function
+# called directly returns what it always did.
+_source_if_missing "planner_persona_apply" \
+  "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/planner-personas.sh"
+_source_if_missing "planner_panel_prompt_apply" \
+  "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/planner-panel.sh"
+
 # Resolved plugin root, memoized per shell. Empty until first resolution.
 _PLANNER_PROMPT_LIB_ROOT="${_PLANNER_PROMPT_LIB_ROOT:-}"
 
@@ -2471,6 +2480,39 @@ planner_prompt_for_phase() {
   # preamble points at a nonexistent lib dir would fail inside the spawned agent
   # with no state log entry — fail here instead, where the operator sees it.
   planner_prompt_lib_root >/dev/null || return 5
+
+  # planner-persona-panel: with PLANNER_PHASE_PERSONAS on, an authoring phase
+  # gets its persona block; for an initiative whose review panel ran,
+  # Consensus gets the panel section. Otherwise the prompt is printed as built.
+  local _persona=0 _panel=0 _built
+  if declare -f planner_persona_phases_enabled >/dev/null 2>&1 && planner_persona_phases_enabled; then
+    _persona=1
+  fi
+  if [ "$phase" = "Consensus" ] && declare -f planner_panel_ran >/dev/null 2>&1 &&
+    planner_panel_ran "$initiative_id" 2>/dev/null; then
+    _panel=1
+  fi
+  if [ "$_persona" -eq 1 ] || [ "$_panel" -eq 1 ]; then
+    _built=$(_planner_prompt_build "$phase" "$initiative_id" "$idea" "$state_dir" && printf x) || return $?
+    _built="${_built%x}"
+    if [ "$_persona" -eq 1 ]; then
+      _built=$(printf '%s' "$_built" | planner_persona_apply "$phase" "$initiative_id" && printf x)
+      _built="${_built%x}"
+    fi
+    if [ "$_panel" -eq 1 ]; then
+      _built=$(printf '%s' "$_built" | planner_panel_prompt_apply "$phase" "$initiative_id" "$state_dir" && printf x)
+      _built="${_built%x}"
+    fi
+    printf '%s' "$_built"
+    return 0
+  fi
+  _planner_prompt_build "$phase" "$initiative_id" "$idea" "$state_dir"
+}
+
+# _planner_prompt_build <phase> <initiative_id> <idea> <state_dir> — the
+# phase's own prompt.
+_planner_prompt_build() {
+  local phase="$1" initiative_id="$2" idea="$3" state_dir="$4"
 
   case "$phase" in
   Appraisal) planner_prompt_appraisal "$initiative_id" "$idea" "$state_dir" ;;
