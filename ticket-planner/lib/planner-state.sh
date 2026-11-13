@@ -269,8 +269,9 @@ PLANNER_CONFIG_KEYS="stop-after create-authorized linear-team linear-team-id lin
 # `draft-readiness` is a gate run (start … done), repeatable by design: every
 # run of the draft readiness gate writes its own done line (S2b).
 # `goldfish` (planner-goldfish-review) records one terminal line per proposal
-# version; every version's lines are kept.
-PLANNER_REPEATABLE_META_STEPS="refinement-round refinement-converge refinement-dispute refinement-after-completed draft-readiness draft-revise goldfish"
+# version; every version's lines are kept. `panel` (planner-persona-panel)
+# records one terminal line per proposal version and seat.
+PLANNER_REPEATABLE_META_STEPS="refinement-round refinement-converge refinement-dispute refinement-after-completed draft-readiness draft-revise goldfish panel"
 
 # Is <step> a config key rather than a progress marker?
 # Usage: _planner_is_config_key <step>

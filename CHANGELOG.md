@@ -17,6 +17,16 @@ marketplace. Where a release also moved `ticket-planner`, `fleet-controller`, or
 > - **0.19.0 never existed.** `plugin.json` went 0.18.0 → 0.20.0. The Phase 2
 >   commit message claims `0.19.0→0.20.0`, but no 0.19.0 was ever committed.
 
+## ticket-planner 0.44.0 (2026-11-13) — persona lookups and review panel, dormant
+
+planner-persona-panel PR A of 2. ticket-auto-pipeline and fleet-controller unchanged (two catalog entries in `features.json`).
+
+### Added (dormant)
+
+- `lib/planner-personas.sh`: finds the persona files of `ticket-auto-pipeline` (`TICKET_AUTO_PLUGIN_ROOT`, then the directory beside the planner, then the installed plugin path), picks the persona of each authoring phase (Appraisal the product owner, Discovery the analyzer, Architecture the architect, Specify the developer for the stack, Epic and Ticket Generation the technical writer) and renders it as a `## Your perspective` block. When no persona directory is found it writes one `META|persona|skip|NOT_AVAILABLE` line and changes nothing.
+- `lib/planner-panel.sh` and `agents/panel-review-agent.md`: a review panel of up to five seats (product owner, architect and QA engineer always; security and one developer when the proposal calls for them), one result per seat and proposal version under `panel/`, at most 6 findings with the seat's id prefix (`PO`, `ARCH`, `QA`, `SEC`, `DEV`). A missing, malformed or contaminated result is retried once and then recorded as `META|panel|fail … NOT_RUN`. `planner_review_lenses_next` / `_apply` hand out the goldfish lens and the panel as one spawn list.
+- Flags `PLANNER_PHASE_PERSONAS` and `PLANNER_PERSONA_PANEL`, both default `false`. Nothing calls the new code yet: prompts, gates and halts are unchanged.
+
 ## grill-me 0.6.0 (2026-11-13) — starting state, defaults and failure behaviour in the product-idea profile
 
 Profile `product-idea` 1.2.0, no weight or critical-set change. A dispatch-rehearsal intent claimed an
