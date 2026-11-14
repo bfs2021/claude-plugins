@@ -797,6 +797,40 @@ if need "$name" planner_ownership_edges_write; then
   check "$name: removed when no edges" "$([ -e "$(SC)" ] && echo present || echo absent)" "absent"
 fi
 
+name="append writer: no edge when an owner writes the key (rehearsal F52)"
+if need "$name" planner_ownership_edges_write; then
+  fresh
+  planner_ownership_contract_mark "$INIT"
+  # foundation seeds articles; create-api appends more; read-api only reads.
+  ospec foundation 'user=create;article=create' ''
+  ospec create-api 'article=append' 'user.id=spec'
+  ospec read-api '' 'article.slug=spec;article.title=spec;user.username=spec'
+  ew >/dev/null
+  check "$name" "$(edges)" "create-api>foundation:user.id read-api>foundation:article.slug,article.title,user.username"
+fi
+
+name="append writers only: every appender stays a blocker"
+if need "$name" planner_ownership_edges_write; then
+  fresh
+  planner_ownership_contract_mark "$INIT"
+  ospec audit-a 'audit_log=append' ''
+  ospec audit-b 'audit_log=append' ''
+  ospec report '' 'audit_log.entry=spec'
+  ew >/dev/null
+  check "$name" "$(edges)" "report>audit-a:audit_log.entry report>audit-b:audit_log.entry"
+fi
+
+name="append writer stays a blocker when the other writer only updates a field"
+if need "$name" planner_ownership_edges_write; then
+  fresh
+  planner_ownership_contract_mark "$INIT"
+  ospec publish 'article=append' ''
+  ospec moderate 'article.status=update' ''
+  ospec listing '' 'article=spec'
+  ew >/dev/null
+  check "$name" "$(edges)" "listing>moderate:article listing>publish:article"
+fi
+
 name="no edges → no file"
 if need "$name" planner_ownership_edges_write; then
   fresh
