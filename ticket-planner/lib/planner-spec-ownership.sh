@@ -157,7 +157,11 @@ one table directly under the heading.
 - One spec owns each key; another spec that needs it reads it. Declare every
   write and read the spec makes.
 - Crosscheck adds the `blocked-by` edge for each `spec` read and each `trigger`
-  itself, so do not add a `## Labels` `blocked-by:` only for that.
+  itself, so do not add a `## Labels` `blocked-by:` only for that. A `spec`
+  read waits for the spec that `create`s the key, not for one that only
+  `append`s to it;
+  if a criterion needs rows that an appending spec adds, put that spec in
+  `## Labels` `blocked-by:`.
 RULES
 }
 
@@ -642,7 +646,14 @@ _planner_own_key_matches() {
 # per edge key, sorted and unique under LC_ALL=C, from valid rows of checked
 # specs only:
 #   - a read whose effective source is `spec` (written `spec`, or a failed
-#     `code:` anchor) → every other spec with a matching data write;
+#     `code:` anchor) → every other spec with a matching data write, except
+#     that an `append` writer is skipped when another spec `create`s a
+#     matching key: the creator already provides the rows, and an
+#     appender (a co-writer by definition) is not a prerequisite for every
+#     reader (rehearsal F52: a read-api blocked on create-api's `article`
+#     append while the seeding spec owned `article`, closing a cycle with the
+#     plan's own read → create edge). No `create` writer (only appenders,
+#     updaters, transitions) → edges to all of them;
 #   - a `trigger` row → every other spec that fires the key.
 # A verified `code:`, a `framework:` or an `external:` read gives none, nor
 # does a read of an effect key or of a key the spec writes itself (the same
@@ -667,12 +678,12 @@ _planner_own_edges_compute() {
         EFFECT[$key]=1
         ;;
       trigger) EFFECT[$key]=1 ;;
-      *) DW[$key]+="${slug}"$'\n' ;;
+      *) DW[$key]+="${slug}"$'\t'"${val}"$'\n' ;;
       esac
     done <<<"${W[$slug]}"
   done < <(find "$specs_dir" -maxdepth 1 -type f -name '*.md' 2>/dev/null | LC_ALL=C sort)
 
-  local src wk wop own eff ws
+  local src wk wop own eff ws mw has_owner
   for slug in "${slugs[@]}"; do
     while IFS=$'\t' read -r ln key src; do
       [ -n "$key" ] || continue
@@ -686,13 +697,22 @@ _planner_own_edges_compute() {
       [ "$own" -eq 1 ] && continue
       eff=$(planner_ownership_read_effective "$init" "$src" "$key")
       [ "${eff%%$'\t'*}" = spec ] || continue
+      # Matching writers as `<slug>\t<op>`; a `create` writer (the rows' owner) hides
+      # the appenders.
+      mw="" has_owner=0
       for wk in "${!DW[@]}"; do
         _planner_own_key_matches "$key" "$wk" || continue
-        while IFS= read -r ws; do
+        while IFS=$'\t' read -r ws wop; do
           [ -n "$ws" ] && [ "$ws" != "$slug" ] || continue
-          printf '%s\t%s\t%s\n' "$slug" "$ws" "$key"
+          mw+="${ws}"$'\t'"${wop}"$'\n'
+          [ "$wop" = create ] && has_owner=1
         done <<<"${DW[$wk]}"
       done
+      while IFS=$'\t' read -r ws wop; do
+        [ -n "$ws" ] || continue
+        [ "$has_owner" -eq 1 ] && [ "$wop" = append ] && continue
+        printf '%s\t%s\t%s\n' "$slug" "$ws" "$key"
+      done <<<"$mw"
     done <<<"${R[$slug]}"
     while IFS=$'\t' read -r ln key val; do
       [ "$val" = trigger ] || continue

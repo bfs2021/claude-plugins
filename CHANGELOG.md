@@ -17,6 +17,19 @@ marketplace. Where a release also moved `ticket-planner`, `fleet-controller`, or
 > - **0.19.0 never existed.** `plugin.json` went 0.18.0 → 0.20.0. The Phase 2
 >   commit message claims `0.19.0→0.20.0`, but no 0.19.0 was ever committed.
 
+## ticket-planner 0.43.4 (2026-11-14) — dispatch-rehearsal iteration 07 finding
+
+- **Ownership edges: an `append` writer no longer blocks every reader (F52).**
+  Crosscheck derived a `blocked-by` edge from each `spec` read to every spec with a
+  matching data write, appenders included. A read API that only reads seeded rows
+  was blocked on the create API that appends articles, which closed a
+  `DEPENDENCY_CYCLE` with the plan's own read → create edge and halted Crosscheck.
+  A read now waits for the spec that `create`s the key; an `append` writer
+  gives an edge only when no spec creates it (an `update`-only writer does not
+  hide it). The Specify/Consensus
+  rules text says to put an appending spec in `## Labels` when a criterion needs
+  its rows.
+
 ## 0.117.3 (2026-11-14) — dispatch-rehearsal iteration 06 findings (ticket-planner 0.43.3)
 
 - **dor-semantic parser: an over-long scan PARAPHRASE is cut, not rejected (F49).**

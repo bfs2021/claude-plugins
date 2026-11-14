@@ -639,7 +639,7 @@ OWN_SPECIFY_HEADINGS=', `## Writes`, `## Reads`'
 # The prompts as they were before planner-ac-code-precondition, i.e. as
 # planner-crosscheck-ownership PR B left them (intermediate pins, design D12),
 # and the lines that change inserted (task 5.4).
-SPECIFY_PRE_ACPRE_SHA="93bbc0bb60710543ba7928ade772f06a57e6f82574e997f41d9bfd4a59fee06a"
+SPECIFY_PRE_ACPRE_SHA="c0ba2fa706aae662e817941b045c83a85b4588841f31b25de8dfe63b633c0a7a"
 CONSENSUS_PRE_ACPRE_SHA="5273988daab593aa79d78e700c9ac45ca52467ccd1f25fc908be24f9b9abf570"
 ACPRE_SPECIFY_BULLET='8. **## Preconditions** — the stored starting state each acceptance criterion needs (rules below)'
 ACPRE_SPECIFY_HEADINGS=', `## Preconditions`'
