@@ -228,7 +228,7 @@ planner_draft_readiness_begin() {
   for vf in "$root"/*/verdict; do
     [ -f "$vf" ] || continue
     if [ "$(cut -d' ' -f3 "$vf")" = "unavailable" ]; then
-      rm -f "$vf" "$(dirname "$vf")/semantic.json" "$(dirname "$vf")/attempts"
+      rm -f "$vf" "$(dirname "$vf")/semantic.json" "$(dirname "$vf")/attempts" "$(dirname "$vf")/last-failure"
     fi
   done
 
@@ -337,20 +337,54 @@ planner_draft_readiness_next() {
   printf '%s' "$out"
 }
 
-# One failed attempt for <slug> on <hash>: the result files go, and the
-# second failure makes the verdict `unavailable` (blocks).
+# _planner_draft_fail <INIT> <slug> <hash> [<reason>]
+# One failed attempt for <slug> on <hash>. The result files move aside as
+# scan-result.rejected.txt / audit-result.rejected.txt (the last attempt's
+# kept for diagnosis, rehearsal F50) so the next attempt starts clean, and
+# <reason> goes to `last-failure`. The second failure makes the verdict
+# `unavailable` (blocks); semantic.json carries the reason, which the gate's
+# `fail|<slug> SEMANTIC_UNAVAILABLE "<reason>"` line then shows.
 _planner_draft_fail() {
-  local init="$1" slug="$2" hash="$3" dir n
+  local init="$1" slug="$2" hash="$3" reason="${4:-}" dir n f
   dir="$(planner_draft_readiness_root "$init")/${slug}"
   n=$(($(_planner_draft_attempts "$init" "$slug" "$hash") + 1))
   printf '%s %s\n' "$hash" "$n" >"${dir}/attempts"
-  rm -f "${dir}/scan-result.txt" "${dir}/audit-result.txt"
+  reason=$(printf '%s' "${reason:-unknown}" | tr '\t\r\n' '   ' | cut -c1-300)
+  printf 'attempt %s: %s\n' "$n" "$reason" >"${dir}/last-failure"
+  for f in scan-result audit-result; do
+    if [ -f "${dir}/${f}.txt" ]; then
+      mv -f "${dir}/${f}.txt" "${dir}/${f}.rejected.txt"
+    fi
+  done
   if [ "$n" -ge "$PLANNER_DRAFT_MAX_ATTEMPTS" ]; then
-    jq -nc --arg e "${DOR_SEMANTIC_EVALUATOR:-}" --arg h "$hash" \
-      '{evaluator: $e, body_hash: $h, unavailable: true, findings: [], gaps: {}, audit: [], missed: []}' \
+    jq -nc --arg e "${DOR_SEMANTIC_EVALUATOR:-}" --arg h "$hash" --arg r "$reason" \
+      '{evaluator: $e, body_hash: $h, unavailable: true, reason: $r, findings: [], gaps: {}, audit: [], missed: []}' \
       >"${dir}/semantic.json"
     planner_draft_readiness_verdict_write "$init" "$slug" "$hash" "${DOR_SEMANTIC_EVALUATOR:-}" unavailable
   fi
+}
+
+# _pdl_parse_one <parser> scan|audit <dir>
+# Parses <dir>/<kind>-result.txt. On success prints the parsed JSON (rc 0).
+# On failure prints the reason (rc 1): the parser's parse_error, else its
+# last stderr line (rehearsal F50: the reason used to be thrown away).
+_pdl_parse_one() {
+  local parse="$1" kind="$2" dir="$3" out err rc=0
+  local -a extra=()
+  [ "$kind" = "audit" ] && extra=(--det-result "${dir}/dor-result.json")
+  err=$(mktemp) || return 1
+  out=$(bash "$parse" --kind "$kind" --result-file "${dir}/${kind}-result.txt" "${extra[@]}" 2>"$err") || rc=$?
+  if [ "$rc" -eq 0 ]; then
+    rm -f "$err"
+    printf '%s' "$out"
+    return 0
+  fi
+  local why
+  why=$(printf '%s' "$out" | jq -r '.parse_error // empty' 2>/dev/null) || why=""
+  [ -n "$why" ] || why=$(grep -v 'WARN' "$err" | tail -1)
+  rm -f "$err"
+  printf '%s %s' "$kind" "${why:-parser exit ${rc}}"
+  return 1
 }
 
 # planner_draft_readiness_apply <INIT> [<refresh-output>]
@@ -377,7 +411,7 @@ planner_draft_readiness_apply() {
   if [ -f "${root}/.pending" ]; then
     while IFS=$'\t' read -r slug kind type pf rf; do
       [ -n "$slug" ] || continue
-      [ -s "$rf" ] || failed[$slug]=1
+      [ -s "$rf" ] || failed[$slug]="${failed[$slug]:+${failed[$slug]}, }no ${kind} result written"
     done <"${root}/.pending"
     rm -f "${root}/.pending"
   fi
@@ -385,15 +419,21 @@ planner_draft_readiness_apply() {
     [ "$status" = "stale" ] || continue
     dir="${root}/${slug}"
     if [ -n "${failed[$slug]:-}" ]; then
-      _planner_draft_fail "$init" "$slug" "$hash"
+      _planner_draft_fail "$init" "$slug" "$hash" "${failed[$slug]}"
       continue
     fi
     [ -s "${dir}/scan-result.txt" ] && [ -s "${dir}/audit-result.txt" ] || continue
     local scan_json audit_json eval_json verdict=ready
-    if ! scan_json=$(bash "$parse" --kind scan --result-file "${dir}/scan-result.txt" 2>/dev/null) ||
-      ! audit_json=$(bash "$parse" --kind audit --result-file "${dir}/audit-result.txt" --det-result "${dir}/dor-result.json" 2>/dev/null) ||
-      ! eval_json=$(_pdl_evaluate "$(_planner_draft_tid "$slug")" "$dir" "$scan_json" "$audit_json"); then
-      _planner_draft_fail "$init" "$slug" "$hash"
+    if ! scan_json=$(_pdl_parse_one "$parse" scan "$dir"); then
+      _planner_draft_fail "$init" "$slug" "$hash" "$scan_json"
+      continue
+    fi
+    if ! audit_json=$(_pdl_parse_one "$parse" audit "$dir"); then
+      _planner_draft_fail "$init" "$slug" "$hash" "$audit_json"
+      continue
+    fi
+    if ! eval_json=$(_pdl_evaluate "$(_planner_draft_tid "$slug")" "$dir" "$scan_json" "$audit_json"); then
+      _planner_draft_fail "$init" "$slug" "$hash" "evaluation of the parsed scan and audit failed"
       continue
     fi
     # A revision that raised a new structural finding is reverted, not judged.
@@ -423,7 +463,7 @@ _planner_draft_findings() {
   local dir="$1"
   [ -f "${dir}/dor-result.json" ] && jq -r '(.missing // [])[] | . + "\t"' "${dir}/dor-result.json" 2>/dev/null
   [ -f "${dir}/semantic.json" ] && jq -r '
-    if .unavailable == true then "SEMANTIC_UNAVAILABLE\t"
+    if .unavailable == true then "SEMANTIC_UNAVAILABLE\t\(.reason // "")"
     else
       ((.findings // [])[] | select(.verified == true and .severity == "blocking")
         | "\(.code)\t\((.quote // .detail // "") | tostring | gsub("[\t\r\n]"; " "))"),
@@ -452,7 +492,7 @@ planner_draft_readiness_gate() {
     [ -n "$slug" ] || continue
     total=$((total + 1))
     dir="${root}/${slug}"
-    local lines=""
+    local lines="" judged=0
     if [ "$status" = "error" ]; then
       lines="DRAFT_COMPOSE_FAILED"$'\t'
     else
@@ -461,6 +501,7 @@ planner_draft_readiness_gate() {
       if [ "$v_hash" != "$hash" ] || [ "$v_eval" != "${DOR_SEMANTIC_EVALUATOR:-}" ]; then
         lines="SEMANTIC_UNAVAILABLE"$'\t'"no verdict for the current draft"
       else
+        judged=1
         lines=$(_planner_draft_findings "$dir")
         if [ -z "$lines" ] && [ "$v_status" != "ready" ]; then
           lines="SEMANTIC_${v_status^^}"$'\t'
@@ -468,12 +509,24 @@ planner_draft_readiness_gate() {
       fi
     fi
     [ -n "$lines" ] || continue
-    blocked=$((blocked + 1))
+    # A code in PLANNER_DRAFT_WARN_CODES (default: the evaluator's own output
+    # could not be read, or a gap had no backing finding) says the draft was
+    # not judged, not that it is not ready: it warns, and Refinement judges
+    # the ticket again after create (block audit, iterations 01-06: none of
+    # these blocks was a real defect). "no verdict for the current draft"
+    # (the loop never judged it) still blocks.
+    local warn_codes=" ${PLANNER_DRAFT_WARN_CODES-SEMANTIC_UNAVAILABLE SEMANTIC_UNVERIFIED} " nblock=0
     while IFS=$'\t' read -r code quote; do
       [ -n "$code" ] || continue
       quote=$(printf '%s' "$quote" | tr '\n\r"' "  '")
-      planner_state_write "$init" "META" "draft-readiness" "fail" "${slug} ${code} \"${quote}\""
+      if [ "$judged" = 1 ] && [[ "$warn_codes" == *" ${code} "* ]]; then
+        planner_state_write "$init" "META" "draft-readiness" "warn" "${slug} ${code} \"${quote}\""
+      else
+        planner_state_write "$init" "META" "draft-readiness" "fail" "${slug} ${code} \"${quote}\""
+        nblock=$((nblock + 1))
+      fi
     done <<<"$lines"
+    [ "$nblock" -gt 0 ] && blocked=$((blocked + 1))
   done <<<"$refresh"
 
   _pdl_spawns_close "$init"
@@ -493,6 +546,18 @@ planner_draft_readiness_gate() {
   planner_draft_readiness_security_report "$init"
   planner_draft_readiness_missed_report "$init"
   return 0
+}
+
+# _planner_draft_unjudged_report <run-lines>
+# The gate's non-blocking SEMANTIC_* warn lines (PLANNER_DRAFT_WARN_CODES):
+# drafts the evaluator could not judge. Prints nothing when there are none.
+_planner_draft_unjudged_report() {
+  local lines
+  lines=$(printf '%s\n' "$1" | grep '^[^|]*|META|draft-readiness|warn|' | cut -d'|' -f5- |
+    grep -E '^[^ ]+ SEMANTIC_[A-Z_]+ ') || return 0
+  echo "Not judged by the semantic evaluator (warning only; Refinement judges these tickets after create):"
+  printf '%s\n' "$lines" | sed 's/^/  /'
+  echo ""
 }
 
 # planner_draft_readiness_report <INIT>
@@ -519,6 +584,7 @@ planner_draft_readiness_report() {
   ready* | accepted*)
     echo "Draft readiness passed (${done_msg}) — nothing was created in Linear yet."
     echo ""
+    _planner_draft_unjudged_report "$run"
     planner_draft_readiness_history_report "$init"
     planner_draft_readiness_security_report "$init"
     planner_draft_readiness_missed_report "$init"
@@ -546,6 +612,7 @@ planner_draft_readiness_report() {
       fi
     done
   echo ""
+  _planner_draft_unjudged_report "$run"
   planner_draft_readiness_history_report "$init"
   planner_draft_readiness_security_report "$init"
   planner_draft_readiness_missed_report "$init"

@@ -589,6 +589,18 @@
       "recommend": "on",
       "why": "Leave on; false gives Refinement an independent semantic sample (two spawns per ticket), useful only to measure draft-vs-ticket agreement.",
       "docs": "ticket-planner/docs/ticket-planner.md"
+    },
+    {
+      "name": "PLANNER_TESTDATA_IMPLIED_BLOCKS",
+      "plugin": "ticket-planner",
+      "default": "false",
+      "on_value": "true",
+      "category": "strictness",
+      "summary": "Crosscheck blocks on a strong implied-test-data match (TEST_DATA_IMPLIED) instead of warning (TEST_DATA_IMPLIED_WEAK).",
+      "requires": [],
+      "recommend": "off",
+      "why": "The match is a pattern over criterion text; in the dispatch rehearsal none of its 5 blocks was a real data gap. Real data needs are still checked through Verification Notes, test-data synthesis and Refinement's strict test-data checks.",
+      "docs": "ticket-planner/docs/test-data-source.md"
     }
   ]
 }

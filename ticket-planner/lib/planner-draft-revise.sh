@@ -56,7 +56,9 @@
 #
 # Guard reason codes (D10): FROZEN_CHANGED CRITERION_DROPPED EXTENSION_INVALID
 # CRITERIA_FLOOD VNOTE_CHANGED SCOPE_DROPPED CONTRACT_DROPPED SPEC_INVALID
-# TESTDATA_REGRESSION ASSUMPTION_INVALID OUT_OF_SCOPE_EDIT. A failing check
+# TESTDATA_REGRESSION (blocking test-data codes only: a strong implied-data
+# match is warn-only unless PLANNER_TESTDATA_IMPLIED_BLOCKS=true, so by
+# default it does not revert a round) ASSUMPTION_INVALID OUT_OF_SCOPE_EDIT. A failing check
 # may print several codes; the first line is the primary one (the status
 # reason).
 #

@@ -1098,6 +1098,15 @@ files live under `artifacts/draft-readiness/<slug>/` (`body.md`, `dor-result.jso
 `semantic.json`, `verdict` written last; revision history `spec.r<N-1>.md`,
 `findings.r<N>.json`, `revise.r<N>.*` once the revision loop runs).
 
+A draft the evaluator could not judge does not block. `SEMANTIC_UNAVAILABLE` (two attempts
+whose result was missing or unreadable) and `SEMANTIC_UNVERIFIED` (a finding or gap without
+evidence) are the codes in `PLANNER_DRAFT_WARN_CODES` (that default; set it empty to block on
+them again). They log `META|draft-readiness|warn|<slug> <CODE> "<reason>"`, the report lists
+them under "Not judged by the semantic evaluator", and Refinement judges those tickets after
+create (no draft verdict is carried over for them). A draft the loop never judged ("no verdict
+for the current draft") still blocks. A failed attempt keeps its reason in `last-failure` and
+its result files as `*-result.rejected.txt`.
+
 ### Revision loop: reasons, assumptions, security
 
 - **Reason class per finding.** At the end of the loop every demoted finding records why

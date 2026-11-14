@@ -134,8 +134,9 @@ _planner_crosscheck_source_if_missing "planner_state_write" \
 # judgment, not by itself proof of a defect.
 # planner-test-data-derivation: TEST_DATA_INVENTORY_MISSING (no epic-wide
 # inventory), TEST_DATA_IMPLIED_WEAK (weak-tier implied data, or a strong
-# match in a legacy initiative) and VERIFICATION_NOTES_MISSING_LEGACY are
-# warn-level; VERIFICATION_NOTES_MISSING and TEST_DATA_IMPLIED block, as does
+# match in a legacy initiative, or any strong match unless
+# PLANNER_TESTDATA_IMPLIED_BLOCKS=true) and VERIFICATION_NOTES_MISSING_LEGACY
+# are warn-level; VERIFICATION_NOTES_MISSING and TEST_DATA_IMPLIED block, as does
 # TEST_DATA_SYNTH_FAILED (the synthesis sub-step could not write its specs).
 # planner-crosscheck-ownership: OWN_NEAR_MATCH, OWN_UNDECLARED_REF,
 # OWN_EXTERNAL_UNANCHORED and OWN_EDGES_DIVERGED are tripwires, warn-level.
@@ -807,7 +808,7 @@ planner_crosscheck_fix_hint() {
     echo "Consensus left a goldfish blocker or major finding without a disposition, or left out the status line — under ## Goldfish Findings Addressed in consensus.md, copy the planner_goldfish_status line first, then write ### G<n> — <severity> — <title> — <accepted | rejected (… covered in …) | deferred | clarified> per named finding; warn only"
     ;;
   TEST_DATA_IMPLIED_WEAK)
-    echo "a criterion may imply test data (weak match) while every row says none — check it; answer TESTDATA_CONFIRM: none in consensus.md to silence it"
+    echo "a criterion may imply test data while every row says none (a pattern match, warn only) — check it; if it does need data, add the Verification Notes row with a Source; else answer TESTDATA_CONFIRM: none in consensus.md to silence it"
     ;;
   *)
     echo "no canned hint for this code — read the finding message"

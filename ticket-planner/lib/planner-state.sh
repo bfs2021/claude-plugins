@@ -649,7 +649,10 @@ planner_state_repair() {
   planner_phase_sequence valid_phases
   valid_phases+=("META")
 
-  local valid_statuses="start done fail skip"
+  # Every status planner_state_write is called with. accepted (an operator
+  # accept), info, step and warn were missing, so a repair dropped them —
+  # an accept silently undone, the draft gate's warn lines lost.
+  local valid_statuses="start done fail skip accepted info step warn"
   local line_count=0 kept=0 dropped=0 trailing=0
   local tmp="${log_file}.repair.tmp.$$"
   local phase status

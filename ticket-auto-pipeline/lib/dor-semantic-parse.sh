@@ -50,7 +50,10 @@ _DSP_GAP_VERDICTS="clear finding not-applicable"
 _DSP_AUDIT_VERDICTS="agree disputed uncertain"
 
 # dor-semantic-paraphrase: the scan's PARAPHRASE line is required, one line,
-# 1 to this many characters (after trimming).
+# at least 1 character (after trimming). A longer value than this is cut to
+# this many characters, never rejected (rehearsal F49): a model cannot count
+# characters, and losing a whole scan over a 403-character summary made the
+# draft SEMANTIC_UNAVAILABLE, which no revision can clear.
 _DSP_PARAPHRASE_MAX=400
 
 _dsp_code_dimension() {
@@ -305,11 +308,12 @@ parse_dor_semantic() {
   fi
 
   # A multi-line paraphrase never reaches here: its continuation line has no
-  # ':' (malformed line) or an invalid key. Length is counted in characters.
+  # ':' (malformed line) or an invalid key. Length is counted in characters;
+  # an over-long value is cut, ending in "...", and the block stays valid.
   if [ "$status" = "ok" ] && [ "$kind" = "scan" ] &&
     [ "${#fields[PARAPHRASE]}" -gt "$_DSP_PARAPHRASE_MAX" ]; then
-    status="invalid"
-    err="PARAPHRASE longer than ${_DSP_PARAPHRASE_MAX} characters (${#fields[PARAPHRASE]})"
+    echo "[dor-semantic-parse] WARN: PARAPHRASE cut from ${#fields[PARAPHRASE]} to ${_DSP_PARAPHRASE_MAX} characters (file=${result_file})" >&2
+    fields[PARAPHRASE]="${fields[PARAPHRASE]:0:$((_DSP_PARAPHRASE_MAX - 3))}..."
   fi
 
   if [ "$status" = "ok" ] && [ "$kind" = "audit" ] &&

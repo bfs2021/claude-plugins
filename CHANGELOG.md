@@ -17,6 +17,40 @@ marketplace. Where a release also moved `ticket-planner`, `fleet-controller`, or
 > - **0.19.0 never existed.** `plugin.json` went 0.18.0 → 0.20.0. The Phase 2
 >   commit message claims `0.19.0→0.20.0`, but no 0.19.0 was ever committed.
 
+## 0.117.3 (2026-11-14) — dispatch-rehearsal iteration 06 findings (ticket-planner 0.43.3)
+
+- **dor-semantic parser: an over-long scan PARAPHRASE is cut, not rejected (F49).**
+  A paraphrase over 400 characters used to invalidate the whole scan block; two such
+  scans made a draft `SEMANTIC_UNAVAILABLE`, which no revision can clear. The parser
+  now cuts it to 400 characters ending in `...`, warns on stderr, and keeps the
+  findings and gaps.
+- **Draft-readiness gate keeps the reason for a failed attempt (F50).** The gate's
+  `fail|<slug> SEMANTIC_UNAVAILABLE` line now carries the parser's error (or "no scan
+  result written"), the reason is kept in `last-failure`, and the rejected result
+  files are moved to `*-result.rejected.txt` instead of deleted. Refinement no longer
+  discards the parser's stderr.
+- **dor-check: chore and security tickets need no Navigation Path (F51).** Their
+  templates carry no such section and `planned-ticket-body-check.sh` asks only feature
+  and improvement for one, but `NAV_PATH_MISSING` fired on every type whose Scope
+  listed an FE layer. It is now `inapplicable` for chore and security.
+- **Gates that blocked good plans now warn (rehearsal block audit, iterations 01–06).** Of
+  13 halts, 3 came from real plan defects; none since iteration 04 did.
+  - Crosscheck's strong `TEST_DATA_IMPLIED` match is reported as `TEST_DATA_IMPLIED_WEAK`
+    (warn, with the TESTDATA_CONFIRM line to answer) unless `PLANNER_TESTDATA_IMPLIED_BLOCKS=true`.
+    5 blocks, no real data gap among them. Verification Notes, synthesis and Refinement's
+    strict test-data checks are unchanged.
+  - The draft gate warns instead of blocking on `SEMANTIC_UNAVAILABLE` and
+    `SEMANTIC_UNVERIFIED` (`PLANNER_DRAFT_WARN_CODES`; empty restores blocking). The
+    report lists such drafts as not judged; Refinement judges them after create. A draft
+    the loop never judged still blocks.
+- **State log repair keeps `accepted`, `info`, `step` and `warn` lines.** Its status list
+  held only start/done/fail/skip, so a repair dropped an operator's accept and the draft
+  gate's warnings.
+- **Crosscheck test-data tripwire: a search of a named file is document text (F48).**
+  "A search of `README.md` for `calculator` returns 0 matches" no longer reads the
+  searched literal as a record, and a count of matches, hits or occurrences is no
+  longer a weak test-data signal.
+
 ## 0.117.2 (2026-11-13) — dispatch-rehearsal iteration 05 findings (ticket-planner 0.43.2)
 
 Six findings from the fifth dispatch-rehearsal run and its same-intent rerun.

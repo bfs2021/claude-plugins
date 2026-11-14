@@ -18,7 +18,7 @@ and [`readiness-quality-score` spec](../../openspec/changes/dor-quality-score/sp
 | Code | Fires when | Applicability |
 |---|---|---|
 | `SCOPE_MISSING` | No `## Scope` table with a `Layer` column | Always |
-| `NAV_PATH_MISSING` | No actual click path: a `## Navigation Path` heading with real (non-placeholder) content, a `**Navigation Path:**` label with text, a backticked `` `A > B` `` path, or a Verification Plan `Navigation path` cell holding `A > B`. The bare phrase "navigation path" — including the Verification Plan column header — does not count | Non-backend-only tickets |
+| `NAV_PATH_MISSING` | No actual click path: a `## Navigation Path` heading with real (non-placeholder) content, a `**Navigation Path:**` label with text, a backticked `` `A > B` `` path, or a Verification Plan `Navigation path` cell holding `A > B`. The bare phrase "navigation path" — including the Verification Plan column header — does not count | feature, improvement and bug tickets that are not backend-only (chore and security: inapplicable) |
 | `TEST_USER_MISSING` | No Test User section | Non-backend-only tickets |
 | `AC_MISSING` | No Acceptance Criteria section/checkboxes | Always |
 | `AC_VAGUE` | Any AC line matches a vague-language pattern (original `audit_ac_testability` set, or the widened DoR-only set below) | Always |
