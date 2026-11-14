@@ -13,6 +13,9 @@
 set -o pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# These scenarios exercise TEST_DATA_IMPLIED in its blocking mode. Since the
+# rehearsal block audit it warns by default; opt back in here.
+export PLANNER_TESTDATA_IMPLIED_BLOCKS=true
 LIB_DIR="${SCRIPT_DIR}/.."
 GOLDEN_DIR="${SCRIPT_DIR}/fixtures/halt-goldens"
 

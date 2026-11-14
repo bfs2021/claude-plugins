@@ -639,8 +639,10 @@ planner_refinement_apply() {
   local det_file="${pdir}/dor-result.json"
 
   local scan_json audit_json scan_rc=0 audit_rc=0
-  scan_json=$(bash "$parse_script" --kind scan --result-file "$scan_file" 2>/dev/null) || scan_rc=$?
-  audit_json=$(bash "$parse_script" --kind audit --result-file "$audit_file" --det-result "$det_file" 2>/dev/null) || audit_rc=$?
+  # The parser's stderr (why a block was rejected) is left visible
+  # (rehearsal F50): with it discarded, SEMANTIC_UNAVAILABLE had no cause.
+  scan_json=$(bash "$parse_script" --kind scan --result-file "$scan_file") || scan_rc=$?
+  audit_json=$(bash "$parse_script" --kind audit --result-file "$audit_file" --det-result "$det_file") || audit_rc=$?
 
   if [ "$scan_rc" -ne 0 ] || [ "$audit_rc" -ne 0 ]; then
     return 1

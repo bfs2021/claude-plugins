@@ -129,6 +129,20 @@ _planner_testdata_crit_is_doc_text 'The README lists the commands `npm install` 
   pass "F39: README + lists is doc text" || fail "F39: README + lists is doc text" "not doc text"
 assert_eq "F39: a quoted literal a file must not contain implies no data" \
   "$(_planner_testdata_implied_match '`dexter-sandbox/CLAUDE.md` does not contain the text `intentionally empty at the start`' "" | cut -d$'\037' -f1)" "none"
+# Rehearsal F48: a search of a named file for a literal is document text.
+_f48='A case-insensitive search of the committed `README.md` for `calculator` returns 0 matches.'
+_planner_testdata_crit_is_doc_text "$_f48" &&
+  pass "F48: search of a file + returns 0 matches is doc text" || fail "F48: search of a file is doc text" "not doc text"
+assert_eq "F48: a literal searched for in a file implies no data" \
+  "$(_planner_testdata_implied_match "$_f48" "" | cut -d$'\037' -f1)" "none"
+_planner_testdata_crit_is_doc_text 'A `grep` of `docs/setup.md` for `TODO` finds no hits' &&
+  pass "F48: grep of a file + finds no hits is doc text" || fail "F48: grep of a file is doc text" "not doc text"
+_planner_testdata_crit_is_doc_text 'A search of the README for `jake` returns 1 match and the feed shows his article' &&
+  fail "F48: a search with a behaviour clause is not doc text" "doc text" || pass "F48: a search with a behaviour clause is not doc text"
+_planner_testdata_crit_is_doc_text 'Searching articles for `jake` returns 2 results' &&
+  fail "F48: a search with no document named is not doc text" "doc text" || pass "F48: a search with no document named is not doc text"
+_planner_testdata_crit_is_doc_text 'The README.md search for `jake` returns 2 results' &&
+  fail "F48: search verb after the document is not doc text" "doc text" || pass "F48: search verb after the document is not doc text"
 _planner_testdata_crit_is_doc_text 'The `welcome-post` article is listed' &&
   fail "no document named is not doc text" "doc text" || pass "no document named is not doc text"
 _planner_testdata_crit_is_doc_text 'The README states that `jake` logs in and the feed shows' &&
@@ -286,10 +300,16 @@ B=$(new_init INIT-trip-1)
 cp "${A}/discovery.md" "${B}/discovery.md"
 spec_none dash 'The dashboard shows 5 overdue invoices' >"${B}/specs/dash.md"
 printf '# bare\n\n## Acceptance Criteria\n\n- [ ] Something happens.\n' >"${B}/specs/bare.md"
+# Default since the rehearsal block audit: a strong match warns, does not block.
+out=$(planner_crosscheck_testdata_tripwires INIT-trip-1)
+H=$(planner_testdata_confirm_hash dash 'The dashboard shows 5 overdue invoices')
+assert_contains "default: strong match warns" "$out" "TEST_DATA_IMPLIED_WEAK dash.md [${H}] match=\"5 overdue invoices\" (strong: count+entity; strong, warn-only (PLANNER_TESTDATA_IMPLIED_BLOCKS is not true))"
+case "$out" in *"TEST_DATA_IMPLIED dash.md"*) fail "default: no blocking IMPLIED" "$out" ;; *) pass "default: no blocking IMPLIED" ;; esac
+# The rest of this file exercises the blocking mode.
+export PLANNER_TESTDATA_IMPLIED_BLOCKS=true
 out=$(planner_crosscheck_testdata_tripwires INIT-trip-1)
 rc=$?
 assert_eq "contract: blocking rc" "$rc" "1"
-H=$(planner_testdata_confirm_hash dash 'The dashboard shows 5 overdue invoices')
 assert_contains "IMPLIED carries slug+hash+match" "$out" "TEST_DATA_IMPLIED dash.md [${H}] match=\"5 overdue invoices\" (strong: count+entity)"
 assert_contains "NOTES_MISSING names the spec" "$out" "VERIFICATION_NOTES_MISSING bare.md has 1 acceptance criteria"
 

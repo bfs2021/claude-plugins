@@ -45,6 +45,23 @@ fi
 
 # ── 7. unavailable ───────────────────────────────────────────────────────
 echo "--- 7. two failed attempts → unavailable ---"
+# Default (block audit): a draft the evaluator could not judge warns and
+# passes; Refinement judges the ticket after create.
+export BROKEN_b_api=1
+_gate
+unset BROKEN_b_api
+report=$(planner_draft_readiness_report "$INIT")
+if [ "$GATE_RC" -eq 0 ] && [ "$(cut -d' ' -f3 "${DR}/b-api/verdict")" = "unavailable" ] &&
+  tail -3 "$LOG" | grep -q '|META|draft-readiness|warn|b-api SEMANTIC_UNAVAILABLE "scan ' &&
+  ! tail -3 "$LOG" | grep -q '|META|draft-readiness|fail|' &&
+  grep -q 'Not judged by the semantic evaluator' <<<"$report" &&
+  grep -q 'b-api SEMANTIC_UNAVAILABLE' <<<"$report"; then
+  pass "default: unavailable warns, the gate passes, the report lists it as not judged"
+else
+  fail "default unavailable" "rc=$GATE_RC $(tail -3 "$LOG") | $report"
+fi
+# The rest of scenario 7 checks the blocking mode.
+export PLANNER_DRAFT_WARN_CODES=""
 export BROKEN_b_api=1
 _gate
 unset BROKEN_b_api
@@ -54,15 +71,28 @@ if [ "$GATE_RC" -eq 3 ] && [ "$(cut -d' ' -f3 "${DR}/b-api/verdict")" = "unavail
 else
   fail "unavailable" "rc=$GATE_RC spawns=$SPAWNS $(cat "${DR}/b-api/verdict" 2>/dev/null) $(tail -3 "$LOG")"
 fi
+# Rehearsal F50: the fail line names the parse error, and the rejected
+# result files are kept for diagnosis.
+if tail -3 "$LOG" | grep -q '|META|draft-readiness|fail|b-api SEMANTIC_UNAVAILABLE "scan no DOR_SEMANTIC_SCAN block' &&
+  [ -s "${DR}/b-api/scan-result.rejected.txt" ] && [ -s "${DR}/b-api/audit-result.rejected.txt" ] &&
+  grep -q '^attempt 2: scan ' "${DR}/b-api/last-failure"; then
+  pass "unavailable: the fail line carries the parse error, rejected files kept"
+else
+  fail "unavailable reason" "$(tail -3 "$LOG") | $(ls "${DR}/b-api") | $(cat "${DR}/b-api/last-failure" 2>/dev/null)"
+fi
 sed -i 's/Export responds with status 200/Export responds with status code 200/' "${SPECS}/b-api.md"
 export MISSING_b_api=1
 _gate
 unset MISSING_b_api
 if [ "$GATE_RC" -eq 3 ] && [ "$(cut -d' ' -f3 "${DR}/b-api/verdict")" = "unavailable" ] && [ "$SPAWNS" -eq 2 ]; then
   pass "no result file written twice: unavailable"
+  tail -3 "$LOG" | grep -q 'b-api SEMANTIC_UNAVAILABLE "no scan result written"' &&
+    pass "missing result: the fail line says which result was not written" ||
+    fail "missing reason" "$(tail -3 "$LOG")"
 else
   fail "missing result" "rc=$GATE_RC spawns=$SPAWNS"
 fi
+unset PLANNER_DRAFT_WARN_CODES
 _gate
 if [ "$GATE_RC" -eq 0 ] && [ "$SPAWNS" -eq 2 ] && [ "$(cut -d' ' -f3 "${DR}/b-api/verdict")" = "ready" ]; then
   pass "the next run retries an unavailable draft (no edit needed)"

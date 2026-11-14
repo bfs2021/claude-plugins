@@ -125,9 +125,8 @@ carry it too, harmlessly); `DETAIL` is optional free text.
 `PARAPHRASE` (dor-semantic-paraphrase, `dor-semantic-v4`) is **required on every scan
 block** and absent from the audit: the one change the ticket makes, in the scanner's own
 words, written before any finding (the prompt asks for it first, so the scanner commits
-to a reading before it hunts for findings). One line, 1 to 400 characters after
-trimming. A missing, empty or over-long value rejects the block (exit 1); a multi-line
-value is a malformed line and rejects it too. The caller treats that like any other
+to a reading before it hunts for findings). One line; longer than 400 characters is cut
+to 400 ending in `...`. A missing, empty or multi-line value rejects the block (exit 1). The caller treats that like any other
 invalid block: re-spawn once, then `SEMANTIC_UNAVAILABLE`. The parser emits it as
 `paraphrase` (redacted like `DETAIL`), and `dor_semantic_apply` stores it as
 `ready.semantic.paraphrase`. Readers that do not know the field ignore it.

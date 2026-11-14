@@ -67,6 +67,12 @@ Put each iteration's output in `$REHEARSAL/iter-NN/`. Paths below that start wit
     `UNMEASURED` stays `UNMEASURED`. Never estimate.
   - **Human input:** each answer file and each manual edit, with the phase it unblocked.
   - **Findings:** the IDs added to `findings.md` by this run.
+  - **Blocks:** every blocking finding (Crosscheck, draft gate, Refinement), one row each, labelled
+    `true` (a real plan defect), `false` (the gate misread a good plan), `checker bug`, `format`
+    (the model's output broke a format rule) or `env`; plus the warnings the gate raised instead
+    of blocking (`TEST_DATA_IMPLIED_WEAK`, `META|draft-readiness|warn|`), each labelled the same way,
+    and the number of revisions applied. Same labels as `$REHEARSAL/block-audit.md`, so runs
+    compare by halts and false-positive rate, not only pass or fail.
   The run is not finished until this file exists. Without it, runs cannot be compared later.
 - [ ] **Classify** every non-zero row of `preflight.tsv` and every planner halt into `findings.md`, one class each (section 4).
 - [ ] **Fix.** Make one commit per fix, each with a regression test. A new `lib/tests` file also needs its Makefile line.
