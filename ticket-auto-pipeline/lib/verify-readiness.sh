@@ -118,7 +118,9 @@ _vr_hit() {
 # verify_readiness_vplan_cols — "ROLE NAV DATA EXPECTED" from the last
 # vplan_parse call: verifiable rows filling each column (vplan-parse.sh).
 verify_readiness_vplan_cols() {
-  printf '%s %s %s %s\n' "${VPLAN_V_ROLE:-0}" "${VPLAN_V_NAV:-0}" "${VPLAN_V_DATA:-0}" "${VPLAN_V_EXPECTED:-0}"
+  # vplan_parse sets all four (0 when no table); an unset one prints empty,
+  # which verify_readiness_score reads as "column not vouched for".
+  printf '%s %s %s %s\n' "$VPLAN_V_ROLE" "$VPLAN_V_NAV" "$VPLAN_V_DATA" "$VPLAN_V_EXPECTED"
 }
 
 verify_readiness_score() {

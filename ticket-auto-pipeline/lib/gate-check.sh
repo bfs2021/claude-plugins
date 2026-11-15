@@ -784,7 +784,7 @@ _gate_entry() {
         vplan_source="description"
         vplan_rows="$VPLAN_ROWS"
         vplan_verifiable="$VPLAN_VERIFIABLE"
-        vplan_cols="${VPLAN_V_ROLE:-0} ${VPLAN_V_NAV:-0} ${VPLAN_V_DATA:-0} ${VPLAN_V_EXPECTED:-0}"
+        vplan_cols="$VPLAN_V_ROLE $VPLAN_V_NAV $VPLAN_V_DATA $VPLAN_V_EXPECTED"
       fi
     fi
 
