@@ -401,37 +401,39 @@ planner_replan_record() {
 
 # ── Post-replan dependency validation ───────────────────────────────────────────
 
-# After regeneration, verify the dependency set is still acyclic.
-# Reuses planner_deps_check_acyclic from planner-deps-check.sh.
+_PLANNER_REPLAN_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# The initiative's dependency graph, {slug: [refs]}, read by the same reader
+# TicketGen orders tickets with (planner_ticketgen_deps_json): `## Labels`
+# `blocked-by:<ref>` tokens (Specify's grammar: no braces, optionally
+# backticked; sibling prefixes resolved to full slugs, external tracker ids
+# verbatim), then the test-data synthesis and ownership sidecar edges.
+# Prints {} when the initiative has no specs.
 #
-# Usage: planner_replan_validate_deps <initiative_id>
-# Returns: 0 if acyclic, 1 if cyclic (writes cycle to stderr).
-planner_replan_validate_deps() {
-  local initiative_id="$1"
-  local specs_dir
-  specs_dir="$(_planner_replan_state_dir "$initiative_id")/artifacts/specs"
-
-  _source_if_missing "planner_deps_check_acyclic" "${CLAUDE_PLUGIN_ROOT:-.}/lib/planner-deps-check.sh"
-
+# Usage: planner_replan_deps_json <initiative_id>
+# Returns: 0, or 1 on an invalid initiative id or a read failure.
+planner_replan_deps_json() {
+  local initiative_id="$1" state_dir specs_dir
+  state_dir=$(_planner_replan_state_dir "$initiative_id") || return 1
+  specs_dir="${state_dir}/artifacts/specs"
   if [ ! -d "$specs_dir" ]; then
-    return 0 # No specs — nothing to validate
-  fi
-
-  # Extract dependency graph from spec files
-  # Each spec has a "blocked-by" label field or dependency section
-  local deps_json
-  deps_json=$(grep -rl 'blocked-by' "$specs_dir" 2>/dev/null | while read -r spec_file; do
-    local ticket_slug blocked_by
-    ticket_slug=$(basename "$spec_file" .md)
-    blocked_by=$(grep 'blocked-by:' "$spec_file" 2>/dev/null | sed 's/.*blocked-by:{\([^}]*\)}.*/\1/' | tr ',' '\n' | sed 's/^ *//;s/ *$//' | grep . | jq -R -s 'split("\n") | map(select(length > 0))')
-    if [ -n "$blocked_by" ] && [ "$blocked_by" != "[]" ]; then
-      echo "{\"$ticket_slug\":$blocked_by}"
-    fi
-  done | jq -s 'add // {}')
-
-  if [ -z "$deps_json" ] || [ "$deps_json" = "{}" ]; then
+    echo '{}'
     return 0
   fi
+  _source_if_missing "planner_ticketgen_deps_json" "${_PLANNER_REPLAN_LIB_DIR}/planner-ticket-body.sh"
+  planner_ticketgen_deps_json "$specs_dir"
+}
 
+# After regeneration, verify the dependency set is still acyclic.
+# Reuses planner_deps_check_acyclic from planner-deps-check.sh over the graph
+# planner_replan_deps_json reads.
+#
+# Usage: planner_replan_validate_deps <initiative_id>
+# Returns: 0 if acyclic, 1 if cyclic (writes cycle to stderr) or the graph
+# could not be read.
+planner_replan_validate_deps() {
+  local initiative_id="$1" deps_json
+  _source_if_missing "planner_deps_check_acyclic" "${_PLANNER_REPLAN_LIB_DIR}/planner-deps-check.sh"
+  deps_json=$(planner_replan_deps_json "$initiative_id") || return 1
   planner_deps_check_acyclic "$deps_json"
 }
