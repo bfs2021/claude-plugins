@@ -1407,13 +1407,14 @@ $(planner_ownership_consensus_rule)
 $(planner_acpre_consensus_rule)
 $(planner_sibling_blocker_rule)
 4. Write a consensus digest to ${state_dir}/artifacts/consensus.md:
-   - **Findings Addressed** — each review finding, its disposition (accepted/rejected/deferred),
-     and what changed (if anything), naming the acceptance criterion you added or
-     changed for it (see below)
+   - **Findings Addressed** — one \`### <id> — <severity> — <title> — <disposition>\`
+     heading per review finding, its disposition last and exactly one of accepted,
+     rejected or deferred (bash counts these headings), and what changed (if anything),
+     naming the acceptance criterion you added or changed for it (see below)
    - **Changes from Original Proposal** — summary of what's different
    - **Deferred Items** — things consciously left unresolved, with rationale
-   - **Open Questions** — questions only the operator can answer, including one
-     line per cited artifact Discovery could not retrieve (see below)
+   - **Open Questions** — questions only the operator can answer (bash adds one
+     line per cited artifact Discovery could not retrieve — see below)
    - **Readiness** — ready-for-spec / needs-further-discovery / blocked
 $(planner_goldfish_consensus_rule)
 
@@ -1441,9 +1442,10 @@ $(planner_sibling_citation_consensus_section "${initiative_id}")
 discovery.md's \`## Cited Artifacts\` section lists every external artifact the
 source material cites (a sample file, a template, an export) and whether
 Discovery could retrieve it. Each NOT FOUND one is a question for the operator,
-asked at this gate: "is it coming, or should it be synthesised?". Bash renders
-the questions — copy its output verbatim into consensus.md's
-\`## Open Questions\` section, do not paraphrase it:
+asked at this gate: "is it coming, or should it be synthesised?". Bash writes
+one \`CITED_ARTIFACT:\` line per such artifact into consensus.md's
+\`## Open Questions\` section after this phase ends, and rewrites any line of
+yours that names one — do not write those lines yourself. To see them:
 
 \`\`\`bash
 $(_planner_prompt_repos_root_export)
@@ -1452,8 +1454,8 @@ source "\${CLAUDE_PLUGIN_ROOT}/lib/planner-crosscheck-testdata.sh"
 planner_cited_artifacts_questions "${initiative_id}"
 \`\`\`
 
-Each line ends \`Answer: PENDING\`. Leave it PENDING — you cannot answer for the
-operator. Crosscheck blocks on a missing line (CITED_ARTIFACT_UNRAISED) or a
+Each line ends \`Answer: PENDING\`. You cannot answer for the operator.
+Crosscheck blocks on a missing line (CITED_ARTIFACT_UNRAISED) or a
 PENDING answer (CITED_ARTIFACT_UNRESOLVED) and stops the run there for the
 operator, who records \`Answer: exists:<where>\` (they supplied it),
 \`Answer: external:<who>\` or \`Answer: generate\`. That answer becomes the
@@ -1489,8 +1491,6 @@ On failure, write \`fail\` instead of \`done\`.
 - The finalized proposal must still satisfy the Planner Context schema — if the
   review found contract compliance issues, those must be resolved here.
 - Deferred items are a conscious choice, not an omission — explain why each is deferred.
-- Every NOT FOUND cited artifact has its \`CITED_ARTIFACT:\` line in \`## Open Questions\`,
-  copied verbatim from \`planner_cited_artifacts_questions\`.
 - Every behaviour sentence you added or changed has an acceptance criterion and a
   Verification Notes row that checks it.
 AGENT_PROMPT

@@ -12,6 +12,17 @@
 #   F70  Consensus's corrected second `done` was dropped as a duplicate with
 #        rc 0, so the agent never knew. A suppressed duplicate now returns 3
 #        and says so on stderr; the log keeps the first line.
+#
+# Slice 2 cases:
+#   F70  (same snapshot) Consensus's status line said 11/0/2, its headings
+#        say 12/0/1. Bash records the headings in phase-results/consensus.json
+#        after Consensus; unreadable headings mean no file, never a guess.
+#   row 19 (s02-cited, iteration 02, two NOT FOUND cited artifacts) A
+#        reworded or dropped CITED_ARTIFACT line used to be
+#        CITED_ARTIFACT_UNRAISED. Bash now restores the canonical lines,
+#        keeping any Answer:, so a paraphrase cannot block Crosscheck.
+#   R1 lint over every prompt status line, and the list of prompt-written
+#        lines whose message a script still reads.
 # Plus a privacy guard: the corpus sits in a public repo.
 #
 # Run: bash ticket-planner/lib/tests/test-planner-corpus.sh
@@ -232,6 +243,59 @@ else
   fail "carve_scope reads no Specify status line" "a Specify log grep is back"
 fi
 
+# Slice 2 (task 2.5): the same rule over every status line a prompt writes —
+# EpicGen, TicketGen, Completed and the META lines included, continuation
+# lines joined — so no agent-typed count can reach a line a script reads.
+counted=$(awk '/\\$/ { buf = buf substr($0, 1, length($0) - 1); next } { print buf $0; buf = "" }' \
+  "${LIB_DIR}/planner-phase-prompts.sh" | grep -E 'planner_state_write "\$\{initiative_id\}" ' |
+  grep -E '"[^"]*(\b[NMXYZ]\b|_counts|<n>|[0-9]+ (tickets?|specs?|findings?))[^"]*"')
+if [ -z "$counted" ]; then
+  pass "no count placeholders in any prompt status line"
+else
+  fail "no count placeholders in any prompt status line" "$counted"
+fi
+
+# The prompt-written lines whose message a script still reads. A new reader
+# fails the inventory below until it is listed here (and justified); a
+# removed one fails until it is dropped, so the list stays true.
+#   key (phase|step) <TAB> reader file <TAB> what it reads
+PROMPT_MESSAGE_READERS=$(
+  cat <<'EOF'
+EpicGen|create	planner-refinement.sh	EPIC_ID= (planner_epic_id; value from Linear's issueCreate response, in prompt bash)
+EpicGen|create	planner-ticket-body.sh	the EPIC_ID= line's timestamp (planner_ticketgen_generated_ts)
+META|adr-gate	planner-adr-gate.sh	<VERDICT> ADR_ID= (agent-copied; change seam-fail-closed)
+META|discovery	planner-crosscheck-repo-ref.sh	repo-ref <repo>@<ref>@<sha> (git output, in prompt bash)
+EOF
+)
+# Every reader is found by the anchored shape it greps or splits on.
+reader_found() {
+  case "$1" in
+  "EpicGen|create") grep -qF 'EpicGen\|[^|]*\|done\|EPIC_ID=' "${LIB_DIR}/$2" ;;
+  "META|adr-gate") grep -q '"adr-gate" ]' "${LIB_DIR}/$2" ;;
+  "META|discovery") grep -q '"repo-ref" ]' "${LIB_DIR}/$2" ;;
+  *) return 1 ;;
+  esac
+}
+stale=""
+while IFS=$'\t' read -r key file _; do
+  [ -n "$key" ] || continue
+  reader_found "$key" "$file" || stale="${stale} ${key}@${file}"
+done <<<"$PROMPT_MESSAGE_READERS"
+if [ -z "$stale" ]; then
+  pass "every listed prompt-message reader still exists"
+else
+  fail "every listed prompt-message reader still exists" "gone:${stale} — drop it from PROMPT_MESSAGE_READERS"
+fi
+# Retired readers (slices 1-2): Specify start, Consensus done, TicketGen's
+# Created/done lines. COMPLETED.md now reads the intent files.
+retired=$(grep -nE "ticketgen\\\\?\|(done|step)\\\\?\||Consensus\\\\?\|resolve\\\\?\|done\\\\?\||Specify\\\\?\|synthesize\\\\?\|start" \
+  "${LIB_DIR}"/*.sh | grep -v 'planner-phase-prompts.sh' | grep -vE '^[^:]*:[0-9]+:[[:space:]]*#')
+if [ -z "$retired" ]; then
+  pass "no lib reads a TicketGen, Specify start or Consensus done message"
+else
+  fail "no lib reads a TicketGen, Specify start or Consensus done message" "$retired"
+fi
+
 # ── F70: a suppressed duplicate done is visible ──────────────────────────────
 echo "--- F70: Consensus's corrected second done ---"
 INIT=INIT-corpus-f70
@@ -255,6 +319,193 @@ if planner_state_write "$INIT" Consensus resolve done "Consensus complete" 2>/de
   pass "start then done is a new run's result (rc 0)"
 else
   fail "start then done is a new run's result (rc 0)" "rc=$?"
+fi
+
+# ── slice 2: Consensus dispositions from consensus.md headings ──────────────
+echo "--- F70 shape: Consensus's status line counts disagree with its headings ---"
+source "${LIB_DIR}/planner-router.sh"
+source "${LIB_DIR}/planner-crosscheck-testdata.sh"
+source "${LIB_DIR}/planner-consensus-gate.sh"
+source "${LIB_DIR}/planner-phase-prompts.sh"
+
+# The router's step 4a, after the Consensus agent returned.
+consensus_end() {
+  planner_dispatch_gate post "$1" Consensus "${REPOS_ROOT}/.ticket-auto/initiatives/$1" >/dev/null 2>&1
+}
+
+INIT=INIT-corpus-disp
+DIR=$(replay s10-crosscheck "$INIT")
+cp "${CORPUS}/s10-crosscheck/consensus.md" "${DIR}/artifacts/consensus.md"
+RESULT="${DIR}/artifacts/phase-results/consensus.json"
+if grep -q '|Consensus|resolve|done|Consensus: 11 accepted, 0 rejected, 2 deferred$' "${DIR}/state.log" &&
+  [ "$(grep -c '^### F[0-9]* — .* — deferred$' "${DIR}/artifacts/consensus.md")" -eq 1 ]; then
+  pass "snapshot still holds the F70 shape (log says 11/0/2, headings say 12/0/1)"
+else
+  fail "snapshot still holds the F70 shape (log says 11/0/2, headings say 12/0/1)" "corpus changed"
+fi
+consensus_end "$INIT"
+if [ "$(jq -c '[.counts.accepted, .counts.rejected, .counts.deferred, .total]' "$RESULT" 2>/dev/null)" = "[12,0,1,13]" ] &&
+  [ "$(jq -r '.derived_by' "$RESULT" 2>/dev/null)" = "bash" ] &&
+  [ "$(jq -r '.consensus_done' "$RESULT" 2>/dev/null)" = "2026-11-15T12:38:44Z" ]; then
+  pass "Consensus end records 12/0/1 from the headings, derived by bash"
+else
+  fail "Consensus end records 12/0/1 from the headings, derived by bash" "$(cat "$RESULT" 2>&1)"
+fi
+if [ "$(planner_consensus_result_counts "$RESULT" 2>/dev/null)" = "12 0 1" ]; then
+  pass "the reader returns accepted rejected deferred"
+else
+  fail "the reader returns accepted rejected deferred" "$(planner_consensus_result_counts "$RESULT" 2>&1)"
+fi
+if [ "$(jq -r '[.findings[] | select(.disposition == "deferred") | .id] | join(",")' "$RESULT" 2>/dev/null)" = "F7" ]; then
+  pass "each finding keeps its id and disposition"
+else
+  fail "each finding keeps its id and disposition" "$(cat "$RESULT" 2>&1)"
+fi
+
+echo "--- unreadable dispositions: no consensus.json, nothing blocks ---"
+# A heading the closed set does not cover (a real iteration wrote "partly
+# accepted"): the counts would be a guess, so no file is written.
+{
+  echo "2026-11-15T13:00:00Z|Consensus|resolve|start|Resolving review findings"
+  echo "2026-11-15T13:05:00Z|Consensus|resolve|done|Consensus written to artifacts/consensus.md"
+} >>"${DIR}/state.log"
+sed -i 's/^\(### F6 — .*\) — accepted$/\1 — partly accepted/' "${DIR}/artifacts/consensus.md"
+RC=0
+planner_dispatch_gate post "$INIT" Consensus "$DIR" >/dev/null 2>&1 || RC=$?
+if [ "$RC" -eq 0 ] && [ ! -f "$RESULT" ]; then
+  pass "an unreadable disposition removes the earlier record and does not block"
+else
+  fail "an unreadable disposition removes the earlier record and does not block" "rc=${RC} $(cat "$RESULT" 2>&1)"
+fi
+
+INIT=INIT-corpus-bold
+DIR=$(replay s10-crosscheck "$INIT")
+RESULT="${DIR}/artifacts/phase-results/consensus.json"
+# Iteration 03's shape: bold lines, no headings.
+printf '# Consensus\n\n## Findings Addressed\n\n**R1 (major): browser verification is not repeatable. Accepted.**\n\n## Readiness\n\nready-for-spec\n' \
+  >"${DIR}/artifacts/consensus.md"
+consensus_end "$INIT"
+if [ ! -f "$RESULT" ]; then
+  pass "findings without id headings are unreadable, never zero"
+else
+  fail "findings without id headings are unreadable, never zero" "$(cat "$RESULT")"
+fi
+printf '# Consensus\n\n## Findings Addressed\n\n### F1 - major - dash separators - accepted\n\n## Readiness\n\nready-for-spec\n' \
+  >"${DIR}/artifacts/consensus.md"
+consensus_end "$INIT"
+if [ ! -f "$RESULT" ]; then
+  pass "an id heading without the em-dash shape is unreadable, not skipped"
+else
+  fail "an id heading without the em-dash shape is unreadable, not skipped" "$(cat "$RESULT")"
+fi
+
+INIT=INIT-corpus-unfinished
+DIR=$(replay s10-crosscheck "$INIT")
+RESULT="${DIR}/artifacts/phase-results/consensus.json"
+cp "${CORPUS}/s10-crosscheck/consensus.md" "${DIR}/artifacts/consensus.md"
+sed -i '$d' "${DIR}/state.log" # drop the Consensus done line
+consensus_end "$INIT"
+if [ ! -f "$RESULT" ]; then
+  pass "nothing recorded while Consensus has not finished"
+else
+  fail "nothing recorded while Consensus has not finished" "$(cat "$RESULT")"
+fi
+
+# ── slice 2: CITED_ARTIFACT questions written by bash ───────────────────────
+echo "--- cited-artifact questions: bash restores the canonical lines ---"
+# replay_cited <init> — iteration 02 at Consensus done, two NOT FOUND artifacts.
+replay_cited() {
+  local dir="${REPOS_ROOT}/.ticket-auto/initiatives/$1"
+  rm -rf "$dir"
+  mkdir -p "${dir}/artifacts/specs"
+  cp "${CORPUS}/s02-cited/state.log" "${dir}/state.log"
+  cp "${CORPUS}/s02-cited/discovery.md" "${CORPUS}/s02-cited/consensus.md" "${dir}/artifacts/"
+  printf '%s\n' "$dir"
+}
+cited_findings() { planner_crosscheck_cited_artifacts "$1" 2>&1; }
+CANON1='- CITED_ARTIFACT: `RealWorld Conduit api/openapi.yml` — cited but not retrievable. Provide it, or confirm it should be synthesised. Answer: PENDING'
+CANON2='- CITED_ARTIFACT: `the brief (exact request/response shapes and status codes for each endpoint)` — cited but not retrievable. Provide it, or confirm it should be synthesised. Answer: PENDING'
+
+INIT=INIT-corpus-cited
+DIR=$(replay_cited "$INIT")
+before=$(sha256sum <"${DIR}/artifacts/consensus.md")
+consensus_end "$INIT"
+if [ "$(sha256sum <"${DIR}/artifacts/consensus.md")" = "$before" ]; then
+  pass "verbatim questions: consensus.md left byte-identical"
+else
+  fail "verbatim questions: consensus.md left byte-identical" "$(diff <(cat "${CORPUS}/s02-cited/consensus.md") "${DIR}/artifacts/consensus.md")"
+fi
+
+INIT=INIT-corpus-paraphrase
+DIR=$(replay_cited "$INIT")
+C="${DIR}/artifacts/consensus.md"
+# Harmful operators an agent applies: reword one question, drop the other.
+sed -i 's/^- CITED_ARTIFACT: `RealWorld Conduit api\/openapi.yml` — .*$/- CITED_ARTIFACT: the published `RealWorld Conduit api\/openapi.yml` was not found; please supply it. Answer: PENDING/' "$C"
+sed -i '/^- CITED_ARTIFACT: `the brief/d' "$C"
+if grep -q 'CITED_ARTIFACT_UNRAISED' <<<"$(cited_findings "$INIT")"; then
+  pass "a dropped question is CITED_ARTIFACT_UNRAISED before bash runs"
+else
+  fail "a dropped question is CITED_ARTIFACT_UNRAISED before bash runs" "$(cited_findings "$INIT")"
+fi
+consensus_end "$INIT"
+OUT=$(cited_findings "$INIT")
+if ! grep -q 'CITED_ARTIFACT_UNRAISED' <<<"$OUT"; then
+  pass "after Consensus, Crosscheck reports no CITED_ARTIFACT_UNRAISED"
+else
+  fail "after Consensus, Crosscheck reports no CITED_ARTIFACT_UNRAISED" "$OUT"
+fi
+if [ "$(grep -cxF -- "$CANON1" "$C")" -eq 1 ] && [ "$(grep -cxF -- "$CANON2" "$C")" -eq 1 ] &&
+  [ "$(grep -c 'CITED_ARTIFACT:' "$C")" -eq 2 ]; then
+  pass "both canonical lines present exactly once, the paraphrase replaced"
+else
+  fail "both canonical lines present exactly once, the paraphrase replaced" "$(grep -n 'CITED_ARTIFACT' "$C")"
+fi
+q=$(awk '/^## Open Questions/{on=1;next} /^## /{on=0} on' "$C")
+if grep -qF -- "$CANON2" <<<"$q" && grep -q '^- Operator merge:' "$C" && grep -q '^ready-for-spec$' "$C"; then
+  pass "the appended line sits in ## Open Questions; other text untouched"
+else
+  fail "the appended line sits in ## Open Questions; other text untouched" "$(cat "$C")"
+fi
+
+INIT=INIT-corpus-answer
+DIR=$(replay_cited "$INIT")
+C="${DIR}/artifacts/consensus.md"
+sed -i 's/^- CITED_ARTIFACT: `RealWorld Conduit api\/openapi.yml` — .*$/- **CITED_ARTIFACT:** `RealWorld Conduit api\/openapi.yml` (public spec) — Answer: external:RealWorld maintainers/' "$C"
+consensus_end "$INIT"
+if grep -qxF -- "${CANON1% Answer: PENDING} Answer: external:RealWorld maintainers" "$C"; then
+  pass "a refreshed line keeps its Answer"
+else
+  fail "a refreshed line keeps its Answer" "$(grep -n 'CITED_ARTIFACT' "$C")"
+fi
+
+INIT=INIT-corpus-nosection
+DIR=$(replay_cited "$INIT")
+C="${DIR}/artifacts/consensus.md"
+printf '# Consensus\n\n## Findings Addressed\n\nNone.\n\n## Readiness\n\nready-for-spec\n' >"$C"
+consensus_end "$INIT"
+if [ "$(awk '/^## Open Questions/{on=1;next} /^## /{on=0} on' "$C" | grep -c 'CITED_ARTIFACT:')" -eq 2 ] &&
+  [ "$(planner_consensus_readiness "$INIT" 2>/dev/null)" = "ready-for-spec" ]; then
+  pass "no ## Open Questions section: bash adds it; Readiness still reads"
+else
+  fail "no ## Open Questions section: bash adds it; Readiness still reads" "$(cat "$C")"
+fi
+
+INIT=INIT-corpus-crlf
+DIR=$(replay_cited "$INIT")
+C="${DIR}/artifacts/consensus.md"
+sed -i '/^- CITED_ARTIFACT: `the brief/d; s/$/\r/' "$C"
+consensus_end "$INIT"
+if [ "$(grep -c $'\r$' "$C")" -eq "$(wc -l <"$C")" ] && [ "$(grep -c 'CITED_ARTIFACT:' "$C")" -eq 2 ]; then
+  pass "CRLF consensus.md keeps CRLF on every line"
+else
+  fail "CRLF consensus.md keeps CRLF on every line" "$(cat -A "$C" | grep CITED)"
+fi
+
+prompt=$(planner_prompt_consensus "$INIT" "an idea" "$DIR" 2>/dev/null)
+if [ -n "$prompt" ] && ! grep -qiE 'copy its output verbatim|copied verbatim from .planner_cited' <<<"$prompt" && grep -q 'Bash writes' <<<"$prompt"; then
+  pass "the Consensus prompt no longer asks the agent to copy the lines"
+else
+  fail "the Consensus prompt no longer asks the agent to copy the lines" "copy instruction still present"
 fi
 
 echo ""

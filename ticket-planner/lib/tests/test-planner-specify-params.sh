@@ -695,6 +695,40 @@ _seam_revert() {
   p="${p//\"Proposal and ticket specs written to artifacts\/specs\/, self-lint clean\"/\"Proposal written, N ticket specs in artifacts\/specs\/, self-lint clean\"}"
   p="${p//\"Resolving review findings\"/\"Resolving N review findings\"}"
   p="${p//\"Consensus written to artifacts\/consensus.md\"/\"Consensus: X accepted, Y rejected, Z deferred\"}"
+  # Slice 2: the disposition heading shape, and bash (not the agent) writing
+  # the CITED_ARTIFACT lines.
+  local new old
+  new='   - **Findings Addressed** — one `### <id> — <severity> — <title> — <disposition>`
+     heading per review finding, its disposition last and exactly one of accepted,
+     rejected or deferred (bash counts these headings), and what changed (if anything),
+     naming the acceptance criterion you added or changed for it (see below)'
+  old='   - **Findings Addressed** — each review finding, its disposition (accepted/rejected/deferred),
+     and what changed (if anything), naming the acceptance criterion you added or
+     changed for it (see below)'
+  p="${p//"$new"/"$old"}"
+  new='asked at this gate: "is it coming, or should it be synthesised?". Bash writes
+one `CITED_ARTIFACT:` line per such artifact into consensus.md'"'"'s
+`## Open Questions` section after this phase ends, and rewrites any line of
+yours that names one — do not write those lines yourself. To see them:'
+  old='asked at this gate: "is it coming, or should it be synthesised?". Bash renders
+the questions — copy its output verbatim into consensus.md'"'"'s
+`## Open Questions` section, do not paraphrase it:'
+  p="${p//"$new"/"$old"}"
+  new='Each line ends `Answer: PENDING`. You cannot answer for the operator.
+Crosscheck blocks'
+  old='Each line ends `Answer: PENDING`. Leave it PENDING — you cannot answer for the
+operator. Crosscheck blocks'
+  p="${p//"$new"/"$old"}"
+  new='   - **Open Questions** — questions only the operator can answer (bash adds one
+     line per cited artifact Discovery could not retrieve — see below)'
+  old='   - **Open Questions** — questions only the operator can answer, including one
+     line per cited artifact Discovery could not retrieve (see below)'
+  p="${p//"$new"/"$old"}"
+  new='- Every behaviour sentence you added or changed'
+  old='- Every NOT FOUND cited artifact has its `CITED_ARTIFACT:` line in `## Open Questions`,
+  copied verbatim from `planner_cited_artifacts_questions`.
+- Every behaviour sentence you added or changed'
+  p="${p//"$new"/"$old"}"
   printf '%s' "$p"
 }
 
