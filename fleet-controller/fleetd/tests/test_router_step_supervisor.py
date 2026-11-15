@@ -186,6 +186,43 @@ class PostSpawnAndInspectorWiringTest(_Base):
         # Decision from the verify outcome alone (no phase-result, exit 1).
         self.assertEqual(spawn_phase.call_args[0][1], 'STEP_4')
 
+    def _advance_verify(self, *lines, exit_code=0):
+        def _post_spawn(phase, tid, log_file, text, **kw):
+            with open(log_file, 'a') as fh:
+                fh.write(''.join(lines))
+            return router_step.PostSpawn(True, '', '')
+
+        sup = self._sup()
+        with mock.patch.object(router_step, 'post_spawn',
+                               side_effect=_post_spawn), \
+                mock.patch.object(router_step, 'inspector',
+                                  return_value=_SKIP), \
+                mock.patch.object(sup, 'spawn_phase') as spawn_phase:
+            sup._advance_phase_dispatch_locked(
+                'T-1', self._entry('STEP_4_5', 'VERIFY'), exit_code, 'exit')
+        return spawn_phase.call_args[0][1]
+
+    def test_a_clean_verify_exit_with_no_verdict_retries_implement(self):
+        # Track 0.5: a VERIFY agent that forgot its PHASE_RESULT block and
+        # exited 0 used to reach PR review as 'verify passed'.
+        self.assertEqual(self._advance_verify(), 'STEP_4')
+
+    def test_an_optimistic_claim_delta_overrides_a_pass(self):
+        # Track 0.5 / rung 5: the bash recompute (claim-delta) beats the
+        # agent's own PASS.
+        delta = json.dumps({'phase': 'VERIFY', 'direction': 'optimistic'})
+        self.assertEqual(self._advance_verify(
+            _phase_result_line('VERIFY', 'PASS'),
+            f'2026-11-11T10:00:01Z|META|claim-delta|info|{delta}\n'),
+            'STEP_4')
+
+    def test_an_aligned_claim_delta_lets_a_pass_through(self):
+        delta = json.dumps({'phase': 'VERIFY', 'direction': 'aligned'})
+        self.assertEqual(self._advance_verify(
+            _phase_result_line('VERIFY', 'PASS'),
+            f'2026-11-11T10:00:01Z|META|claim-delta|info|{delta}\n'),
+            'STEP_4_6')
+
     def test_non_inspected_phase_runs_no_router_step(self):
         sup = self._sup()
         with mock.patch.object(router_step, 'post_spawn') as ps, \

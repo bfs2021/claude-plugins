@@ -175,17 +175,23 @@ class TestSequencing(unittest.TestCase):
 
 class TestAutoMerge(unittest.TestCase):
 
+    BRANCH = ('2026-09-03T09:00:00Z|META|branch-context|info|base=develop;'
+              'integration=;source=default;ticket=feat/cre-2;'
+              'uat-policy=per-ticket;merge-policy=')
     OUTCOME = '2026-09-03T10:00:00Z|META|outcome-label|info|Smooth'
     PR = '2026-09-03T10:05:00Z|PR-REVIEW|checkout-pr|done|412'
 
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
         self.log = Path(self._tmp.name) / 'CRE-2-pipeline.log'
-        self.log.write_text(self.OUTCOME + '\n' + self.PR + '\n')
+        self.log.write_text(
+            self.BRANCH + '\n' + self.OUTCOME + '\n' + self.PR + '\n')
         self.calls = []
         self._real_gh = orchestration._gh
         orchestration._gh = self._fake_gh
-        self.gh_returns = {}
+        # The PR's head is the ticket's own recorded branch unless a test
+        # says otherwise — the one shape auto-merge may act on.
+        self.gh_returns = {'headRefName': 'feat/cre-2'}
 
     def tearDown(self):
         orchestration._gh = self._real_gh
@@ -295,6 +301,73 @@ class TestAutoMerge(unittest.TestCase):
         self.assertNotIn(['pr', 'merge', '412', '--squash', '--auto'],
                          self.calls)
 
+    def _merge_called(self):
+        return any(args[:2] == ['pr', 'merge'] for args in self.calls)
+
+    def test_a_non_numeric_pr_number_never_merges(self):
+        # Track 0.1: the PR number is agent-written text. Anything but a bare
+        # number is refused before gh is ever asked about it.
+        for bad in ('#412', 'PR 412', '412a', '-1', '412 413', '0x1f'):
+            with self.subTest(pr=bad):
+                self.calls = []
+                self.log.write_text(
+                    self.BRANCH + '\n' + self.OUTCOME + '\n'
+                    + f'2026-09-03T10:05:00Z|PR-REVIEW|checkout-pr|done|{bad}\n')
+                result = orchestration.run_auto_merge(
+                    {'kind': 'auto_merge'}, self._ctx())
+                self.assertEqual(result.status, orchestration.SKIPPED)
+                self.assertEqual(self.calls, [])
+                self.assertIn('PR_NUMBER_INVALID', self.log.read_text())
+
+    def test_a_pr_whose_head_is_another_branch_never_merges(self):
+        # Track 0.1: a valid number copied from another ticket would merge
+        # that ticket's PR. The head must be this ticket's recorded branch.
+        self.gh_returns = {'headRefName': 'feat/cre-9'}
+        result = orchestration.run_auto_merge({'kind': 'auto_merge'},
+                                              self._ctx())
+        self.assertEqual(result.status, orchestration.SKIPPED)
+        self.assertFalse(self._merge_called())
+        self.assertIn('PR_HEAD_MISMATCH', self.log.read_text())
+        self.assertIn('feat/cre-9', result.detail)
+
+    def test_no_recorded_ticket_branch_never_merges(self):
+        # Nothing to compare the head against is not a pass.
+        self.log.write_text(self.OUTCOME + '\n' + self.PR + '\n')
+        result = orchestration.run_auto_merge({'kind': 'auto_merge'},
+                                              self._ctx())
+        self.assertEqual(result.status, orchestration.SKIPPED)
+        self.assertFalse(self._merge_called())
+        self.assertIn('PR_BRANCH_UNRECORDED', self.log.read_text())
+
+    def test_an_empty_ticket_field_counts_as_unrecorded(self):
+        self.log.write_text(
+            self.BRANCH.replace('ticket=feat/cre-2', 'ticket=') + '\n'
+            + self.OUTCOME + '\n' + self.PR + '\n')
+        result = orchestration.run_auto_merge({'kind': 'auto_merge'},
+                                              self._ctx())
+        self.assertEqual(result.status, orchestration.SKIPPED)
+        self.assertFalse(self._merge_called())
+
+    def test_an_unreadable_head_ref_refuses_even_without_an_epic(self):
+        # Before Track 0.1 the head was read only under an integration
+        # branch; a plain ticket PR was merged on the number alone.
+        self.gh_returns = {'headRefName': None}
+        result = orchestration.run_auto_merge({'kind': 'auto_merge'},
+                                              self._ctx())
+        self.assertEqual(result.status, orchestration.SKIPPED)
+        self.assertFalse(self._merge_called())
+        self.assertIn('PR_HEAD_UNREADABLE', self.log.read_text())
+
+    def test_the_latest_branch_context_is_the_record(self):
+        self.log.write_text(
+            self.BRANCH.replace('feat/cre-2', 'feat/old') + '\n'
+            + self.BRANCH + '\n' + self.OUTCOME + '\n' + self.PR + '\n')
+        result = orchestration.run_auto_merge({'kind': 'auto_merge'},
+                                              self._ctx())
+        self.assertEqual(result.status, orchestration.OK)
+        self.assertIn(['pr', 'merge', '412', '--squash', '--auto'],
+                      self.calls)
+
     def test_no_pr_number_is_a_skip_not_a_failure(self):
         self.log.write_text(self.OUTCOME + '\n')
         result = orchestration.run_auto_merge({'kind': 'auto_merge'},
@@ -302,7 +375,7 @@ class TestAutoMerge(unittest.TestCase):
         self.assertEqual(result.status, orchestration.SKIPPED)
 
     def test_a_failed_merge_never_blocks(self):
-        self.gh_returns = {'merge': None}
+        self.gh_returns = {'headRefName': 'feat/cre-2', 'merge': None}
         result = orchestration.run_auto_merge({'kind': 'auto_merge'},
                                               self._ctx())
         self.assertEqual(result.status, orchestration.FAILED)

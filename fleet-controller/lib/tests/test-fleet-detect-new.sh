@@ -88,6 +88,64 @@ test_planner_feedback_collected() {
   }
 }
 
+# Track 0.4: fleet-feedback.sh writes its file through `jq .`, which puts a
+# space after every colon. The compact fixture above never showed that the
+# detector's old grep for `"source_tid":"<tid>"` could not match a real file.
+_write_real_feedback_file() {
+  local ws="$1" tid="$2"
+  mkdir -p "$ws/.ticket-auto/initiatives/INIT-42/feedback"
+  jq -nc --arg tid "$tid" \
+    '{initiative_id: "INIT-42", tickets: [{confidence_actual: 0.85} + {source_tid: $tid}]}' |
+    jq . >"$ws/.ticket-auto/initiatives/INIT-42/feedback/2026-07-07.json"
+}
+
+test_planner_feedback_collected_pretty_printed() {
+  local ws
+  ws=$(_setup_workspace)
+  _plog "$ws" "CRE-101" "META" "planner-feedback" "info" "{\"decision_drift\":\"none\"}"
+  _write_real_feedback_file "$ws" "CRE-101"
+  grep -q '"source_tid": "CRE-101"' "$ws/.ticket-auto/initiatives/INIT-42/feedback/2026-07-07.json" || {
+    echo "fixture is not in the jq . shape"
+    return 1
+  }
+  local sev
+  sev=$(REPOS_ROOT="$ws" detect_planner_feedback "CRE-101" "$ws")
+  [ "$sev" = "0" ] || {
+    echo "expected 0 (collected, pretty-printed file), got $sev"
+    return 1
+  }
+}
+
+test_planner_feedback_other_ticket_is_not_collected() {
+  local ws
+  ws=$(_setup_workspace)
+  _plog "$ws" "CRE-10" "META" "planner-feedback" "info" "{\"decision_drift\":\"none\"}"
+  # CRE-101's entry must not count as CRE-10's (prefix of the id).
+  _write_real_feedback_file "$ws" "CRE-101"
+  local sev
+  sev=$(REPOS_ROOT="$ws" detect_planner_feedback "CRE-10" "$ws")
+  [ "$sev" = "1" ] || {
+    echo "expected 1 (another ticket's feedback), got $sev"
+    return 1
+  }
+}
+
+test_planner_feedback_malformed_file_stays_uncollected() {
+  local ws
+  ws=$(_setup_workspace)
+  _plog "$ws" "CRE-101" "META" "planner-feedback" "info" "{\"decision_drift\":\"none\"}"
+  mkdir -p "$ws/.ticket-auto/initiatives/INIT-42/feedback"
+  # Names the ticket but is not JSON: an unreadable file is not proof.
+  printf '{"tickets": [{"source_tid": "CRE-101"' \
+    >"$ws/.ticket-auto/initiatives/INIT-42/feedback/2026-07-07.json"
+  local sev
+  sev=$(REPOS_ROOT="$ws" detect_planner_feedback "CRE-101" "$ws")
+  [ "$sev" = "1" ] || {
+    echo "expected 1 (malformed file), got $sev"
+    return 1
+  }
+}
+
 test_planner_feedback_no_log_file() {
   local ws
   ws=$(_setup_workspace)
@@ -403,6 +461,9 @@ test_schema_fleet_wide_entry_keys() {
 _run "planner_feedback_no_entries" test_planner_feedback_none
 _run "planner_feedback_found_uncollected" test_planner_feedback_found
 _run "planner_feedback_collected" test_planner_feedback_collected
+_run "planner_feedback_collected_pretty_printed" test_planner_feedback_collected_pretty_printed
+_run "planner_feedback_other_ticket_is_not_collected" test_planner_feedback_other_ticket_is_not_collected
+_run "planner_feedback_malformed_file_stays_uncollected" test_planner_feedback_malformed_file_stays_uncollected
 _run "planner_feedback_no_log_file" test_planner_feedback_no_log_file
 _run "initiative_dispatch_no_linear_api_graceful" test_initiative_dispatch_no_linear_api
 
