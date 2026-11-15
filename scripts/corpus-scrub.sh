@@ -19,20 +19,23 @@
 #        token-shaped strings (sk-ant-, lin_api_, gh?_, github_pat_, glpat-,
 #        xox?-, AKIA…, JWTs)                     → REDACTED-TOKEN
 #        linear.app URLs                         → https://tracker.example/issue
-#        <owner>/<sandbox>, <sandbox>, <owner>   → owner/app, app, owner
 #        /home/<user>, /Users/<user>             → ~
 #        -home-<user>- (dash-encoded paths)      → -homedir-
-#        <KEY>-<n> tracker ids, a bare <KEY>       → TKT-<n>, TKT
-#        private names (whole words, any case)   → user
+#   3. Private tokens from the local names file (below), never from this repo:
+#        <owner>/<sandbox>, <sandbox>, <owner>   → owner/app, app, owner
+#        <KEY>-<n> tracker ids, a bare <KEY>     → TKT-<n>, TKT
+#        names (whole words, any case)           → user
+#        path prefixes (after home paths → ~)    → their replacement
 #
 # Then scripts/corpus-rehash.sh <dst-dir> recomputes BODY_HASH and
 # revise.r<N>.sha, which the rewrite invalidated.
 #
-# Env (defaults are the rehearsal sandbox's values; override for another one):
-#   CORPUS_SCRUB_TRACKER_KEYS  space-separated tracker keys (default "WIL")
-#   CORPUS_SCRUB_OWNER         repository owner (default "willard-pro")
-#   CORPUS_SCRUB_SANDBOX       sandbox repository name (default "dexter-sandbox")
-#   CORPUS_SCRUB_NAMES         private names, whole words (default "dexter mortal willard")
+# Private names are never committed. They are read from
+# $CORPUS_PRIVATE_NAMES_FILE (default ~/.config/claude-plugins/corpus-private-names),
+# one per line, `#` comments allowed:
+#   name <word> | owner <name> | sandbox <name> | tracker <KEY> | path <prefix> <replacement>
+# A missing file means only the generic rules above apply (a note on stderr);
+# test-corpus-privacy.sh reads the same file.
 #
 # A scrub is not a privacy check: test-corpus-privacy.sh is, and runs in CI.
 # Read what you harvest; leave out a file you cannot confidently scrub.
@@ -43,10 +46,7 @@ set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SALT="corpus-scrub-v1"
-TRACKER_KEYS="${CORPUS_SCRUB_TRACKER_KEYS:-WIL}"
-OWNER="${CORPUS_SCRUB_OWNER:-willard-pro}"
-SANDBOX="${CORPUS_SCRUB_SANDBOX:-dexter-sandbox}"
-NAMES="${CORPUS_SCRUB_NAMES:-dexter mortal willard}"
+NAMES_FILE="${CORPUS_PRIVATE_NAMES_FILE:-${HOME}/.config/claude-plugins/corpus-private-names}"
 EMAIL_ALLOW='@(conduit\.test|example\.(com|org|net))$'
 
 usage() {
@@ -66,6 +66,27 @@ if [ -e "$DST" ] && [ -n "$(find "$DST" -mindepth 1 -print -quit 2>/dev/null)" ]
   exit 2
 fi
 SRC=$(cd "$SRC" && pwd)
+
+# The local names file: kind value [replacement]. Values must be plain tokens.
+OWNERS="" SANDBOXES="" TRACKERS="" NAMES="" PATHS=""
+if [ -f "$NAMES_FILE" ]; then
+  while read -r kind value repl _; do
+    case "$kind" in '' | '#'*) continue ;; esac
+    case "$kind" in
+    name) NAMES="$NAMES $value" ;;
+    owner) OWNERS="$OWNERS $value" ;;
+    sandbox) SANDBOXES="$SANDBOXES $value" ;;
+    tracker) TRACKERS="$TRACKERS $value" ;;
+    path) PATHS="${PATHS}${value}"$'\t'"${repl}"$'\n' ;;
+    *)
+      echo "corpus-scrub: unknown kind '${kind}' in ${NAMES_FILE}" >&2
+      exit 2
+      ;;
+    esac
+  done <"$NAMES_FILE"
+else
+  echo "corpus-scrub: no private names file (${NAMES_FILE}); only the generic rules apply" >&2
+fi
 
 # _fake <kind> <value> — the deterministic fake for one value.
 _fake() {
@@ -153,21 +174,38 @@ done < <(grep -ohE '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}' "$ALL" | sor
   echo 's/AKIA[0-9A-Z]{16}/REDACTED-TOKEN/g'
   echo 's/eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/REDACTED-TOKEN/g'
   echo 's#https?://linear\.app/[^] )>"'"'"'`]*#https://tracker.example/issue#g'
-  printf 's/%s\\/%s/owner\\/app/g\n' "$(_lit "$OWNER")" "$(_lit "$SANDBOX")"
-  printf 's/%s/app/g\n' "$(_lit "$SANDBOX")"
-  printf 's/%s/APP/g\n' "$(_lit "$(tr '[:lower:]-' '[:upper:]_' <<<"$SANDBOX")")"
-  printf 's/%s/app/g\n' "$(_lit "$(tr '-' '_' <<<"$SANDBOX")")"
-  printf 's/%s/owner/g\n' "$(_lit "$OWNER")"
   echo 's#/home/[A-Za-z0-9_.-]+#~#g'
   echo 's#/Users/[A-Za-z0-9_.-]+#~#g'
   echo 's/-home-[A-Za-z0-9_.]+-/-homedir-/g'
-  for k in $TRACKER_KEYS; do
+  for o in $OWNERS; do
+    for b in $SANDBOXES; do
+      printf 's/%s\\/%s/owner\\/app/g\n' "$(_lit "$o")" "$(_lit "$b")"
+    done
+  done
+  for b in $SANDBOXES; do
+    printf 's/%s/app/g\n' "$(_lit "$b")"
+    printf 's/%s/APP/g\n' "$(_lit "$(tr '[:lower:]-' '[:upper:]_' <<<"$b")")"
+    printf 's/%s/app/g\n' "$(_lit "$(tr '-' '_' <<<"$b")")"
+  done
+  for o in $OWNERS; do
+    printf 's/%s/owner/g\n' "$(_lit "$o")"
+  done
+  for k in $TRACKERS; do
     printf 's/\\b%s-([0-9]+)\\b/TKT-\\1/g\n' "$(_lit "$k")"
     printf 's/\\b%s\\b/TKT/g\n' "$(_lit "$k")"
   done
   for n in $NAMES; do
     printf 's/\\b%s\\b/user/gI\n' "$(_lit "$n")"
   done
+  while IFS=$'\t' read -r from to; do
+    [ -n "$from" ] || continue
+    printf 's/%s/%s/g\n' "$(_lit "$from")" "$(_lit "$to")"
+    # The same prefix in a dash-encoded path (-homedir-a-b-…).
+    case "$from" in
+    \~/*) printf 's/%s/%s/g\n' "$(_lit "-homedir-$(sed 's#^~/##; s#/#-#g' <<<"$from")")" \
+      "$(_lit "-homedir-$(sed 's#^~/##; s#/#-#g' <<<"$to")")" ;;
+    esac
+  done <<<"$PATHS"
 } >>"$SCRIPT"
 
 mkdir -p "$DST" || exit 1

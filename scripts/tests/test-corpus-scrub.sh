@@ -12,6 +12,11 @@ PASS=0
 FAIL=0
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
+# Synthetic private tokens: the real ones live only in a local, uncommitted
+# names file. Scrub and privacy test both read this one.
+export CORPUS_PRIVATE_NAMES_FILE="$TMP/names"
+printf '%s\n' '# synthetic' 'owner acme-corp' 'sandbox zorblax-sandbox' 'tracker ZRB' 'name zorblax' \
+  'path ~/zorb/space/ ~/work/' >"$CORPUS_PRIVATE_NAMES_FILE"
 
 ok() {
   PASS=$((PASS + 1))
@@ -33,18 +38,18 @@ D="$RAW/iter-05/draft-readiness/init-1794584184-3869-test-data-pack"
 mkdir -p "$D" "$RAW/iter-05/specs"
 cat >"$RAW/iter-05/state.log" <<'EOF'
 2026-11-13T10:00:00Z|META|initiative-id|start|INIT-1794584184-3869
-2026-11-13T10:00:01Z|META|discovery|repo-ref|dexter-sandbox@main@0123456789abcdef0123456789abcdef01234567
-2026-11-13T10:00:02Z|Specify|synthesize|start|Writing specs in /home/alice/workspace/e2e-conduit/dexter-sandbox
-2026-11-13T10:00:03Z|META|ticketgen|step|Created WIL-131 (8f14e45f-ceea-467a-9575-6a2fba8f6b17) https://linear.app/acme/issue/WIL-131/x
-2026-11-13T10:00:04Z|META|note|done|cloned github.com/willard-pro/dexter-sandbox as DEXTER_SANDBOX; scratch /tmp/c/-home-alice-workspace-x
+2026-11-13T10:00:01Z|META|discovery|repo-ref|zorblax-sandbox@main@0123456789abcdef0123456789abcdef01234567
+2026-11-13T10:00:02Z|Specify|synthesize|start|Writing specs in /home/alice/zorb/space/e2e-conduit/zorblax-sandbox
+2026-11-13T10:00:03Z|META|ticketgen|step|Created ZRB-131 (8f14e45f-ceea-467a-9575-6a2fba8f6b17) https://linear.app/acme/issue/ZRB-131/x
+2026-11-13T10:00:04Z|META|note|done|cloned github.com/acme-corp/zorblax-sandbox as ZORBLAX_SANDBOX; scratch /tmp/c/-home-alice-zorb-space-x
 2026-11-13T10:00:05Z|META|note|done|key sk-ant-api03-abcdefgh lin_api_abcdefgh1234; mail ops.person@gmail.com, jake@conduit.test, admin@example.com
-2026-11-13T10:00:06Z|META|note|done|team ref='WIL'; run by Mortal; sibling init-1794584184-3869-test-data-pack; commit 0123456789abcdef0123456789abcdef01234567
+2026-11-13T10:00:06Z|META|note|done|team ref='ZRB'; run by Zorblax; sibling init-1794584184-3869-test-data-pack; commit 0123456789abcdef0123456789abcdef01234567
 EOF
-printf '# init-1794584184-3869-test-data-pack\n\nSeeds jake@conduit.test for WIL-131 in dexter-sandbox.\n' >"$D/body.md"
+printf '# init-1794584184-3869-test-data-pack\n\nSeeds jake@conduit.test for ZRB-131 in zorblax-sandbox.\n' >"$D/body.md"
 RAW_HASH=$(_dor_body_hash "$(cat "$D/body.md")")
 printf '=== DOR_SEMANTIC_SCAN ===\nSCHEMA_VERSION: 1\nTICKET: DRAFT-init-1794584184-3869-test-data-pack\nBODY_HASH: %s\nPARAPHRASE: Seed data.\n=== END DOR_SEMANTIC_SCAN ===\n' "$RAW_HASH" >"$D/scan-result.txt"
 printf '{"version":1,"kind":"scan","ticket":"DRAFT-x","body_hash":"%s","attempt":1,"result_file":"scan-result.txt"}\n' "$RAW_HASH" >"$D/scan-result.request.json"
-printf 'RESOLVED 1 — in dexter-sandbox\n' >"$D/revise.r1.md"
+printf 'RESOLVED 1 — in zorblax-sandbox\n' >"$D/revise.r1.md"
 sha256sum <"$D/revise.r1.md" | cut -d' ' -f1 >"$D/revise.r1.sha"
 mkdir -p "$RAW/iter-06/orphan"
 printf '=== DOR_SEMANTIC_AUDIT ===\nBODY_HASH: %s\n=== END DOR_SEMANTIC_AUDIT ===\n' "$RAW_HASH" >"$RAW/iter-06/orphan/audit-result.txt"
@@ -70,7 +75,7 @@ if [ -n "$DD" ] && [ "$(basename "$DD")" = "init-0000000000-${fake##*-}-test-dat
 else
   bad "a directory name gets the same fake as the text: $(find "$OUT" -type d | tr '\n' ' ')"
 fi
-if grep -q 'Created TKT-131 ' "$LOG" && ! grep -q 'WIL-' "$LOG"; then
+if grep -q 'Created TKT-131 ' "$LOG" && ! grep -q 'ZRB-' "$LOG"; then
   ok "tracker ids become TKT-<n>"
 else
   bad "tracker ids become TKT-<n>"
@@ -80,10 +85,10 @@ if grep -q 'https://tracker.example/issue' "$LOG" && ! grep -q 'linear.app' "$LO
 else
   bad "linear.app URLs are replaced"
 fi
-if grep -q 'Writing specs in ~/workspace/e2e-conduit/app$' "$LOG" && grep -q '/tmp/c/-homedir-workspace-x' "$LOG"; then
-  ok "home paths become ~ and -homedir-; the sandbox becomes app"
+if grep -q 'Writing specs in ~/work/e2e-conduit/app$' "$LOG" && grep -q '/tmp/c/-homedir-work-x' "$LOG"; then
+  ok "home paths become ~ and -homedir-, a listed prefix becomes ~/work/; the sandbox becomes app"
 else
-  bad "home paths become ~ and -homedir-; the sandbox becomes app: $(sed -n '3p;5p' "$LOG")"
+  bad "home paths become ~ and -homedir-, a listed prefix becomes ~/work/; the sandbox becomes app: $(sed -n '3p;5p' "$LOG")"
 fi
 if grep -q 'github.com/owner/app as APP' "$LOG" && grep -q 'repo-ref|app@main@' "$LOG"; then
   ok "owner/sandbox, upper-case sandbox and repo-ref are mapped"
@@ -154,6 +159,25 @@ if ! CORPUS_PRIVACY_DIRS="$RAW" bash "$PRIVACY" >/dev/null 2>&1; then
 else
   bad "the raw tree fails test-corpus-privacy.sh"
 fi
+
+# ── no names file: only the generic rules ──────────────────────────────────
+if CORPUS_PRIVATE_NAMES_FILE="$TMP/absent" bash "$SCRUB" "$RAW" "$TMP/out-generic" >"$TMP/generic.log" 2>&1 &&
+  grep -q 'no private names file' "$TMP/generic.log" &&
+  grep -q 'run by Zorblax' "$TMP/out-generic/iter-05/state.log" &&
+  grep -q 'Writing specs in ~/zorb/space/' "$TMP/out-generic/iter-05/state.log"; then
+  ok "without a names file the scrub says so and applies only the generic rules"
+else
+  bad "without a names file the scrub says so and applies only the generic rules: $(cat "$TMP/generic.log")"
+fi
+if ! CORPUS_PRIVACY_DIRS="$TMP/out-generic" bash "$PRIVACY" >/dev/null 2>&1; then
+  ok "names the scrub did not know are still caught by the privacy test's names file"
+else
+  bad "names the scrub did not know are still caught by the privacy test's names file"
+fi
+printf 'nickname x\n' >"$TMP/bad-names"
+rc=0
+CORPUS_PRIVATE_NAMES_FILE="$TMP/bad-names" bash "$SCRUB" "$RAW" "$TMP/out-bad" >/dev/null 2>&1 || rc=$?
+[ "$rc" -eq 2 ] && ok "an unknown kind in the names file is refused (rc 2)" || bad "an unknown kind in the names file is refused (rc $rc)"
 
 # ── refusals ────────────────────────────────────────────────────────────────
 rc=0

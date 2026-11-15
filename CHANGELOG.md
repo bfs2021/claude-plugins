@@ -24,17 +24,21 @@ marketplace. Where a release also moved `ticket-planner`, `fleet-controller`, or
   initiative ids, UUIDs and commit shas get a fake derived from a hash of the value (the
   same value always gets the same fake), e-mails outside `conduit.test` and
   `example.{com,org,net}` become `redacted@example.com`, token-shaped strings become
-  `REDACTED-TOKEN`, and tracker ids, `linear.app` URLs, home paths, the sandbox repository
-  and owner names and private names are rewritten. It refuses binary files, symlinks and
-  a non-empty destination. **`scripts/corpus-rehash.sh <dir>`** then recomputes what the
+  `REDACTED-TOKEN`, and `linear.app` URLs and home paths are rewritten. Private tokens
+  (names, the sandbox repository and owner, tracker keys, local path prefixes, which become
+  `~/work/`) are never committed: both the scrub and the privacy test read them from a
+  local names file (`$CORPUS_PRIVATE_NAMES_FILE`, default
+  `~/.config/claude-plugins/corpus-private-names`); without it only the generic rules
+  apply. It refuses binary files, symlinks and a non-empty destination. **`scripts/corpus-rehash.sh <dir>`** then recomputes what the
   rewrite invalidated: `BODY_HASH` (and a spawn request's `body_hash`) with ticket-auto's
   `_dor_body_hash` over the scrubbed `body.md`, and `revise.r<N>.sha` over the scrubbed
   revise file. A result with no `body.md` beside it keeps its hash. Test:
   `scripts/tests/test-corpus-scrub.sh`.
 - **`test-corpus-privacy.sh`** is its own CI test. It scans every `*/lib/tests/corpus/`
   directory, contents and file names, for tracker ids and URLs, real initiative ids, home
-  paths, the sandbox, owner and private names, token-shaped strings and e-mails outside
-  the allowlist, then plants one leak of each kind in a copy and checks each is reported.
+  paths and home-relative paths outside `~/work/`, token-shaped strings, e-mails outside
+  the allowlist and every token in the local names file, then plants one leak of each kind
+  (private names from a synthetic names file) in a copy and checks each is reported.
 - **`/ticket-planner doctor` refuses a `REPOS_ROOT` that holds a corpus (F46 class).** A
   `corpus/MANIFEST.tsv` (or the local unscrubbed `corpus-raw/MANIFEST.tsv`) within 10
   levels of `REPOS_ROOT` is an `error` row and counts as an issue: phase agents would read
