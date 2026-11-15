@@ -22,6 +22,8 @@
 #      an unset AUTONOMY never auto-merges from the router.
 #   2. COMPLEXITY must be `simple`.
 #   3. The latest META|outcome-label|info| must read `Smooth`.
+#   3b. The latest PR-REVIEW|pr-review terminal must be done|OK
+#      (PR_REVIEW_NOT_OK) — the verdict bash routed from PHASE_RESULT.
 #   4. A PR number must be recorded (PR-REVIEW|checkout-pr|done|<n>), and the
 #      whole message must be that number (`#<n>` tolerated) — PR_NUMBER_INVALID.
 #      The ticket branch must be recorded (META|branch-context ticket=, else
@@ -163,6 +165,22 @@ main() {
     _am_out skipped "outcome=${outcome:-unrecorded}"
     return 3
   fi
+
+  # 3b. The latest PR-REVIEW|pr-review terminal must be `done|OK`. That line
+  # is spawn_agent_post's, routed from the parsed PHASE_RESULT
+  # (lib/phase-route.sh, seam audit Track 0.2) — a missing or invalid review
+  # verdict reads BLOCK there, so it can never reach a merge here.
+  local review
+  review=$(grep -E '^[^|]*\|PR-REVIEW\|pr-review\|(done|fail)\|' "$_AM_LOG" 2>/dev/null | tail -1 |
+    cut -d'|' -f4-) || review=""
+  case "$review" in
+  "done|OK"*) ;;
+  *)
+    _am_log skip "PR_REVIEW_NOT_OK: latest PR review terminal is not done|OK, not auto-merging"
+    _am_out skipped "PR review verdict is not OK"
+    return 3
+    ;;
+  esac
 
   # 4. PR number — resolved BEFORE the integration guard. The checkout-pr
   # line is agent-written, so its whole message must be the number (an

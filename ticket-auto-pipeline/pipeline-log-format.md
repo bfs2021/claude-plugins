@@ -97,6 +97,17 @@ three loop-bearing phases and a phase-specific synonym would make the enum
 phase-dependent. A consumer correlating the two channels for the same run must apply this
 mapping — it is the one place their vocabularies diverge.
 
+**Who picks the token (seam audit Track 0.2).** For the VERIFY `verify` and PR-REVIEW
+`pr-review` steps the token is bash's, not the router model's: `lib/phase-route.sh` maps the
+bracket's `META|phase-result` record (and, for VERIFY, a contradicting `META|claim-delta` on
+fresh evidence) with the table above, and `router-step.sh post-spawn` prints it as
+`ROUTE_RESULT`/`ROUTE_VERDICT`/`ROUTE_SOURCE`. A missing or invalid block is VERIFY `fail`/`FAIL`
+and PR-REVIEW `done`/`BLOCK`. `spawn_agent_post` (with `LOOP_BEARING=true`) enforces it: when
+the router's claim is less conservative than the route it writes
+`META|route-override|warn|<PHASE>: router claimed <R>/<V>, PHASE_RESULT routes <R>/<V> (<source>)`
+and the routed values instead. It never upgrades a router FAIL/WARN/BLOCK. `auto-merge.sh`
+merges only after a `PR-REVIEW|pr-review|done|OK` terminal.
+
 Example:
 
 ```bash

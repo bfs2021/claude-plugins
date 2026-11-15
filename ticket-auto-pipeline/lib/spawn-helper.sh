@@ -996,6 +996,69 @@ phase_terminal_write() {
   return 0
 }
 
+# _spawn_route_rank <PHASE> <RESULT> <VERDICT> — how far from "advance" a
+# claim is: VERIFY done/PASS 0, anything else 1; PR-REVIEW OK 0, WARN 1,
+# BLOCK (or anything unknown) 2.
+_spawn_route_rank() {
+  if [ "$1" = "VERIFY" ]; then
+    if [ "$2" = "done" ] && [ "$3" = "PASS" ]; then echo 0; else echo 1; fi
+    return 0
+  fi
+  case "$3" in
+  OK) echo 0 ;;
+  WARN) echo 1 ;;
+  *) echo 2 ;;
+  esac
+}
+
+# _spawn_route_enforce — called by spawn_agent_post with its own locals in
+# scope (dynamic scoping): reads PHASE/STEP/LOG_FILE and may rewrite
+# RESULT/VERDICT. Only the verdict steps route (VERIFY/verify and
+# PR-REVIEW/pr-review); pr-iterate, reconcile and every other step pass
+# through untouched.
+_spawn_route_enforce() {
+  local _rp _rs
+  _rp=$(echo "${PHASE:-}" | tr '[:lower:]' '[:upper:]')
+  _rs=$(echo "${STEP:-}" | tr '[:upper:]' '[:lower:]')
+  case "$_rp/$_rs" in
+  VERIFY/verify | PR-REVIEW/pr-review) ;;
+  *) return 0 ;;
+  esac
+
+  local _route="" _r_result="" _r_verdict="" _r_source=""
+  if ! declare -f phase_route >/dev/null 2>&1; then
+    # shellcheck source=phase-route.sh
+    source "$(dirname "${BASH_SOURCE[0]}")/phase-route.sh" 2>/dev/null || true
+  fi
+  if declare -f phase_route >/dev/null 2>&1; then
+    _route=$(phase_route "$_rp" "$LOG_FILE" 2>/dev/null) || _route=""
+  fi
+  _r_result=$(sed -n 's/^ROUTE_RESULT=//p' <<<"$_route")
+  _r_verdict=$(sed -n 's/^ROUTE_VERDICT=//p' <<<"$_route")
+  _r_source=$(sed -n 's/^ROUTE_SOURCE=//p' <<<"$_route")
+  if [ -z "$_r_result" ] || [ -z "$_r_verdict" ]; then
+    # phase-route.sh unavailable: fail closed, never pass.
+    if [ "$_rp" = "VERIFY" ]; then
+      _r_result=fail _r_verdict=FAIL
+    else
+      _r_result=done _r_verdict=BLOCK
+    fi
+    _r_source="route-unavailable"
+  fi
+
+  local _claimed _routed
+  _claimed=$(_spawn_route_rank "$_rp" "$RESULT" "$VERDICT")
+  _routed=$(_spawn_route_rank "$_rp" "$_r_result" "$_r_verdict")
+  if [ "$_routed" -gt "$_claimed" ]; then
+    _plog "$LOG_FILE" "META" "route-override" "warn" \
+      "${_rp}: router claimed ${RESULT}/${VERDICT:-none}, PHASE_RESULT routes ${_r_result}/${_r_verdict} (${_r_source})"
+    echo "spawn_agent_post: ${_rp} verdict ${RESULT}/${VERDICT:-none} overridden to ${_r_result}/${_r_verdict} (${_r_source}) — the parsed PHASE_RESULT decides" >&2
+    RESULT="$_r_result"
+    VERDICT="$_r_verdict"
+  fi
+  return 0
+}
+
 # ── spawn_agent_post ─────────────────────────────────────────────────────────────
 # Post-spawn boilerplate: stops the heartbeat pinger and writes the done or fail
 # log entry. Call this after the agent returns.
@@ -1190,6 +1253,17 @@ spawn_agent_post() {
   # router died before reaching this point. Runs unconditionally — an orphan
   # from a crashed run is exactly the case where HB_LOG_FILE may be unset here.
   spawn_sweep_orphans "$TICKET_ID" "$LOG_FILE"
+
+  # Seam audit Track 0.2: a VERIFY / PR-REVIEW verdict step routes on the
+  # parsed PHASE_RESULT (lib/phase-route.sh), never on the router model's
+  # reading of the agent's prose. The router's own claim may only be the more
+  # conservative one: bash downgrades it (logging META|route-override), never
+  # upgrades it. A missing or invalid PHASE_RESULT routes VERIFY to FAIL and
+  # PR-REVIEW to BLOCK. Manual-router path only — fleetd calls
+  # phase_terminal_write directly with its own classify_phase outcome.
+  if [ "$LOOP_BEARING" = "true" ] && [ -n "${LOG_FILE:-}" ]; then
+    _spawn_route_enforce
+  fi
 
   phase_terminal_write \
     PHASE="$PHASE" \

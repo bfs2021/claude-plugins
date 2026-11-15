@@ -221,7 +221,9 @@ test_post_spawn() { # CASE
   case "$c" in
   impl_incomplete) grep -qx 'RETURN_COMPLETENESS_STATUS=incomplete' "$WS/stdout" || rc=1 ;;
   impl_complete) grep -qx 'RETURN_COMPLETENESS_STATUS=complete' "$WS/stdout" || rc=1 ;;
-  *) [ ! -s "$WS/stdout" ] || rc=1 ;;
+  # VERIFY / PR-REVIEW print only the route (seam audit Track 0.2).
+  *) [ -z "$(grep -v '^ROUTE_\(RESULT\|VERDICT\|SOURCE\)=' "$WS/stdout")" ] &&
+    grep -q '^ROUTE_VERDICT=' "$WS/stdout" || rc=1 ;;
   esac
   _ws_rm
   return $rc

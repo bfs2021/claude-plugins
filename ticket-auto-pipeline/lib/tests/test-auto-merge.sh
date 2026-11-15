@@ -42,6 +42,7 @@ _setup() {
 2026-10-01T00:00:00Z|META|branch-context|info|base=develop;integration=;source=default;ticket=feat/cre-2;uat-policy=per-ticket;merge-policy=
 2026-10-01T00:00:00Z|META|outcome-label|info|Smooth
 2026-10-01T00:00:01Z|PR-REVIEW|checkout-pr|done|12
+2026-10-01T00:00:02Z|PR-REVIEW|pr-review|done|OK — Verdict: all requirements addressed
 EOF
   : >"$_ws/env.sh"
 }
@@ -297,6 +298,41 @@ test_gh_view_failure_without_integration_fails_closed() {
   [ "$ok" = 1 ]
 }
 
+# ── Track 0.2: the merge needs bash's own PR-REVIEW OK ───────────────────────
+# The latest PR-REVIEW|pr-review terminal is what spawn_agent_post wrote from
+# the parsed PHASE_RESULT. Anything but done|OK refuses the merge, whatever
+# the router model concluded.
+test_pr_review_block_refuses() {
+  _setup
+  echo '2026-10-01T00:00:03Z|PR-REVIEW|pr-review|done|BLOCK — no PHASE_RESULT' >>"$_ws/log"
+  _am
+  local ok=1
+  [ "$_rc" = 3 ] && ! grep -q '^pr ' "$_ws/gh.calls" &&
+    grep -q '|META|pr-auto-merge|skip|PR_REVIEW_NOT_OK' "$_ws/log" || ok=0
+  _teardown
+  [ "$ok" = 1 ]
+}
+
+test_pr_review_warn_refuses() {
+  _setup
+  echo '2026-10-01T00:00:03Z|PR-REVIEW|pr-review|done|WARN — gaps' >>"$_ws/log"
+  _am
+  local ok=1
+  [ "$_rc" = 3 ] && ! _merged || ok=0
+  _teardown
+  [ "$ok" = 1 ]
+}
+
+test_no_pr_review_terminal_refuses() {
+  _setup
+  grep -v '|PR-REVIEW|pr-review|' "$_ws/log" >"$_ws/log.new" && mv "$_ws/log.new" "$_ws/log"
+  _am
+  local ok=1
+  [ "$_rc" = 3 ] && ! _merged || ok=0
+  _teardown
+  [ "$ok" = 1 ]
+}
+
 test_usage_rc2() {
   local rc=0
   bash "$AM" CRE-2 >/dev/null 2>&1 || rc=$?
@@ -332,6 +368,9 @@ _run "#-prefixed PR number merges" test_hash_prefixed_pr_number_merges
 _run "head ref != ticket branch refuses" test_head_ref_mismatch_refuses
 _run "no recorded ticket branch refuses" test_no_ticket_branch_refuses
 _run "unreadable head ref without integration branch refuses" test_gh_view_failure_without_integration_fails_closed
+_run "PR-REVIEW BLOCK terminal refuses" test_pr_review_block_refuses
+_run "PR-REVIEW WARN terminal refuses" test_pr_review_warn_refuses
+_run "no PR-REVIEW terminal refuses" test_no_pr_review_terminal_refuses
 _run "usage error rc 2" test_usage_rc2
 _run "router delegates to auto-merge.sh" test_router_delegates_to_script
 

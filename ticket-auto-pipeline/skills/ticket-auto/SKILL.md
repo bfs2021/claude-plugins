@@ -168,14 +168,10 @@ Every agent spawn follows this 3-step pattern:
    FAIL_ACTION=warn-continue spawn_agent_post TICKET_ID={TICKET-ID} RESULT=fail MSG="<reason>"
    ```
 
-   **Verdict phases (VERIFY, PR-REVIEW only)** — pass `VERDICT=<token>` so `spawn_agent_post`
-   prepends a canonical token to `MSG` (`done|PASS — <result>`). This decouples
-   `detect-resume.sh`'s resume grep from router free-text prose or emoji bytes. See
-   [Verdict tokens](../../pipeline-log-format.md#verdict-tokens) for the full token table.
-   ```bash
-   spawn_agent_post TICKET_ID={TICKET-ID} RESULT=done VERDICT=PASS MSG="<result>" NEXT_PHASE=<next>
-   spawn_agent_post TICKET_ID={TICKET-ID} RESULT=done VERDICT=WARN MSG="Verdict: ⚠️ <summary>" NEXT_PHASE=<next>
-   ```
+   **Verdict phases (VERIFY, PR-REVIEW only)** — `RESULT=`/`VERDICT=` are the `ROUTE_RESULT`/
+   `ROUTE_VERDICT` that `router-step.sh post-spawn` prints from the parsed PHASE_RESULT, never
+   your reading of the return; `spawn_agent_post` enforces them and prepends the token to `MSG`.
+   See [Verdict tokens](../../pipeline-log-format.md#verdict-tokens).
 
 ### Phase inspector (after IMPLEMENT, VERIFY, PR-REVIEW)
 
@@ -584,9 +580,8 @@ INSTRUCTIONS="Follow the skill exactly. Use per-criterion checkpointing: after e
 NEXT_PHASE=VERIFY
 ```
 
-**After verify completes**, write the terminal entry with a canonical `VERDICT` token
-(see [Verdict tokens](../../pipeline-log-format.md#verdict-tokens)) so PASS/FAIL never
-depends on router prose, then re-run `detect-resume.sh` and check VERIFY_ATTEMPTS:
+**After verify completes**, write the terminal entry from post-spawn's `ROUTE_*` values, then
+check VERIFY_ATTEMPTS:
 
 ```bash
 cat > ./logs/{TICKET-ID}-agent-return.txt <<'AGENT_RETURN_EOF'
@@ -597,15 +592,15 @@ AGENT_RETURN_EOF
 # overwrites the first capture and the retry history is gone.
 bash ~/.claude/skills/lib/router-step.sh post-spawn VERIFY {TICKET_ID} --log-file "{LOG_FILE}" --attempt $(({VERIFY_ATTEMPTS} + 1)) --ticket-dir "{TICKET_DIR}"
 
-spawn_agent_post TICKET_ID={TICKET-ID} RESULT=done VERDICT=PASS MSG="<summary>" NEXT_PHASE=PR-REVIEW LOOP_BEARING=true  # on PASS
-spawn_agent_post TICKET_ID={TICKET-ID} RESULT=fail VERDICT=FAIL MSG="<summary>" LOOP_BEARING=true                         # on FAIL
+# ROUTE_RESULT/ROUTE_VERDICT as post-spawn printed them (done PASS or fail FAIL)
+spawn_agent_post TICKET_ID={TICKET-ID} RESULT={ROUTE_RESULT} VERDICT={ROUTE_VERDICT} MSG="<summary>" NEXT_PHASE=PR-REVIEW LOOP_BEARING=true
 
 # Verify may tick deferred tasks: re-count if return_completeness is FAIL (#598).
 bash "${CLAUDE_SKILLS_LIB:-$HOME/.claude/skills/lib}/return-completeness-check.sh" "{TICKET_ID}" \
   --repos-root "{REPOS_ROOT}" --log-file "{LOG_FILE}" --refresh >/dev/null || true
 ```
 
-`post-spawn VERIFY` captures this attempt, runs the advisory `phase-result-parse.sh` (it reads the last block, which is this attempt's), then `verdict-recompute.sh`. That script derives the verdict from `verify-session.md` on its own and logs `META|claim-delta`. It never gates or halts on a mismatch.
+`post-spawn VERIFY` captures this attempt, parses its PHASE_RESULT, runs `verdict-recompute.sh` (`META|claim-delta`) and prints `ROUTE_*` (`lib/phase-route.sh`): PASS only for a valid PASS block not contradicted by fresh `verify-session.md` evidence; missing or invalid is FAIL.
 
 Then run the [Phase inspector](#phase-inspector-after-implement-verify-pr-review) for `VERIFY`, before the retry/advance decision (it does not affect that decision): `bash ~/.claude/skills/lib/router-step.sh inspector VERIFY {TICKET_ID} --log-file "{LOG_FILE}" || true`.
 
@@ -645,10 +640,8 @@ INSTRUCTIONS="Follow the skill exactly. Return verdict: ✅ ✅, ⚠️, or ❌.
 NEXT_PHASE=PR-REVIEW
 ```
 
-**After PR review completes**, write the terminal entry with a canonical `VERDICT` token
-mapped from the review's emoji verdict (see
-[Verdict tokens](../../pipeline-log-format.md#verdict-tokens)) — this is what `ITERATION`
-counts on, so it must never be skipped or left as free-text prose:
+**After PR review completes**, write the terminal entry with post-spawn's `ROUTE_VERDICT` —
+`ITERATION` counts on it, so it must never be skipped:
 
 ```bash
 cat > ./logs/{TICKET-ID}-agent-return.txt <<'AGENT_RETURN_EOF'
@@ -658,22 +651,20 @@ AGENT_RETURN_EOF
 # PR-REVIEW iterates, so --attempt is mandatory (a second cycle must not overwrite the first capture).
 bash ~/.claude/skills/lib/router-step.sh post-spawn PR-REVIEW {TICKET_ID} --log-file "{LOG_FILE}" --attempt $(({ITERATION} + 1))
 
-# ✅ → VERDICT=OK
-# ⚠️ → VERDICT=WARN
-# ❌ → VERDICT=BLOCK
-spawn_agent_post TICKET_ID={TICKET-ID} RESULT=done VERDICT=<OK|WARN|BLOCK> MSG="Verdict: <emoji> <summary>" NEXT_PHASE=<next> LOOP_BEARING=true
+# ROUTE_VERDICT as post-spawn printed it (OK | WARN | BLOCK), never the emoji
+spawn_agent_post TICKET_ID={TICKET-ID} RESULT=done VERDICT={ROUTE_VERDICT} MSG="Verdict: <summary>" NEXT_PHASE=<next> LOOP_BEARING=true
 ```
 
-`post-spawn PR-REVIEW` captures this cycle and runs the advisory `phase-result-parse.sh`. This is the last gate before merge, so its record matters most, but it stays observe-only. The `VERDICT` token is what routes.
+`post-spawn PR-REVIEW` parses this cycle's PHASE_RESULT and prints `ROUTE_VERDICT`: PASS → OK, WARN → WARN, anything else (missing or invalid included) → BLOCK. `auto-merge.sh` merges only after a `done|OK` terminal.
 
 **After spawn_agent_post**, run the [Phase inspector](#phase-inspector-after-implement-verify-pr-review) for `PR-REVIEW`: `bash ~/.claude/skills/lib/router-step.sh inspector PR-REVIEW {TICKET_ID} --log-file "{LOG_FILE}" || true`.
 
 Then evaluate verdict:
 
 ```bash
-# ✅ (VERDICT=OK) → proceed to STEP_5 (Document + Wiki)
-# ⚠️ (VERDICT=WARN) AND ITERATION < 3 → spawn pr-iterate (moves Review→Ready, re-adds approved) → THEN run gate-check.sh --mode reapprove (it asserts state=Ready AND approved, which only pr-iterate establishes) → implement → outcome-check → implement-complete → verify → loop back to pr-review
-# ❌ (VERDICT=BLOCK) → gate-stop
+# ROUTE_VERDICT=OK → proceed to STEP_5 (Document + Wiki)
+# ROUTE_VERDICT=WARN AND ITERATION < 3 → spawn pr-iterate (moves Review→Ready, re-adds approved) → THEN run gate-check.sh --mode reapprove (it asserts state=Ready AND approved, which only pr-iterate establishes) → implement → outcome-check → implement-complete → verify → loop back to pr-review
+# ROUTE_VERDICT=BLOCK → gate-stop
 # ITERATION >= 3 → gate-stop with code PR_REVIEW_EXHAUSTED (matching the VERIFY_EXHAUSTED / PR_FEEDBACK_EXHAUSTED cap convention)
 ```
 
@@ -799,7 +790,7 @@ Statelessness, no inline reasoning and bash-only gates: see the introduction. Th
 
 1. **Sequential dispatch**: one agent in flight at a time.
 2. **Router-managed loops**: the verify retry, PR iteration, reconcile and PR-feedback loops are counted by the router from the pipeline log, never inside a phase agent.
-3. **Advisory parsers never route**: `phase-result-parse.sh` (IMPLEMENT, VERIFY, PR-REVIEW) and `verdict-recompute.sh` (VERIFY) only append `META|phase-result|info|` / `META|claim-delta|info|` lines, are `|| true`-guarded and emit no gate-stop code. Routing stays on `RESULT=` and `VERDICT=`. See [phase-result schema](../../docs/phase-result-schema.md) and [pipeline-log-format.md](../../pipeline-log-format.md#claim-delta-entries-rlvr-verdict-recompute).
+3. **Bash routes VERIFY / PR-REVIEW**: `phase-route.sh` turns the `META|phase-result` (`phase-result-parse.sh`) and `META|claim-delta` (`verdict-recompute.sh`) lines into `ROUTE_*`; a missing or invalid block never passes. For IMPLEMENT the parser stays advisory. See [phase-result schema](../../docs/phase-result-schema.md) and [pipeline-log-format.md](../../pipeline-log-format.md#claim-delta-entries-rlvr-verdict-recompute).
 
 ---
 
