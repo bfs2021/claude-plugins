@@ -1,0 +1,17 @@
+=== DOR_SEMANTIC_SCAN ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-frontend-editor
+BODY_HASH: sha256:0e51ce2119b95b29e9a5c43eb69203cd4c20378df174e68786da0df6e2d8714c
+PARAPHRASE: Add a guarded /editor page to the frontend where a signed-in author publishes an article (single-submit POST /api/articles) and is taken to the returned slug's page, with 422/401 errors shown inline keeping typed values, and signed-out visitors (or rejected tokens) redirected to /login.
+FINDING_1_CODE: UNSTATED_DEPENDENCY
+FINDING_1_QUOTE: All paths are under `app/frontend/`. The router (with its guard hook), `api.js` and the article page come from the reader-pages ticket; `auth.js` (with its exported `ready` promise), `errors.js` and the signed-in header with the "New Article" link come from the sign-in ticket.
+FINDING_1_DETAIL: The router guard hook, api.js, the article page and the home page feed (needed by the 201 navigation and the "first article preview on the home page" criterion) come from the reader-pages ticket, but Related Tickets lists only DRAFT-backend-articles and DRAFT-frontend-auth-pages as blockers; without a blocked-by edge on the reader-pages ticket this can dispatch before the router/article page exist and its post-publish criteria cannot pass.
+GAP_REQUIREMENT_COMPLETENESS: clear
+GAP_REQUIREMENT_COMPLETENESS_REASON: Every described behaviour (guard redirect incl. rejected token, form fields, single submit, 201 navigation and home listing, 422 and 401 handling, suffixed slug) has at least one acceptance criterion.
+GAP_CONTRADICTORY_REQUIREMENTS: clear
+GAP_CONTRADICTORY_REQUIREMENTS_REASON: The 401 no-redirect behaviour explicitly and deliberately supersedes the architecture's redirect-on-401 rule, and the rest of the body is consistent with it.
+GAP_DEEP_SCOPE_AMBIGUITY: clear
+GAP_DEEP_SCOPE_AMBIGUITY_REASON: Scope is bounded to the frontend editor page, its guard and single-submit publish, with editing, deletion, tags, preview, sign-out and backend changes explicitly out of scope.
+GAP_EDGE_CASE_SUFFICIENCY: clear
+GAP_EDGE_CASE_SUFFICIENCY_REASON: Double-submit, duplicate title slug, empty fields, rejected token at load and at publish, and check ordering in the shared session are all addressed.
+=== END DOR_SEMANTIC_SCAN ===

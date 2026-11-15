@@ -1,0 +1,9 @@
+=== DOR_SEMANTIC_AUDIT ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-repo-docs-conduit
+BODY_HASH: sha256:f791bd2130b448195fa3c56384cc6294a9f43fd63fc45fb20b5127f65251d0cc
+MISSED_1_CODE: CONTRADICTORY_REQUIREMENTS
+MISSED_1_REASON: Technical Context "Edit only `app/CLAUDE.md:7`, `app/CLAUDE.md:15` and `app/CLAUDE.md:54`" (and the staging recipe's "three line edits") conflicts with Planner Context "Target Symbols: Purpose:app/CLAUDE.md:5-7;...;Conventions:app/CLAUDE.md:50-54" and with the Purpose change that removes "empty at the start"; if that text sits on lines 5-6 or 50-53, the line-7/54-only limit cannot be met and the staged edit set is no longer three lines.
+SCORE_PLAUSIBLE: yes
+SCORE_REASON: No dor_quality_score present; deterministic status ready with empty missing/advisory is consistent with a fully specified docs ticket with testable ACs and an explicit none for test data.
+=== END DOR_SEMANTIC_AUDIT ===

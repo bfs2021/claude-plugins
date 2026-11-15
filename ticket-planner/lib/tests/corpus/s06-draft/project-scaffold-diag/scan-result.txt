@@ -1,0 +1,14 @@
+=== DOR_SEMANTIC_SCAN ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-project-scaffold
+BODY_HASH: sha256:0664a49e7cb644feee3e15e0ff0342b2b492f9158e3a1e1bd866b7b230e6ff39
+PARAPHRASE: Scaffold the empty project: an Express backend package (app factory with a fresh empty in-memory store per call, node:test runner behind npm test, npm start on port 3000) and a Vite frontend package (port 5173, /api dev proxy, router and header shells), plus a .gitignore, both lockfiles and a README rewrite that drops the calculator text and names the backend start command; CLAUDE.md stays untouched.
+GAP_REQUIREMENT_COMPLETENESS: clear
+GAP_REQUIREMENT_COMPLETENESS_REASON: Every behaviour in Proposed Changes (test runner, 404 on port 3000, per-call empty store, dev server, direct-open page path, proxy with backend up and down, build, ignore rules, README text and start command, lockfiles, CLAUDE.md unchanged) has a criterion and a matching Verification Plan row; no human decision is open.
+GAP_CONTRADICTORY_REQUIREMENTS: clear
+GAP_CONTRADICTORY_REQUIREMENTS_REASON: The criteria and Verification Plan rows agree with each other and with the rest of the body on ports, commands, paths and the empty store; the initiative-level "seeded" store in Planner Context is deferred to later tickets by the body itself.
+GAP_DEEP_SCOPE_AMBIGUITY: clear
+GAP_DEEP_SCOPE_AMBIGUITY_REASON: Scope is bounded by an explicit list of created and edited files and an Out of Scope section naming endpoints, seed rows, page content, CORS, root package.json and CLAUDE.md.
+GAP_EDGE_CASE_SUFFICIENCY: clear
+GAP_EDGE_CASE_SUFFICIENCY_REASON: The plausible edge cases for a scaffold are covered: undefined route, direct open of a page path, proxy with the backend stopped, ports already in use (server-state note), and store isolation between createApp() calls.
+=== END DOR_SEMANTIC_SCAN ===

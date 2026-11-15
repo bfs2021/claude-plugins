@@ -1,0 +1,7 @@
+=== DOR_SEMANTIC_AUDIT ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-auth-api
+BODY_HASH: sha256:f01542d0a29186e5f7950de514be4d552231d032cbb0de7d6316cfd99e7d21ba
+SCORE_PLAUSIBLE: yes
+SCORE_REASON: No dor_quality_score is present; the deterministic "ready" status with empty missing/advisory arrays matches the body, which has concrete, testable criteria for every proposed behaviour, seeded test data with sources, and a full per-criterion Verification Plan.
+=== END DOR_SEMANTIC_AUDIT ===

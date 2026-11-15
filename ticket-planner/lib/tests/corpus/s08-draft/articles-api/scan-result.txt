@@ -1,0 +1,17 @@
+=== DOR_SEMANTIC_SCAN ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-articles-api
+BODY_HASH: sha256:08fd35c0546097337be2fe112c2964706cca7664e29669b6d00e9f586e1e243d
+PARAPHRASE: Add the backend article API: authenticated create with title-derived unique slugs and blank/auth validation, public read-by-slug with 404 for unknown slugs, and a public newest-first list with tolerant limit/offset paging and an exact-match author filter, never exposing password data.
+FINDING_1_CODE: EDGE_CASE_GAP
+FINDING_1_QUOTE: `GET /api/articles?limit=abc` returns status 200 with 2 items
+FINDING_1_DETAIL: The paging rule treats any value that is not a whole number as its default, but no criterion covers a fractional value such as `limit=1.5` (or a non-numeric `offset`); a parseInt-based implementation would turn `limit=1.5` into 1 and return 1 item instead of the default 2, and every listed criterion would still pass.
+GAP_REQUIREMENT_COMPLETENESS: clear
+GAP_REQUIREMENT_COMPLETENESS_REASON: Every proposed behaviour (create, slug uniqueness, create errors, read one, 404, list order and tie-break, paging, author filter, no passwords) has at least one acceptance criterion and a matching Verification Plan row.
+GAP_CONTRADICTORY_REQUIREMENTS: clear
+GAP_CONTRADICTORY_REQUIREMENTS_REASON: The edited criteria and Verification Plan rows agree with each other, with the Proposed Behaviour and with the Technical Context test-isolation notes.
+GAP_DEEP_SCOPE_AMBIGUITY: clear
+GAP_DEEP_SCOPE_AMBIGUITY_REASON: The criteria and plan rows are bounded to the three named endpoints and named files, and Out of Scope explicitly excludes edit, delete, tags, comments, favorites, feed, profiles and frontend.
+GAP_EDGE_CASE_SUFFICIENCY: finding
+GAP_EDGE_CASE_SUFFICIENCY_REASON: Paging criteria cover negative, non-numeric, empty and zero values but not fractional values, which the "whole number" rule singles out and a common parseInt implementation gets wrong.
+=== END DOR_SEMANTIC_SCAN ===

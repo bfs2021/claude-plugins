@@ -1,0 +1,95 @@
+2026-11-15T10:25:32Z|META|schema|start|1
+2026-11-15T10:25:32Z|META|initiative-id|start|INIT-0000000000-7573
+2026-11-15T10:25:32Z|META|idea|start|Build the first slice of a blogging app in the app repo, modelled on the RealWorld Conduit spec (api/openapi.yml): register, login, current user, create/read/list articles, plus five frontend pages. It replaces the calculator placeholder named in the repo's CLAUDE.md and creates the Express + Vite project from scratch, including a backend test runner behind npm test. 
+2026-11-15T10:25:32Z|META|contract|start|test-data-source-v1
+2026-11-15T10:25:32Z|META|no-tests-rule|done|false
+2026-11-15T10:25:32Z|META|intent|done|85,ready,24a27ce34cccf15cb5f0e85dcbf45ba85b5fddce3360b03597f098578563e10f
+2026-11-15T10:25:48Z|Appraisal|scope|start|Interpreting idea: Build the first slice of a blogging app in the app repo, modelled on the RealWorld Conduit spec (api/openapi.yml): register, login, current user, create/read/list articles, plus five frontend pages. It replaces the calculator placeholder named in the repo's CLAUDE.md and creates the Express + Vite project from scratch, including a backend test runner behind npm test.
+2026-11-15T10:26:28Z|Appraisal|scope|done|Scope summary written to artifacts/appraisal.md
+2026-11-15T10:27:08Z|Discovery|explore|start|Exploring affected repositories
+2026-11-15T10:27:09Z|META|discovery|repo-ref|app@main@54d88f7c38c68fe8229b5bd0d135ca9b6e6c78fb
+2026-11-15T10:28:09Z|Discovery|explore|done|Discovery report: 1 services, 4 symbols resolved
+2026-11-15T10:28:43Z|Architecture|design|start|Evaluating technical approaches
+2026-11-15T10:30:04Z|Architecture|design|done|Architecture decision: Express createApp factory + in-memory seeded store + bcryptjs/jsonwebtoken + node:test (fetch on port 0) in backend/; Vite vanilla SPA with pushState routing and /api dev proxy to :3000 in frontend/
+2026-11-15T10:30:19Z|META|contract|start|specify-parameters-v1
+2026-11-15T10:30:19Z|META|contract|start|spec-ownership-v1
+2026-11-15T10:30:19Z|META|contract|start|ac-precondition-v1
+2026-11-15T10:30:33Z|Specify|synthesize|start|Synthesizing proposal and writing specs for N tickets
+2026-11-15T10:38:45Z|META|ac-precondition|done|0 checked, 0 unchecked, 4 planned, 6 input
+2026-11-15T10:39:17Z|META|ac-precondition|done|0 checked, 0 unchecked, 4 planned, 6 input
+2026-11-15T10:40:28Z|META|ac-precondition|done|0 checked, 0 unchecked, 4 planned, 6 input
+2026-11-15T10:40:35Z|Specify|synthesize|done|Proposal written, 7 ticket specs in artifacts/specs/, self-lint clean
+2026-11-15T10:40:52Z|META|goldfish|skip|f19436dbdd2d DISABLED
+2026-11-15T10:41:02Z|Review|critique|start|Critiquing proposal for gaps and risks
+2026-11-15T10:43:36Z|Review|critique|done|Review complete: 0 blockers, 4 major, 7 minor, 4 nit; verdict needs-revision
+2026-11-15T10:44:34Z|Consensus|resolve|start|Resolving 15 review findings
+2026-11-15T10:50:01Z|Consensus|resolve|done|Consensus: 13 accepted, 1 rejected, 1 deferred
+2026-11-15T10:50:18Z|Crosscheck|check|start|running testdata-synth + citation + propagation + bypass + contracts + signals + deps + testdata checks
+2026-11-15T10:50:18Z|Crosscheck|testdata-synth|start|synthesizing test-data specs for unowned needs
+2026-11-15T10:50:20Z|Crosscheck|testdata-synth|done|0 TD spec(s), 0 need(s)
+2026-11-15T10:50:20Z|META|ownership-edges|done|4 edge(s)
+2026-11-15T10:50:23Z|META|crosscheck|warn|info DISCOVERY_GAP_UNRESOLVED ~/workspace/workbench/e2e-conduit/.ticket-auto/initiatives/INIT-0000000000-7573/artifacts/discovery.md:128 → "  app — backend   quick-scan   Directory does not exist at the pinned ref; only the `CLAUDE.md` config surfaces (test command, " not recorded in proposal.md Out of Scope
+2026-11-15T10:50:23Z|META|crosscheck|warn|info DISCOVERY_GAP_UNRESOLVED ~/workspace/workbench/e2e-conduit/.ticket-auto/initiatives/INIT-0000000000-7573/artifacts/discovery.md:129 → "  app — frontend   quick-scan   Directory does not exist at the pinned ref; only `CLAUDE.md` config (dev/build commands, port, " not recorded in proposal.md Out of Scope
+2026-11-15T10:50:36Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/articles-api.md:36 ## Technical Context names keys neither ## Writes nor ## Reads declares: articles.empty_slug_base, articles.list_default_limit, articles.list_default_offset, articles.invalid_paging — declare each in the table it belongs to
+2026-11-15T10:50:36Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/auth-api.md:39 ## Technical Context names keys neither ## Writes nor ## Reads declares: auth.bcrypt_cost, auth.token_expiry, auth.jwt_dev_secret, req.user — declare each in the table it belongs to
+2026-11-15T10:50:36Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/backend-scaffold.md:35 ## Technical Context names keys neither ## Writes nor ## Reads declares: server.api_port, auth.bcrypt_cost — declare each in the table it belongs to
+2026-11-15T10:50:36Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/frontend-read-pages.md:35 ## Technical Context names keys neither ## Writes nor ## Reads declares: server.port, frontend.dev_port, server.api_port, location.pathname — declare each in the table it belongs to
+2026-11-15T10:50:36Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/repo-docs.md:29 ## Technical Context names keys neither ## Writes nor ## Reads declares: server.api_port, frontend.dev_port — declare each in the table it belongs to
+2026-11-15T10:50:36Z|META|ac-precondition|done|0 checked, 0 unchecked, 5 planned, 8 input
+2026-11-15T10:50:36Z|Crosscheck|check|done|clean (7 warn, 0 accepted)
+2026-11-15T10:50:43Z|META|draft-readiness|start|evaluator=dor-semantic-v4
+2026-11-15T10:51:22Z|META|draft-readiness|info|round=0 revise=0 reevaluate=4 spawns=4/56
+2026-11-15T10:53:36Z|META|draft-readiness|info|round=0 revise=0 reevaluate=4 spawns=8/56
+2026-11-15T10:55:35Z|META|draft-readiness|info|round=0 revise=0 reevaluate=3 spawns=11/56
+2026-11-15T10:57:25Z|META|draft-readiness|info|round=0 revise=0 reevaluate=3 spawns=14/56
+2026-11-15T10:58:57Z|META|draft-readiness|info|round=1 revise=5 reevaluate=0 spawns=19/56
+2026-11-15T10:58:57Z|META|draft-revise|start|articles-api round=1 findings=1
+2026-11-15T10:58:57Z|META|draft-revise|start|auth-api round=1 findings=1
+2026-11-15T10:58:57Z|META|draft-revise|start|backend-scaffold round=1 findings=3
+2026-11-15T10:58:57Z|META|draft-revise|start|frontend-auth-pages round=1 findings=1
+2026-11-15T10:58:57Z|META|draft-revise|start|repo-docs round=1 findings=1
+2026-11-15T11:02:17Z|META|draft-revise|info|articles-api ASSUMED EDGE_CASE_GAP f-48900e438e0b "A title, description or body that is not a string, or that holds only whitespace, counts as blank and gets the same 422 can't be blank error as a missing field."
+2026-11-15T11:02:17Z|META|draft-revise|done|articles-api round=1 status=applied resolved=0 rebutted=0 unaddressed=0 added=2 extended=0 assumed=1
+2026-11-15T11:02:44Z|META|draft-revise|info|auth-api SOURCE_UNMATCHED f-ca6beb26b024
+2026-11-15T11:02:44Z|META|draft-revise|done|auth-api round=1 status=applied resolved=1 rebutted=0 unaddressed=0 added=2 extended=0
+2026-11-15T11:03:08Z|META|draft-revise|info|backend-scaffold REBUTTAL EDGE_CASE_GAP f-b0a0c8ca5363 "the malformed-JSON response is deliberately undefined for this initiative: consensus Deferred Items says 'Malformed JSON request bodies (part of F6). The brief defines no status or envelope for a body that is not valid JSON, so any choice here would invent an API contract. The frontend always sends valid JSON. Recorded in the Risk Register', and the consensus Scope change says 'malformed JSON bodies are out of scope'; adding a criterion here would contradict that decision."
+2026-11-15T11:03:08Z|META|draft-revise|info|backend-scaffold SOURCE_UNMATCHED f-dbdd129688d5
+2026-11-15T11:03:08Z|META|draft-revise|done|backend-scaffold round=1 status=applied resolved=2 rebutted=1 unaddressed=0 added=4 extended=1
+2026-11-15T11:03:33Z|META|draft-revise|info|frontend-auth-pages ASSUMED EDGE_CASE_GAP f-1e054ffe2188 "When the start-up current-user check fails with a network error or a server error instead of a 401, the app keeps the stored token, shows the signed-out header and still renders the first page."
+2026-11-15T11:03:33Z|META|draft-revise|done|frontend-auth-pages round=1 status=applied resolved=0 rebutted=0 unaddressed=0 added=2 extended=0 assumed=1
+2026-11-15T11:03:57Z|META|draft-revise|done|repo-docs round=1 status=applied resolved=1 rebutted=0 unaddressed=0 added=2 extended=0
+2026-11-15T11:03:57Z|Crosscheck|check|start|running testdata-synth + citation + propagation + bypass + contracts + signals + deps + testdata checks
+2026-11-15T11:03:57Z|Crosscheck|testdata-synth|start|synthesizing test-data specs for unowned needs
+2026-11-15T11:04:00Z|Crosscheck|testdata-synth|done|0 TD spec(s), 0 need(s)
+2026-11-15T11:04:03Z|META|crosscheck|warn|info DISCOVERY_GAP_UNRESOLVED ~/workspace/workbench/e2e-conduit/.ticket-auto/initiatives/INIT-0000000000-7573/artifacts/discovery.md:128 → "  app — backend   quick-scan   Directory does not exist at the pinned ref; only the `CLAUDE.md` config surfaces (test command, " not recorded in proposal.md Out of Scope
+2026-11-15T11:04:03Z|META|crosscheck|warn|info DISCOVERY_GAP_UNRESOLVED ~/workspace/workbench/e2e-conduit/.ticket-auto/initiatives/INIT-0000000000-7573/artifacts/discovery.md:129 → "  app — frontend   quick-scan   Directory does not exist at the pinned ref; only `CLAUDE.md` config (dev/build commands, port, " not recorded in proposal.md Out of Scope
+2026-11-15T11:04:20Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/articles-api.md:36 ## Technical Context names keys neither ## Writes nor ## Reads declares: articles.empty_slug_base, articles.list_default_limit, articles.list_default_offset, articles.invalid_paging — declare each in the table it belongs to
+2026-11-15T11:04:20Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/auth-api.md:39 ## Technical Context names keys neither ## Writes nor ## Reads declares: auth.bcrypt_cost, auth.token_expiry, auth.jwt_dev_secret, req.user — declare each in the table it belongs to
+2026-11-15T11:04:20Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/backend-scaffold.md:35 ## Technical Context names keys neither ## Writes nor ## Reads declares: server.api_port, auth.bcrypt_cost — declare each in the table it belongs to
+2026-11-15T11:04:20Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/frontend-read-pages.md:35 ## Technical Context names keys neither ## Writes nor ## Reads declares: server.port, frontend.dev_port, server.api_port, location.pathname — declare each in the table it belongs to
+2026-11-15T11:04:20Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/repo-docs.md:29 ## Technical Context names keys neither ## Writes nor ## Reads declares: server.api_port, frontend.dev_port — declare each in the table it belongs to
+2026-11-15T11:04:20Z|META|ac-precondition|done|0 checked, 0 unchecked, 5 planned, 8 input
+2026-11-15T11:04:20Z|Crosscheck|check|done|clean (7 warn, 0 accepted)
+2026-11-15T11:04:43Z|META|draft-readiness|info|round=1 revise=0 reevaluate=4 spawns=23/56
+2026-11-15T11:07:16Z|META|draft-readiness|info|round=1 revise=0 reevaluate=4 spawns=27/56
+2026-11-15T11:09:11Z|META|draft-readiness|info|round=1 revise=0 reevaluate=1 spawns=28/56
+2026-11-15T11:10:30Z|META|draft-readiness|info|round=1 revise=0 reevaluate=1 spawns=29/56
+2026-11-15T11:11:33Z|META|draft-readiness|info|round=2 revise=1 reevaluate=0 spawns=30/56
+2026-11-15T11:11:34Z|META|draft-revise|start|repo-docs round=2 findings=2
+2026-11-15T11:12:47Z|META|draft-revise|done|repo-docs round=2 status=applied resolved=2 rebutted=0 unaddressed=0 added=4 extended=0
+2026-11-15T11:12:47Z|Crosscheck|check|start|running testdata-synth + citation + propagation + bypass + contracts + signals + deps + testdata checks
+2026-11-15T11:12:47Z|Crosscheck|testdata-synth|start|synthesizing test-data specs for unowned needs
+2026-11-15T11:12:49Z|Crosscheck|testdata-synth|done|0 TD spec(s), 0 need(s)
+2026-11-15T11:12:52Z|META|crosscheck|warn|info DISCOVERY_GAP_UNRESOLVED ~/workspace/workbench/e2e-conduit/.ticket-auto/initiatives/INIT-0000000000-7573/artifacts/discovery.md:128 → "  app — backend   quick-scan   Directory does not exist at the pinned ref; only the `CLAUDE.md` config surfaces (test command, " not recorded in proposal.md Out of Scope
+2026-11-15T11:12:52Z|META|crosscheck|warn|info DISCOVERY_GAP_UNRESOLVED ~/workspace/workbench/e2e-conduit/.ticket-auto/initiatives/INIT-0000000000-7573/artifacts/discovery.md:129 → "  app — frontend   quick-scan   Directory does not exist at the pinned ref; only `CLAUDE.md` config (dev/build commands, port, " not recorded in proposal.md Out of Scope
+2026-11-15T11:13:10Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/articles-api.md:36 ## Technical Context names keys neither ## Writes nor ## Reads declares: articles.empty_slug_base, articles.list_default_limit, articles.list_default_offset, articles.invalid_paging — declare each in the table it belongs to
+2026-11-15T11:13:10Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/auth-api.md:39 ## Technical Context names keys neither ## Writes nor ## Reads declares: auth.bcrypt_cost, auth.token_expiry, auth.jwt_dev_secret, req.user — declare each in the table it belongs to
+2026-11-15T11:13:10Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/backend-scaffold.md:35 ## Technical Context names keys neither ## Writes nor ## Reads declares: server.api_port, auth.bcrypt_cost — declare each in the table it belongs to
+2026-11-15T11:13:10Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/frontend-read-pages.md:35 ## Technical Context names keys neither ## Writes nor ## Reads declares: server.port, frontend.dev_port, server.api_port, location.pathname — declare each in the table it belongs to
+2026-11-15T11:13:10Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/repo-docs.md:29 ## Technical Context names keys neither ## Writes nor ## Reads declares: server.api_port, frontend.dev_port — declare each in the table it belongs to
+2026-11-15T11:13:10Z|META|ac-precondition|done|0 checked, 0 unchecked, 5 planned, 8 input
+2026-11-15T11:13:10Z|Crosscheck|check|done|clean (7 warn, 0 accepted)
+2026-11-15T11:13:26Z|META|draft-readiness|info|round=2 revise=0 reevaluate=1 spawns=31/56
+2026-11-15T11:14:39Z|META|draft-readiness|info|round=2 revise=0 reevaluate=1 spawns=32/56
+2026-11-15T11:16:03Z|META|draft-readiness|fail|frontend-editor INTENT_AC_MISMATCH "After publishing the title `<img src=x onerror=alert(1)>`, the home page article list contains 0 `img` elements"
+2026-11-15T11:16:03Z|META|draft-readiness|done|blocked 1/7

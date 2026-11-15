@@ -1,0 +1,11 @@
+=== DOR_SEMANTIC_AUDIT ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-init-0000000000-1247-test-data-pack
+BODY_HASH: sha256:0ffd7e30bc25d893673b179c239551492d4a219be9e00d9607de9cfbed319a3e
+MISSED_1_CODE: INTENT_AC_MISMATCH
+MISSED_1_REASON: AC "Every seeded foreign key resolves to a seeded or existing parent record" (VPLAN row 3: "verify target reports no orphan rows") assumes database records, but every item under Test Data Provided is a git worktree of app, which has no foreign keys or rows, so the criterion does not serve the stated intent.
+MISSED_2_CODE: EDGE_CASE_GAP
+MISSED_2_REASON: The worktrees are created "at a temporary path", but the consumers need VERIFY_REPO_PATH_APP to point at them, and no AC or Proposed Change says where the path is recorded or how consumers find it. Re-running seed (upsert by record key) also has to cope with a worktree that already exists at that path, or one whose temporary path was cleaned up.
+SCORE_PLAUSIBLE: yes
+SCORE_REASON: No dor_quality_score is present. The status "ready" with empty missing/advisory fits a body whose structure is complete; the gaps found here are semantic, which the mechanical check cannot see.
+=== END DOR_SEMANTIC_AUDIT ===

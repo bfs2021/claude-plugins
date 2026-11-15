@@ -1,0 +1,7 @@
+=== DOR_SEMANTIC_AUDIT ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-editor-page
+BODY_HASH: sha256:c984da314874f94df2411601b2b299bab063957023d95e9e5446d1e0e4a789cf
+SCORE_PLAUSIBLE: yes
+SCORE_REASON: No dor_quality_score is present in the deterministic result; its status "ready" with empty missing/advisory arrays is plausible, since every described behaviour (form fields, publish and redirect, slug collision, blank-field and bad-token errors, reload after rejected token) has a concrete, testable criterion, and test data and dependencies are named.
+=== END DOR_SEMANTIC_AUDIT ===

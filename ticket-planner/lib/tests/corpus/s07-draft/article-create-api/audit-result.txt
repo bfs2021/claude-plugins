@@ -1,0 +1,7 @@
+=== DOR_SEMANTIC_AUDIT ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-article-create-api
+BODY_HASH: sha256:fbb8af5b845fb19295fbcf719f6be47ea514c62418d8fe572ff4aa7e62e4dc20
+SCORE_PLAUSIBLE: yes
+SCORE_REASON: No dor_quality_score is present; the deterministic status "ready" with empty missing/advisory arrays is plausible because every behaviour in Proposed Behaviour (create, slug, uniqueness suffix, validation, token rejection, nothing stored on 401) has a concrete criterion with matching Test Data Prerequisites and Verification Plan rows.
+=== END DOR_SEMANTIC_AUDIT ===

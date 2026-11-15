@@ -1,0 +1,7 @@
+=== DOR_SEMANTIC_AUDIT ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-backend-scaffold
+BODY_HASH: sha256:c8ac1cdfce636908c4dd85f97946be6083bd0a676608bf200cc38192431fdec2
+SCORE_PLAUSIBLE: yes
+SCORE_REASON: No dor_quality_score is present; status "ready" with empty missing/advisory fits a ticket whose 13 criteria each map to a terminal-verifiable Verification Plan row and whose seeded test data is listed with a source.
+=== END DOR_SEMANTIC_AUDIT ===

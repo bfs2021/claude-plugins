@@ -1,0 +1,19 @@
+=== DOR_SEMANTIC_SCAN ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-backend-store-and-seed
+BODY_HASH: sha256:e724b5ce9681899b76e76d263cefb0cab3f3d4d24be47b7f88fbe823fee03c3c
+FINDING_1_CODE: MISSING_CORE_AC
+FINDING_1_QUOTE: The brief requires in-memory storage re-seeded on every server start, with fixed seed users and articles so list ordering is deterministic.
+FINDING_1_DETAIL: The ticket specifies listArticles({author, limit, offset}) with sort createdAt desc then seq desc, author filtering, articlesCount = filtered total before slicing, and case-insensitive findUserByEmail, but no acceptance criterion exercises any of it; the deterministic-ordering requirement that motivates the seed is never verified, so a wrong sort or a count taken after slicing would pass every listed AC.
+FINDING_2_CODE: EDGE_CASE_GAP
+FINDING_2_QUOTE: - `src/serializers.js`: `toUserResponse(user, token)` returns only `email, token, username, bio, image`; `toProfile(user)` returns only `username, bio, image`; `toArticle(article)` returns `slug, title, description, body, createdAt, updatedAt, author` with `author` built by `toProfile`.
+FINDING_2_DETAIL: toArticle emits updatedAt, but the seed articles define only createdAt; serializing a seed article yields updatedAt undefined, which JSON.stringify drops, so the article response for both seed articles lacks the updatedAt key the serializer promises (the seed should state updatedAt, e.g. equal to createdAt).
+GAP_REQUIREMENT_COMPLETENESS: finding
+GAP_REQUIREMENT_COMPLETENESS_REASON: Store query behavior (listArticles sort/filter/count, case-insensitive email lookup) is specified but has no acceptance criterion.
+GAP_CONTRADICTORY_REQUIREMENTS: clear
+GAP_CONTRADICTORY_REQUIREMENTS_REASON: The 422-before-404 behavior on a malformed POST to an unknown path is consistent with the stated middleware order (express.json, routers, 404, error handler); no requirements disagree.
+GAP_DEEP_SCOPE_AMBIGUITY: clear
+GAP_DEEP_SCOPE_AMBIGUITY_REASON: Files, exports, seed records and out-of-scope items (routes, JWT signing, frontend, database) are concretely bounded.
+GAP_EDGE_CASE_SUFFICIENCY: finding
+GAP_EDGE_CASE_SUFFICIENCY_REASON: Seed articles omit updatedAt although the article serializer returns it.
+=== END DOR_SEMANTIC_SCAN ===

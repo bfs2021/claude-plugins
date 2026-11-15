@@ -1,0 +1,14 @@
+=== DOR_SEMANTIC_SCAN ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-articles-api
+BODY_HASH: sha256:a687b90b5991857a321c7a8a91c49dfd6ee23b2a327e91c79a87b5d560939617
+PARAPHRASE: Add backend article endpoints: authenticated create with slug generation and blank-field validation, public read-by-slug with 404 on unknown slug, and a public newest-first list with limit/offset paging (bad values fall back to defaults), total count before paging, and an exact-match author filter.
+GAP_REQUIREMENT_COMPLETENESS: clear
+GAP_REQUIREMENT_COMPLETENESS_REASON: Every behaviour in Proposed Behaviour and the Scope assumption (create, slug rules, 401, 422 incl. whitespace/non-string, read, 404, list, paging, invalid paging, author filter) has a matching acceptance criterion and Verification Plan row.
+GAP_CONTRADICTORY_REQUIREMENTS: clear
+GAP_CONTRADICTORY_REQUIREMENTS_REASON: The Scope assumption widening blank to whitespace-only and non-string values extends the 422 rule without conflicting with it; AC, Scope and Verification Plan rows agree with Proposed Behaviour and Technical Context.
+GAP_DEEP_SCOPE_AMBIGUITY: clear
+GAP_DEEP_SCOPE_AMBIGUITY_REASON: Scope names the exact files in one service and Out of Scope excludes tags, comments, favorites, feed, edit and delete.
+GAP_EDGE_CASE_SUFFICIENCY: clear
+GAP_EDGE_CASE_SUFFICIENCY_REASON: Slug collisions, empty slug, non-ASCII letters, blank/whitespace/non-string fields, missing article key, invalid paging values, case-sensitive author filter and equal-timestamp ordering are all specified.
+=== END DOR_SEMANTIC_SCAN ===

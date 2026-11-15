@@ -1,0 +1,7 @@
+=== DOR_SEMANTIC_AUDIT ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-frontend-auth-pages
+BODY_HASH: sha256:0c21badc5f217a834b308d20e345f2f30b81ff5e66d435e73615078ae32cc2e9
+SCORE_PLAUSIBLE: yes
+SCORE_REASON: No dor_quality_score is present in the deterministic result; its status "ready" with empty missing/advisory arrays is plausible, since every described behaviour (both pages, token storage, signed-in header, error lines, rejected-token removal, 5xx/network-error assumption) has a criterion, a Verification Plan row and covered test data.
+=== END DOR_SEMANTIC_AUDIT ===

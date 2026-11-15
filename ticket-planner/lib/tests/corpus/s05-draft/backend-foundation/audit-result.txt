@@ -1,0 +1,7 @@
+=== DOR_SEMANTIC_AUDIT ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-backend-foundation
+BODY_HASH: sha256:12dbd69b34799657a7d03fbe983628be152f3fdf4234dcc06a44bf3b711e9415
+SCORE_PLAUSIBLE: yes
+SCORE_REASON: No dor_quality_score is present; status "ready" with empty missing/advisory is plausible: every proposed behavior has a concrete, testable AC, a matching Verification Plan row, and the two data needs (worktree, empty dir) are listed with sources in Test Data Prerequisites.
+=== END DOR_SEMANTIC_AUDIT ===

@@ -1,0 +1,9 @@
+=== DOR_SEMANTIC_AUDIT ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-frontend-editor
+BODY_HASH: sha256:1b2404b0724b33bfb649ade6ccb9c3334d6b9d120492b1d1eefe7a62201541e3
+MISSED_1_CODE: EDGE_CASE_GAP
+MISSED_1_REASON: AC 9 and AC 10 ("Publishing as jake with title `My first post`, description `Intro`, body `Hello world` changes the address bar path to `/article/my-first-post`") each describe their own publish of the same title, and Verification Plan rows 9 and 10 list separate "Sign in > New Article > Publish Article" paths; nothing says they share one publish, so a verifier that runs each row on its own publishes twice and AC 10 lands on /article/my-first-post-2 (and AC 19 on -3).
+SCORE_PLAUSIBLE: yes
+SCORE_REASON: There is no dor_quality_score. The status "ready" with empty missing/advisory arrays fits a ticket where every criterion has a matching Verification Plan row and listed test data.
+=== END DOR_SEMANTIC_AUDIT ===

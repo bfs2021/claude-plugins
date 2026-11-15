@@ -1,0 +1,23 @@
+=== DOR_SEMANTIC_SCAN ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-init-0000000000-1247-test-data-pack
+BODY_HASH: sha256:0ffd7e30bc25d893673b179c239551492d4a219be9e00d9607de9cfbed319a3e
+PARAPHRASE: Add idempotent Make targets (seed, verify, reset) plus a README that create three git worktrees of app (two intact, one with frontend/ deleted) so the backend-foundation and frontend-reader-pages env-start criteria can be verified against a second checkout.
+FINDING_1_CODE: INTENT_AC_MISMATCH
+FINDING_1_QUOTE: - [ ] Every seeded foreign key resolves to a seeded or existing parent record
+FINDING_1_DETAIL: The seeded "records" are git worktrees, not database rows; there are no foreign keys or parent records, so this criterion (and its "no orphan rows" Verification Plan row) checks nothing that serves the intent of providing usable worktree checkouts.
+FINDING_2_CODE: SCOPE_AMBIGUOUS
+FINDING_2_QUOTE: - `td-1794584184-3869-2` — 1 git worktree of `app` at a temporary path — for `backend-foundation`: With `VERIFY_REPO_PATH_APP` set to a second checkout made by `git worktree add`, after `bash scripts/env-start.sh` the process listening on port 3000 has a working directory inside that checkout
+FINDING_2_DETAIL: "A temporary path" is not bounded: the ticket never says where each worktree is created or how its path is published (file, env, README) so a consumer verifier can set VERIFY_REPO_PATH_APP to it, nor whether the path must survive tmp cleanup between seed and consumer verification.
+FINDING_3_CODE: EDGE_CASE_GAP
+FINDING_3_QUOTE: - [ ] make reset-seed-init-0000000000-1247-test-data-pack removes only the records this ticket seeds and exits 0
+FINDING_3_DETAIL: td-1794584184-3869-4 is a worktree with tracked frontend/ files deleted, so it is dirty; plain `git worktree remove` refuses a dirty worktree and reset would exit non-zero unless it forces removal, and a temp path already deleted by the OS leaves a stale worktree registration needing `git worktree prune`. Neither case is addressed.
+GAP_REQUIREMENT_COMPLETENESS: clear
+GAP_REQUIREMENT_COMPLETENESS_REASON: Seed, idempotent re-run, verify, reset and README each have an acceptance criterion.
+GAP_CONTRADICTORY_REQUIREMENTS: clear
+GAP_CONTRADICTORY_REQUIREMENTS_REASON: No two requirements disagree; Test Data Prerequisites "None" is consistent since the seed ticket's own criteria need no pre-existing data.
+GAP_DEEP_SCOPE_AMBIGUITY: finding
+GAP_DEEP_SCOPE_AMBIGUITY_REASON: Worktree location and how consumers discover each worktree path are unspecified.
+GAP_EDGE_CASE_SUFFICIENCY: finding
+GAP_EDGE_CASE_SUFFICIENCY_REASON: Reset of the dirty frontend-removed worktree and of a worktree whose temp path vanished are unaddressed.
+=== END DOR_SEMANTIC_SCAN ===

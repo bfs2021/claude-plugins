@@ -1,0 +1,17 @@
+=== DOR_SEMANTIC_SCAN ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-repo-docs
+BODY_HASH: sha256:1d9aadf120e6ee44c994c72df6b9f02c76059dfb692f40b94e8c8bf6ca5becc4
+PARAPHRASE: Documentation-only update to app CLAUDE.md and README.md replacing the stale calculator/empty-repo description with Conduit-lite, relabelling the npm run build row as "FE build" from frontend/, and documenting how to start backend and frontend, seeded accounts and JWT_SECRET, while preserving existing commands and URLs.
+FINDING_1_CODE: MISSING_CORE_AC
+FINDING_1_QUOTE: `README.md` contains no occurrence of the word `calculator`, in any letter case
+FINDING_1_DETAIL: The Summary and Proposed Changes require README.md to "describe Conduit-lite", but no acceptance criterion or Verification Plan row checks that README.md names Conduit-lite; the README criteria only check absence of "calculator" plus commands, ports, the seeded account and JWT_SECRET, so a README that never names or describes the app would pass.
+GAP_REQUIREMENT_COMPLETENESS: finding
+GAP_REQUIREMENT_COMPLETENESS_REASON: README's core "describe Conduit-lite" change has no criterion; all other proposed changes are covered.
+GAP_CONTRADICTORY_REQUIREMENTS: clear
+GAP_CONTRADICTORY_REQUIREMENTS_REASON: Criteria and Verification Plan rows agree with Proposed Changes, Technical Context and Out of Scope (BE server row, BE_TEST_CMD, LOCAL_URL preserved).
+GAP_DEEP_SCOPE_AMBIGUITY: clear
+GAP_DEEP_SCOPE_AMBIGUITY_REASON: Scope is bounded to two named files with cited lines that change and lines that must not change.
+GAP_EDGE_CASE_SUFFICIENCY: clear
+GAP_EDGE_CASE_SUFFICIENCY_REASON: Small non-branching documentation edit; the shifted line after backend-foundation's row is already addressed in Technical Context.
+=== END DOR_SEMANTIC_SCAN ===

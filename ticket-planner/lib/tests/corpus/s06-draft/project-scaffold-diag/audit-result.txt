@@ -1,0 +1,12 @@
+=== DOR_SEMANTIC_AUDIT ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-project-scaffold
+BODY_HASH: sha256:0664a49e7cb644feee3e15e0ff0342b2b492f9158e3a1e1bd866b7b230e6ff39
+AUDIT_1_CODE: NAV_PATH_MISSING
+AUDIT_1_VERDICT: disputed
+AUDIT_1_REASON: The body has no Navigation Path section, so the code is literally correct, but there is no page to navigate to: all 20 Verification Plan rows give the navigation path as "terminal, no page" or "API request, no page", the Test User section says "Every check runs without credentials", and the Summary says the ticket adds "no page content". Every criterion is a terminal command or a plain GET request, so a navigation path would carry no information.
+MISSED_1_CODE: MISSING_CORE_AC
+MISSED_1_REASON: Scope lists "error-body builders" and Technical Context has `backend/src/errors.js` build "the four error bodies the brief defines (422 validation, 401 login, 401 token, 404 article)", but no acceptance criterion checks them and the ticket never gives the body shapes, so later tickets can inherit wrong bodies unnoticed.
+SCORE_PLAUSIBLE: yes
+SCORE_REASON: The deterministic result carries no dor_quality_score to judge; its not-ready status rests only on NAV_PATH_MISSING, which is disputed above for a ticket with no page to navigate to.
+=== END DOR_SEMANTIC_AUDIT ===

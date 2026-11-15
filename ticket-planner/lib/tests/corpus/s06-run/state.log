@@ -1,0 +1,85 @@
+2026-11-14T10:16:24Z|META|schema|start|1
+2026-11-14T10:16:24Z|META|initiative-id|start|INIT-0000000000-2000
+2026-11-14T10:16:24Z|META|idea|start|Build the first slice of a blogging app modelled on the RealWorld Conduit spec, replacing the calculator placeholder named in the repo's CLAUDE.md: registration, login, current user, create/read/list articles, and five frontend pages. The slice creates the Express + Vite project from scratch, including a backend test runner behind `npm test`. 
+2026-11-14T10:16:24Z|META|contract|start|test-data-source-v1
+2026-11-14T10:16:24Z|META|no-tests-rule|done|false
+2026-11-14T10:16:50Z|Appraisal|scope|start|Interpreting idea: Build the first slice of a blogging app modelled on the RealWorld Conduit spec, replacing the calculator placeholder named in the repo's CLAUDE.md: registration, login, current user, create/read/list articles, and five frontend pages. The slice creates the Express + Vite project from scratch, including a backend test runner behind `npm test`.
+2026-11-14T10:17:46Z|Appraisal|scope|done|Scope summary written to artifacts/appraisal.md
+2026-11-14T10:18:31Z|Discovery|explore|start|Exploring affected repositories
+2026-11-14T10:18:31Z|META|discovery|repo-ref|app@main@54d88f7c38c68fe8229b5bd0d135ca9b6e6c78fb
+2026-11-14T10:19:34Z|Discovery|explore|done|Discovery report: 1 services, 14 symbols resolved
+2026-11-14T10:20:08Z|Architecture|design|start|Evaluating technical approaches
+2026-11-14T10:21:33Z|Architecture|design|done|Architecture decision: two independent packages - Express app factory with per-call seeded in-memory store, node:test + supertest, Vite vanilla JS with History-API router and /api dev proxy
+2026-11-14T10:21:44Z|META|contract|start|specify-parameters-v1
+2026-11-14T10:21:44Z|META|contract|start|spec-ownership-v1
+2026-11-14T10:21:44Z|META|contract|start|ac-precondition-v1
+2026-11-14T10:21:57Z|Specify|synthesize|start|Synthesizing proposal and writing specs
+2026-11-14T10:31:26Z|Specify|synthesize|done|Proposal written, 6 ticket specs in artifacts/specs/, self-lint clean
+2026-11-14T10:31:43Z|META|goldfish|skip|fd9b8da04c12 DISABLED
+2026-11-14T10:32:08Z|Review|critique|start|Critiquing proposal for gaps and risks
+2026-11-14T10:36:03Z|Review|critique|done|Review complete: 0 blockers, 3 major, 12 minor, 3 nit - verdict needs-revision
+2026-11-14T10:36:29Z|Consensus|resolve|start|Resolving review findings
+2026-11-14T10:44:39Z|Consensus|resolve|done|Consensus: 16 accepted, 1 rejected, 1 deferred
+2026-11-14T10:44:57Z|Crosscheck|check|start|running testdata-synth + citation + propagation + bypass + contracts + signals + deps + testdata checks
+2026-11-14T10:44:57Z|Crosscheck|testdata-synth|start|synthesizing test-data specs for unowned needs
+2026-11-14T10:45:00Z|Crosscheck|testdata-synth|done|0 TD spec(s), 0 need(s)
+2026-11-14T10:45:00Z|META|ownership-edges|done|6 edge(s)
+2026-11-14T10:45:02Z|META|crosscheck|warn|info DISCOVERY_GAP_UNRESOLVED ~/workspace/workbench/e2e-conduit/.ticket-auto/initiatives/INIT-0000000000-2000/artifacts/discovery.md:176 → "Not explored, by design: the RealWorld reference repo (a published reference the intent says is not binding; not retrieved). Gaps in the inp" not recorded in proposal.md Out of Scope
+2026-11-14T10:45:14Z|META|crosscheck|fail|TEST_DATA_IMPLIED project-scaffold.md [f979ebee] match="calculator" (strong: entity) — every Verification Notes row says Test data none, but this criterion implies data must exist first: "A case-insensitive search of the committed `README.md` for `calculator` returns 0 matches." — derive the need from its Given/When with a Source, or answer TESTDATA_CONFIRM: `project-scaffold` [f979ebee] in consensus.md (none, generate: <what>, exists:<where>, external:<who>)
+2026-11-14T10:45:15Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/article-editor-page.md:37 ## Technical Context names keys neither ## Writes nor ## Reads declares: frontend.token_storage_key, frontend.port — declare each in the table it belongs to
+2026-11-14T10:45:15Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/article-reading-pages.md:35 ## Technical Context names keys neither ## Writes nor ## Reads declares: frontend.port — declare each in the table it belongs to
+2026-11-14T10:45:15Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/articles-api.md:37 ## Technical Context names keys neither ## Writes nor ## Reads declares: articles.list_default_limit, articles.list_default_offset, api.port — declare each in the table it belongs to
+2026-11-14T10:45:15Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/project-scaffold.md:47 ## Technical Context names keys neither ## Writes nor ## Reads declares: api.port, frontend.port, server.port, server.proxy — declare each in the table it belongs to
+2026-11-14T10:45:15Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/sign-up-and-sign-in-pages.md:41 ## Technical Context names keys neither ## Writes nor ## Reads declares: frontend.token_storage_key, frontend.port — declare each in the table it belongs to
+2026-11-14T10:45:15Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/users-api.md:39 ## Technical Context names keys neither ## Writes nor ## Reads declares: auth.bcrypt_cost, auth.jwt_expiry, auth.jwt_algorithm, auth.jwt_secret_default, api.port — declare each in the table it belongs to
+2026-11-14T10:45:16Z|META|ac-precondition|done|0 checked, 0 unchecked, 48 planned, 16 input
+2026-11-14T10:45:16Z|Crosscheck|check|fail|1 blocking finding(s), 7 warn, 0 accepted — see META crosscheck entries
+2026-11-14T10:45:36Z|Crosscheck|check|start|running testdata-synth + citation + propagation + bypass + contracts + signals + deps + testdata checks
+2026-11-14T10:45:36Z|Crosscheck|testdata-synth|start|synthesizing test-data specs for unowned needs
+2026-11-14T10:45:39Z|Crosscheck|testdata-synth|done|0 TD spec(s), 0 need(s)
+2026-11-14T10:45:42Z|META|crosscheck|warn|info DISCOVERY_GAP_UNRESOLVED ~/workspace/workbench/e2e-conduit/.ticket-auto/initiatives/INIT-0000000000-2000/artifacts/discovery.md:176 → "Not explored, by design: the RealWorld reference repo (a published reference the intent says is not binding; not retrieved). Gaps in the inp" not recorded in proposal.md Out of Scope
+2026-11-14T10:46:00Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/article-editor-page.md:37 ## Technical Context names keys neither ## Writes nor ## Reads declares: frontend.token_storage_key, frontend.port — declare each in the table it belongs to
+2026-11-14T10:46:00Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/article-reading-pages.md:35 ## Technical Context names keys neither ## Writes nor ## Reads declares: frontend.port — declare each in the table it belongs to
+2026-11-14T10:46:00Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/articles-api.md:37 ## Technical Context names keys neither ## Writes nor ## Reads declares: articles.list_default_limit, articles.list_default_offset, api.port — declare each in the table it belongs to
+2026-11-14T10:46:00Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/project-scaffold.md:47 ## Technical Context names keys neither ## Writes nor ## Reads declares: api.port, frontend.port, server.port, server.proxy — declare each in the table it belongs to
+2026-11-14T10:46:00Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/sign-up-and-sign-in-pages.md:41 ## Technical Context names keys neither ## Writes nor ## Reads declares: frontend.token_storage_key, frontend.port — declare each in the table it belongs to
+2026-11-14T10:46:00Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/users-api.md:39 ## Technical Context names keys neither ## Writes nor ## Reads declares: auth.bcrypt_cost, auth.jwt_expiry, auth.jwt_algorithm, auth.jwt_secret_default, api.port — declare each in the table it belongs to
+2026-11-14T10:46:01Z|META|ac-precondition|done|0 checked, 0 unchecked, 48 planned, 16 input
+2026-11-14T10:46:01Z|Crosscheck|check|done|clean (7 warn, 0 accepted)
+2026-11-14T10:46:07Z|META|draft-readiness|start|evaluator=dor-semantic-v4
+2026-11-14T10:46:48Z|META|draft-readiness|info|round=0 revise=0 reevaluate=4 spawns=4/48
+2026-11-14T10:48:04Z|META|draft-readiness|info|round=0 revise=0 reevaluate=4 spawns=8/48
+2026-11-14T10:49:15Z|META|draft-readiness|info|round=0 revise=0 reevaluate=2 spawns=10/48
+2026-11-14T10:50:25Z|META|draft-readiness|info|round=0 revise=0 reevaluate=2 spawns=12/48
+2026-11-14T10:51:28Z|META|draft-readiness|info|round=1 revise=4 reevaluate=0 spawns=16/48
+2026-11-14T10:51:28Z|META|draft-revise|start|article-editor-page round=1 findings=1
+2026-11-14T10:51:28Z|META|draft-revise|start|articles-api round=1 findings=1
+2026-11-14T10:51:28Z|META|draft-revise|start|project-scaffold round=1 findings=2
+2026-11-14T10:51:28Z|META|draft-revise|start|users-api round=1 findings=1
+2026-11-14T10:55:15Z|META|draft-revise|info|article-editor-page ASSUMED EDGE_CASE_GAP f-3ab7c9059139 "When publishing fails for any reason, the browser stays on the editor page and does not go to an article page, and how the failure is shown is left to the implementer."
+2026-11-14T10:55:15Z|META|draft-revise|done|article-editor-page round=1 status=applied resolved=0 rebutted=0 unaddressed=0 added=1 extended=0 assumed=1
+2026-11-14T10:56:02Z|META|draft-revise|info|articles-api ASSUMED EDGE_CASE_GAP f-8cd62f179291 "When more than one of title, description and body is missing or empty on article creation, the 422 response lists every blank field, each with the message can't be blank, and no other field."
+2026-11-14T10:56:02Z|META|draft-revise|done|articles-api round=1 status=applied resolved=0 rebutted=0 unaddressed=0 added=2 extended=0 assumed=1
+2026-11-14T10:56:45Z|META|draft-revise|info|project-scaffold REBUTTAL NAV_PATH_MISSING NAV_PATH_MISSING "this ticket has no page to navigate to: every criterion is a terminal or API check ('Every check runs without credentials', every Verification Notes row reads 'terminal, no page' or 'API request, no page'), and consensus R1 records the choice: 'the scaffold says it in its Technical Context, since it has no Navigation Path'. The `## Navigation Path` section is also outside the regions this revision may edit, so adding one would revert the round."
+2026-11-14T10:56:45Z|META|draft-revise|done|project-scaffold round=1 status=applied resolved=1 rebutted=1 unaddressed=0 added=3 extended=0
+2026-11-14T10:57:31Z|META|draft-revise|info|users-api ASSUMED EDGE_CASE_GAP f-272eac211052 "A current-user request with a correctly signed, unexpired token whose user is no longer in the store gets the same 401 token error as a missing or invalid token."
+2026-11-14T10:57:31Z|META|draft-revise|done|users-api round=1 status=applied resolved=0 rebutted=0 unaddressed=0 added=1 extended=0 assumed=1
+2026-11-14T10:57:31Z|Crosscheck|check|start|running testdata-synth + citation + propagation + bypass + contracts + signals + deps + testdata checks
+2026-11-14T10:57:31Z|Crosscheck|testdata-synth|start|synthesizing test-data specs for unowned needs
+2026-11-14T10:57:36Z|Crosscheck|testdata-synth|done|0 TD spec(s), 0 need(s)
+2026-11-14T10:57:38Z|META|crosscheck|warn|info DISCOVERY_GAP_UNRESOLVED ~/workspace/workbench/e2e-conduit/.ticket-auto/initiatives/INIT-0000000000-2000/artifacts/discovery.md:176 → "Not explored, by design: the RealWorld reference repo (a published reference the intent says is not binding; not retrieved). Gaps in the inp" not recorded in proposal.md Out of Scope
+2026-11-14T10:58:00Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/article-editor-page.md:37 ## Technical Context names keys neither ## Writes nor ## Reads declares: frontend.token_storage_key, frontend.port — declare each in the table it belongs to
+2026-11-14T10:58:00Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/article-reading-pages.md:35 ## Technical Context names keys neither ## Writes nor ## Reads declares: frontend.port — declare each in the table it belongs to
+2026-11-14T10:58:00Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/articles-api.md:37 ## Technical Context names keys neither ## Writes nor ## Reads declares: articles.list_default_limit, articles.list_default_offset, api.port — declare each in the table it belongs to
+2026-11-14T10:58:00Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/project-scaffold.md:47 ## Technical Context names keys neither ## Writes nor ## Reads declares: api.port, frontend.port, server.port, server.proxy — declare each in the table it belongs to
+2026-11-14T10:58:00Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/sign-up-and-sign-in-pages.md:41 ## Technical Context names keys neither ## Writes nor ## Reads declares: frontend.token_storage_key, frontend.port — declare each in the table it belongs to
+2026-11-14T10:58:00Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/users-api.md:39 ## Technical Context names keys neither ## Writes nor ## Reads declares: auth.bcrypt_cost, auth.jwt_expiry, auth.jwt_algorithm, auth.jwt_secret_default, api.port — declare each in the table it belongs to
+2026-11-14T10:58:01Z|META|ac-precondition|done|0 checked, 0 unchecked, 48 planned, 16 input
+2026-11-14T10:58:01Z|Crosscheck|check|done|clean (7 warn, 0 accepted)
+2026-11-14T10:58:26Z|META|draft-readiness|info|round=1 revise=0 reevaluate=4 spawns=20/48
+2026-11-14T10:59:41Z|META|draft-readiness|info|round=1 revise=0 reevaluate=4 spawns=24/48
+2026-11-14T11:00:51Z|META|draft-readiness|info|round=1 revise=0 reevaluate=1 spawns=25/48
+2026-11-14T11:01:54Z|META|draft-readiness|info|round=1 revise=0 reevaluate=1 spawns=26/48
+2026-11-14T11:03:15Z|META|draft-readiness|fail|project-scaffold NAV_PATH_MISSING ""
+2026-11-14T11:03:15Z|META|draft-readiness|fail|project-scaffold SEMANTIC_UNAVAILABLE ""
+2026-11-14T11:03:15Z|META|draft-readiness|done|blocked 1/6

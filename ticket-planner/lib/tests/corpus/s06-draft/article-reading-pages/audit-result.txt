@@ -1,0 +1,7 @@
+=== DOR_SEMANTIC_AUDIT ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-article-reading-pages
+BODY_HASH: sha256:e3704b86abfeddd743a7db6e2e6eede97e56b0b36c35544252486cfcbb158685
+SCORE_PLAUSIBLE: yes
+SCORE_REASON: No dor_quality_score is present; status "ready" with empty missing/advisory arrays is consistent with a body whose 11 criteria cover every proposed behaviour, with matching test data and verification rows.
+=== END DOR_SEMANTIC_AUDIT ===

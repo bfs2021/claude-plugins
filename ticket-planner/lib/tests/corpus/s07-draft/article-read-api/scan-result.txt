@@ -1,0 +1,14 @@
+=== DOR_SEMANTIC_SCAN ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-article-read-api
+BODY_HASH: sha256:12c8e510a4765263ad0ee28f81809675be20e79e044ee0b2acdf3d2759ec1d71
+PARAPHRASE: Add a new Express router with two unauthenticated read endpoints: GET /api/articles (newest-first list with insertion-order tie-break, limit/offset paging that falls back to defaults on bad input, case-sensitive author filter, pre-paging count) and GET /api/articles/:slug (single article or 404), both returning the same article shape with embedded author.
+GAP_REQUIREMENT_COMPLETENESS: clear
+GAP_REQUIREMENT_COMPLETENESS_REASON: Every described behaviour (anonymous access, ordering, tie-break, paging defaults and invalid values, limit=0, author filter and case sensitivity, unknown author, read one, 404, article shape) has at least one acceptance criterion; no human decision is left open.
+GAP_CONTRADICTORY_REQUIREMENTS: clear
+GAP_CONTRADICTORY_REQUIREMENTS_REASON: Proposed Behaviour, Technical Context (D14, D19, D20), acceptance criteria and test data all state the same ordering, paging, filtering and error rules.
+GAP_DEEP_SCOPE_AMBIGUITY: clear
+GAP_DEEP_SCOPE_AMBIGUITY_REASON: Scope is bounded to the two GET routes in backend/src/routes/articles.js and its test file, with create/edit/delete, tags, favorites, feed and comments explicitly out of scope.
+GAP_EDGE_CASE_SUFFICIENCY: clear
+GAP_EDGE_CASE_SUFFICIENCY_REASON: The plausible edge cases (invalid and negative paging values, limit=0, equal createdAt, wrong-case and unknown author, unknown slug, more than one page of results) are specified and each has a criterion.
+=== END DOR_SEMANTIC_SCAN ===

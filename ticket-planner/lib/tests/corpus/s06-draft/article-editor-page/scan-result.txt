@@ -1,0 +1,14 @@
+=== DOR_SEMANTIC_SCAN ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-article-editor-page
+BODY_HASH: sha256:207e9fd5f6859e819dd066b5f9dad808d67d1cc6345e4e1d27a9219c65326aa3
+PARAPHRASE: Add a frontend editor page at /editor (one new page file plus one route) where a signed-in author fills in title, description and body and publishes through the existing POST /api/articles endpoint; the browser then goes to /article/<slug> using the slug the server returns, the new article lists first on the home page, and a failed publish leaves the browser on the editor.
+GAP_REQUIREMENT_COMPLETENESS: clear
+GAP_REQUIREMENT_COMPLETENESS_REASON: Every described behaviour (header link, direct open, four form controls, publish and redirect, article shown, home-page ordering, duplicate-title slug, author attribution, stay on editor on a failed publish) has a criterion and a matching Verification Plan row; no human decision is open, since failure display is explicitly left to the implementer.
+GAP_CONTRADICTORY_REQUIREMENTS: clear
+GAP_CONTRADICTORY_REQUIREMENTS_REASON: The changed criteria, the Scope assumption and the Verification Plan rows agree with each other and with Proposed Behaviour and Technical Context; the empty-title criterion asserts only the path, consistent with the note that error display is unspecified.
+GAP_DEEP_SCOPE_AMBIGUITY: clear
+GAP_DEEP_SCOPE_AMBIGUITY_REASON: Scope names one new file and one route in one existing file, frontend only, and Out of Scope excludes edit, delete, tags and all backend code.
+GAP_EDGE_CASE_SUFFICIENCY: clear
+GAP_EDGE_CASE_SUFFICIENCY_REASON: The duplicate-title slug and the empty-title publish are covered by criteria, the Scope assumption bounds every other publish failure, and the signed-out visit is owned by the existing router guard from the sign-in ticket.
+=== END DOR_SEMANTIC_SCAN ===

@@ -73,8 +73,9 @@ specify_end() {
 has_code() { grep -q "planner-crosscheck-propagation: $1 " <<<"$2"; }
 
 # ── privacy ──────────────────────────────────────────────────────────────────
-echo "--- corpus carries no private data ---"
-leaks=$(grep -rInE 'INIT-[0-9]{6,}|WIL-[0-9]|/home/[a-z]|dexter|mortal|willard|lin_api_|sk-ant-|ghp_|github_pat_|xox[bp]-' "$CORPUS" 2>/dev/null)
+echo "--- corpus carries no private data (the full gate is test-corpus-privacy.sh) ---"
+# The scrub writes INIT-0000000000-<n> fakes; a real id starts with a non-zero digit.
+leaks=$(grep -rInE '[Ii][Nn][Ii][Tt]-[1-9][0-9]{5,}|WIL-[0-9]|/home/[a-z]|dexter|mortal|willard|lin_api_|sk-ant-|ghp_|github_pat_|xox[bp]-' "$CORPUS" 2>/dev/null)
 emails=$(grep -rIhoE '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}' "$CORPUS" 2>/dev/null |
   grep -vE '@(conduit\.test|example\.(com|org|net))$')
 if [ -z "$leaks" ] && [ -z "$emails" ]; then

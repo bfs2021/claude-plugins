@@ -1,0 +1,14 @@
+=== DOR_SEMANTIC_SCAN ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-articles-api
+BODY_HASH: sha256:e0e1856b93a11a3fb602e2dcc96f4bbdaf5a66f9a29c9a4fe36b2b9d8748d426
+PARAPHRASE: Add three in-memory article endpoints to the backend (authenticated create with slug generation and collision suffix, public read by slug, public newest-first list with limit/offset/author filter), with two articles re-seeded on every server start, plus the node:test files that cover them.
+GAP_REQUIREMENT_COMPLETENESS: clear
+GAP_REQUIREMENT_COMPLETENESS_REASON: Every described behaviour (create shape and 201, slug rule and collision suffix, 401 and 422 errors incl. multi-blank, rejected request stores nothing, read 200/404, list order, paging defaults, author filter, articlesCount, reseed on restart) has a criterion; the behaviours the brief leaves undefined are explicitly declared uncovered, with no human decision pending.
+GAP_CONTRADICTORY_REQUIREMENTS: clear
+GAP_CONTRADICTORY_REQUIREMENTS_REASON: The changed Acceptance Criteria, Scope assumption on multiple blank fields and Verification Plan rows agree with each other and with Proposed Behaviour, the seed rows and the Test Data sections; counts (2 seeds, 19 created, 21 total, 20 returned) are consistent.
+GAP_DEEP_SCOPE_AMBIGUITY: clear
+GAP_DEEP_SCOPE_AMBIGUITY_REASON: Scope names the concrete files and the store areas touched, states the multi-blank 422 assumption explicitly, and Out of Scope bounds the slice (no tags, comments, favorites, feed, edit, delete, page).
+GAP_EDGE_CASE_SUFFICIENCY: clear
+GAP_EDGE_CASE_SUFFICIENCY_REASON: Slug collision against created and seeded articles, punctuation and trim, missing vs empty fields, multiple blanks, three 401 variants, unknown slug, paging past the default limit and restart loss are all covered; the remaining cases are named in the body as undefined by the brief and deliberately left without criteria.
+=== END DOR_SEMANTIC_SCAN ===

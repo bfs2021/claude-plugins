@@ -1,0 +1,9 @@
+=== DOR_SEMANTIC_AUDIT ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-backend-store-and-seed
+BODY_HASH: sha256:e724b5ce9681899b76e76d263cefb0cab3f3d4d24be47b7f88fbe823fee03c3c
+MISSED_1_CODE: MISSING_CORE_AC
+MISSED_1_REASON: Technical Context makes store.js query behavior (listArticles sort createdAt desc then seq desc, articlesCount = filtered total, limit/offset slicing; case-insensitive findUserByEmail) and serializers.js field whitelisting (no password in toUserResponse/toProfile) deliverables that later tickets depend on, but no acceptance criterion covers any of them.
+SCORE_PLAUSIBLE: yes
+SCORE_REASON: No dor_quality_score is present; a status of ready with empty missing/advisory arrays is plausible because the mechanical sections (AC, Verification Plan, Test Data Prerequisites, Navigation Path) are complete and consistent.
+=== END DOR_SEMANTIC_AUDIT ===

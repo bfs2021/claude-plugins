@@ -1,0 +1,38 @@
+2026-11-15T12:16:26Z|META|schema|start|1
+2026-11-15T12:16:26Z|META|initiative-id|start|INIT-0000000000-7379
+2026-11-15T12:16:26Z|META|idea|start|Build the first slice of a blogging app modelled on the RealWorld Conduit spec in the empty app repo: Express API (port 3000) + Vite vanilla JS frontend (port 5173) covering register, login, current user, create/read/list articles and five frontend pages. Replaces the calculator placeholder named in the repo's CLAUDE.md. 
+2026-11-15T12:16:26Z|META|contract|start|test-data-source-v1
+2026-11-15T12:16:26Z|META|no-tests-rule|done|false
+2026-11-15T12:16:26Z|META|intent|done|84,ready,5fb33e8f2f66de67312993918d59350737e95bf87ecde6ddf29ebc3dfaeaf5e2
+2026-11-15T12:16:42Z|Appraisal|scope|start|Interpreting idea: Build the first slice of a blogging app modelled on the RealWorld Conduit spec in the empty app repo: Express API (port 3000) + Vite vanilla JS frontend (port 5173) covering register, login, current user, create/read/list articles and five frontend pages. Replaces the calculator placeholder named in the repo's CLAUDE.md.
+2026-11-15T12:17:24Z|Appraisal|scope|done|Scope summary written to artifacts/appraisal.md
+2026-11-15T12:17:48Z|Discovery|explore|start|Exploring affected repositories
+2026-11-15T12:18:15Z|META|discovery|repo-ref|app@main@54d88f7c38c68fe8229b5bd0d135ca9b6e6c78fb
+2026-11-15T12:19:05Z|Discovery|explore|done|Discovery report: 1 services, 10 symbols resolved
+2026-11-15T12:19:23Z|Architecture|design|start|Evaluating technical approaches
+2026-11-15T12:20:21Z|Architecture|design|done|Architecture decision: CommonJS Express app exported for in-process Jest+supertest tests, Vite vanilla SPA on 5173 reaching API via /api dev proxy (no CORS)
+2026-11-15T12:20:31Z|META|contract|start|specify-parameters-v1
+2026-11-15T12:20:31Z|META|contract|start|spec-ownership-v1
+2026-11-15T12:20:31Z|META|contract|start|ac-precondition-v1
+2026-11-15T12:21:03Z|Specify|synthesize|start|Synthesizing proposal and writing specs for 7 tickets
+2026-11-15T12:31:48Z|Specify|synthesize|done|Proposal written, 8 ticket specs in artifacts/specs/, self-lint clean
+2026-11-15T12:32:01Z|META|goldfish|skip|788196fd91f3 DISABLED
+2026-11-15T12:32:12Z|Review|critique|start|Critiquing proposal for gaps and risks
+2026-11-15T12:34:20Z|Review|critique|done|Review complete: 0 blockers, 3 major, 7 minor, 3 nit; verdict needs-revision
+2026-11-15T12:34:41Z|Consensus|resolve|start|Resolving review findings
+2026-11-15T12:38:31Z|META|ac-precondition|done|0 checked, 0 unchecked, 11 planned, 8 input
+2026-11-15T12:38:44Z|Consensus|resolve|done|Consensus: 11 accepted, 0 rejected, 2 deferred
+2026-11-15T12:39:13Z|Crosscheck|check|start|running testdata-synth + citation + propagation + bypass + contracts + signals + deps + testdata checks
+2026-11-15T12:39:13Z|Crosscheck|testdata-synth|start|synthesizing test-data specs for unowned needs
+2026-11-15T12:39:15Z|Crosscheck|testdata-synth|done|0 TD spec(s), 0 need(s)
+2026-11-15T12:39:16Z|META|ownership-edges|done|6 edge(s)
+2026-11-15T12:39:17Z|META|crosscheck|fail|CARVE_SCOPE_LOST Specify declared 7 tickets, 8 spec files exist — a ticket was carved or dropped after Specify; manual scope audit needed (no pre-carve proposal snapshot is retained to diff automatically)
+2026-11-15T12:39:30Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/api-publish-article.md:36 ## Technical Context names keys neither ## Writes nor ## Reads declares: articles.slug_empty_base, auth.check_order, articles.updated_at_on_create, validation.blank_rule, validation.report_all_fields — declare each in the table it belongs to
+2026-11-15T12:39:30Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/api-read-articles.md:40 ## Technical Context names keys neither ## Writes nor ## Reads declares: auth.bcrypt_cost, articles.updated_at_on_create, articles.list_default_limit, articles.list_default_offset, articles.list_invalid_paging, articles.list_unknown_author — declare each in the table it belongs to
+2026-11-15T12:39:30Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/api-register.md:34 ## Technical Context names keys neither ## Writes nor ## Reads declares: auth.bcrypt_cost, auth.jwt_expiry, auth.jwt_dev_secret, validation.blank_rule, validation.report_all_fields — declare each in the table it belongs to
+2026-11-15T12:39:30Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/api-sign-in.md:35 ## Technical Context names keys neither ## Writes nor ## Reads declares: auth.jwt_dev_secret, auth.unknown_user_token, auth.jwt_expiry, validation.blank_rule, validation.report_all_fields — declare each in the table it belongs to
+2026-11-15T12:39:30Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/web-accounts.md:37 ## Technical Context names keys neither ## Writes nor ## Reads declares: web.signup_route, web.rejected_token_on_load, web.form_error_display — declare each in the table it belongs to
+2026-11-15T12:39:30Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/web-publish-article.md:35 ## Technical Context names keys neither ## Writes nor ## Reads declares: web.form_error_display — declare each in the table it belongs to
+2026-11-15T12:39:30Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/web-read-articles.md:40 ## Technical Context names keys neither ## Writes nor ## Reads declares: web.empty_list_text, web.form_error_display — declare each in the table it belongs to
+2026-11-15T12:39:31Z|META|ac-precondition|done|0 checked, 0 unchecked, 11 planned, 8 input
+2026-11-15T12:39:31Z|Crosscheck|check|fail|1 blocking finding(s), 7 warn, 0 accepted — see META crosscheck entries

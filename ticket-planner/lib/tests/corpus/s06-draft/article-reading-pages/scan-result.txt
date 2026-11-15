@@ -1,0 +1,14 @@
+=== DOR_SEMANTIC_SCAN ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-article-reading-pages
+BODY_HASH: sha256:e3704b86abfeddd743a7db6e2e6eede97e56b0b36c35544252486cfcbb158685
+PARAPHRASE: Add two public frontend pages to the Vite app: a home page that lists every article title newest first as links, and an article page at /article/<slug> that shows one article's title and body and survives a reload, both usable without signing in.
+GAP_REQUIREMENT_COMPLETENESS: clear
+GAP_REQUIREMENT_COMPLETENESS_REASON: Every described behaviour (anonymous list, newest-first order, title links to /article/<slug>, title and body on the article page, reload) has an acceptance criterion; the home path is declared an implementer default and no human decision is left open.
+GAP_CONTRADICTORY_REQUIREMENTS: clear
+GAP_CONTRADICTORY_REQUIREMENTS_REASON: Summary, proposed behaviour, criteria, test data and verification rows agree on the two seeded articles, their order, the slugs and the path shape.
+GAP_DEEP_SCOPE_AMBIGUITY: clear
+GAP_DEEP_SCOPE_AMBIGUITY_REASON: Scope names the two new page files and the two routes in router.js, states vite.config.js is unchanged, and Out of Scope lists tags, comments, favorites, feed, profiles and the editor.
+GAP_EDGE_CASE_SUFFICIENCY: clear
+GAP_EDGE_CASE_SUFFICIENCY_REASON: Empty list, unknown slug, failed request and extra fields are named and explicitly left unspecified with no criterion, and paging is bounded to one default-size call; verification always runs against the two seeded articles, so no unaddressed case can fail a criterion.
+=== END DOR_SEMANTIC_SCAN ===

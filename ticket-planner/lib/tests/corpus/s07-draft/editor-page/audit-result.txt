@@ -1,0 +1,7 @@
+=== DOR_SEMANTIC_AUDIT ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-editor-page
+BODY_HASH: sha256:202e25253035faffd3eb742f2de3858e011fe05f914200b84248f9b92b9c7884
+SCORE_PLAUSIBLE: yes
+SCORE_REASON: No dor_quality_score is present; the deterministic status "ready" with empty missing/advisory arrays is consistent with a ticket whose ACs cover every described behaviour (signed-out redirect, rejected token, load and publish 5xx, publish redirect, slug collision, 422 error line) and whose test data is sourced from backend-foundation seeds.
+=== END DOR_SEMANTIC_AUDIT ===

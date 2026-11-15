@@ -1,0 +1,14 @@
+=== DOR_SEMANTIC_SCAN ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-backend-foundation
+BODY_HASH: sha256:d31e3bb6f1a37bf6f683e04a0a1da2cfbd60283d90baa71b2876c039028ee4ff
+PARAPHRASE: Scaffold the app backend/ Express 5 project (port 3000, CORS for localhost:5173, in-memory store that resets and re-seeds two users and two articles with bcrypt-hashed passwords, error-body helper, Jest via npm test) and, as a declared related change, reword the repo CLAUDE.md and README.md from calculator to Conduit-lite.
+GAP_REQUIREMENT_COMPLETENESS: clear
+GAP_REQUIREMENT_COMPLETENESS_REASON: The edited criteria cover the npm test run, the server start, CORS preflight and header, seed contents, timestamps, bcrypt cost, reset, idempotent re-seed, both error helpers and both doc rewordings.
+GAP_CONTRADICTORY_REQUIREMENTS: clear
+GAP_CONTRADICTORY_REQUIREMENTS_REASON: The edited criteria, prerequisites and verification rows agree with the seed data, timestamps, port, origin and Build & Test table in the rest of the body.
+GAP_DEEP_SCOPE_AMBIGUITY: clear
+GAP_DEEP_SCOPE_AMBIGUITY_REASON: The scope is bounded to the backend/ scaffold and named doc lines, and API routes, the frontend and persistence are explicitly out of scope.
+GAP_EDGE_CASE_SUFFICIENCY: clear
+GAP_EDGE_CASE_SUFFICIENCY_REASON: The plausible edge cases for this non-branching scaffold, reset without seed and seed twice without reset, are each covered by a criterion and a verification row.
+=== END DOR_SEMANTIC_SCAN ===

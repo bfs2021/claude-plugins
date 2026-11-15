@@ -1,0 +1,7 @@
+=== DOR_SEMANTIC_AUDIT ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-frontend-auth-editor
+BODY_HASH: sha256:66d36487617c30d1ede34b020f8400f1f43635263ef233059fab82b78108ea1a
+SCORE_PLAUSIBLE: yes
+SCORE_REASON: No dor_quality_score present; the deterministic status "ready" with empty missing/advisory is plausible, since every described behavior (sign-up, sign-in, form errors, editor, editor errors, 401 on publish, guard) has concrete ACs, matching Verification Plan rows, and seeded test data with named sources.
+=== END DOR_SEMANTIC_AUDIT ===

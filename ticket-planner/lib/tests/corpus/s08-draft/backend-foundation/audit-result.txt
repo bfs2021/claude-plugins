@@ -1,0 +1,9 @@
+=== DOR_SEMANTIC_AUDIT ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-backend-foundation
+BODY_HASH: sha256:575eea8525ded3cb354f59555949fe77e78d00f2dfd10737cfd17ca2711256e6
+MISSED_1_CODE: MISSING_CORE_AC
+MISSED_1_REASON: Technical Context lists store lookups later tickets rely on ("Lookups: `findUserByEmail` ... `findUserById`, `findArticleBySlug`, `insertUser`, `insertArticle`, `listArticles({ author, limit, offset })`" and "Ids are incrementing integers starting at 1"), but no criterion covers findUserById, findArticleBySlug, listArticles or id assignment.
+SCORE_PLAUSIBLE: yes
+SCORE_REASON: No dor_quality_score is present; status ready with empty missing/advisory is plausible for a well-specified enabler, apart from the minor store-lookup coverage gap.
+=== END DOR_SEMANTIC_AUDIT ===
