@@ -1315,6 +1315,12 @@ spawn_capture() {
   if ! command -v capture_agent_result >/dev/null 2>&1; then
     source "${CLAUDE_SKILLS_LIB:-$HOME/.claude/skills/lib}/capture-transcript.sh" 2>/dev/null || true
   fi
+  # Fall back to this lib's own copy (a checkout with no synced skills lib,
+  # e.g. CI): without it nothing is captured and VERIFY/PR-REVIEW route on no
+  # verdict.
+  if ! command -v capture_agent_result >/dev/null 2>&1; then
+    source "$(dirname "${BASH_SOURCE[0]}")/capture-transcript.sh" 2>/dev/null || true
+  fi
 
   local TICKET_ID=""
   local PHASE=""
