@@ -111,7 +111,8 @@ get_critique_status() {
 
   # Seam audit Track 0.3: the label is matched case-insensitively and in both
   # bold forms (`**Status:**` and `**Status**:`), and the value is
-  # case-folded — "Blocked" is BLOCKED. A value outside the enum prints
+  # case-folded — "Blocked" is BLOCKED; `*` and backticks around the value
+  # (`**CLEAR**`, `` `WARNINGS` ``) are dropped. A value outside the enum prints
   # nothing; the gate reads that as CRITIQUE_STATUS_MISSING, never as clear.
   local status
   status=$(tail -n "+$start_line" "$notes" 2>/dev/null |
@@ -119,6 +120,7 @@ get_critique_status() {
     grep -iE '^\*\*Status(:\*\*|\*\*:)' |
     head -1 |
     sed -E 's/^\*\*[Ss][Tt][Aa][Tt][Uu][Ss](:\*\*|\*\*:)[[:space:]]*//' |
+    sed -E 's/[*`]//g; s/^[[:space:]]+//' |
     tr '[:lower:]' '[:upper:]' |
     grep -oE '^(BLOCKED|WARNINGS|CLEAR)\b' || true)
 
@@ -134,8 +136,9 @@ get_critique_status() {
 # Counts the open `[needs-human]` questions under notes.md `## Open Questions`
 # (seam audit Track 0.3 — the entry gate holds an auto-approval on them).
 # Tolerant of the shapes agents write: the heading in any case with an
-# optional trailing colon, `###` subsections inside it, `-`/`*`/`+` bullets,
-# an unticked `[ ]` box, and bold `**[needs-human]**`. A struck bullet
+# optional suffix (`:`, `(2)`), `###` subsections inside it, `-`/`*`/`+` and
+# numbered (`1.`/`1)`) bullets, an unticked `[ ]` box, a bold label before the
+# tag (`- **Q1:** [needs-human]`), and bold `**[needs-human]**`. A struck bullet
 # (`- ~~[needs-human] …~~`) or a ticked box (`- [x] [needs-human]`) is answered.
 # Lines inside ``` / ~~~ fences are skipped. Prints an integer, always.
 # Exit codes: 0 = counted (may be 0), 1 = notes.md unreadable
@@ -150,9 +153,9 @@ get_open_needs_human_count() {
     fence { next }
     /^##[ \t]/ && !/^###/ {
       h = tolower($0); sub(/^##[ \t]+/, "", h); sub(/[ \t:]+$/, "", h)
-      f = (h == "open questions"); next
+      f = (h ~ /^open questions([^a-z].*)?$/); next
     }
-    f && tolower($0) ~ /^[ \t]*[-*+][ \t]+(\[[ \t]\][ \t]+)?(\*\*)?\[needs-human\]/ { n++ }
+    f && tolower($0) ~ /^[ \t]*([-*+]|[0-9]+[.)])[ \t]+(\[[ \t]\][ \t]+)?(\*\*[^*]*\*\*[ \t]*)?(\*\*)?\[needs-human\]/ { n++ }
     END { print n + 0 }
   ' "$notes" 2>/dev/null || echo 0
   return 0
