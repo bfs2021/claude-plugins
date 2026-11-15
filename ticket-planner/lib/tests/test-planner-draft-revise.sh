@@ -532,6 +532,16 @@ else
 fi
 c=$(DOR_SEMANTIC_STRUCTURAL_CODES="MISSING_CORE_AC" DOR_AUDIT_DEMOTABLE_CODES="TEST_DATA_MISSING" planner_draft_revise_classify "$SEM" "$DET")
 [ "$(jq -c '[.revisable[].id]' <<<"$c")" = '["b","TEST_DATA_MISSING"]' ] && pass "env overrides change the classification" || fail "classify env" "$c"
+# Rehearsal F62: INTENT_AC_MISMATCH on one criterion is revisable; on any
+# other unit, with no unit, or a different structural code, it is not.
+SEM_AC='{"findings":[{"id":"e","code":"INTENT_AC_MISMATCH","severity":"blocking","verified":true,"unit":"Acceptance Criteria/ac:bd958d14"},{"id":"f","code":"INTENT_AC_MISMATCH","severity":"blocking","verified":true,"unit":"Summary"},{"id":"g","code":"CONTRADICTORY_REQUIREMENTS","severity":"blocking","verified":true,"unit":"Acceptance Criteria/ac:bd958d14"},{"id":"h","code":"INTENT_AC_MISMATCH","severity":"blocking","verified":false,"unit":"Acceptance Criteria/ac:bd958d14"},{"id":"i","code":"INTENT_AC_MISMATCH","severity":"blocking","verified":true,"unit":"Acceptance Criteria/ac:../x"},{"id":"j","code":"INTENT_AC_MISMATCH","severity":"blocking","verified":true},{"id":"k","code":"INTENT_AC_MISMATCH","severity":"blocking","verified":true,"unit":"Acceptance Criteria"}]}'
+c=$(planner_draft_revise_classify "$SEM_AC")
+if [ "$(jq -c '[.revisable[].id]' <<<"$c")" = '["e"]' ] &&
+  [ "$(jq -c '[.non_revisable[] | "\(.id):\(.why)"]' <<<"$c")" = '["h:unverified","f:structural","g:structural","i:structural","j:structural","k:structural"]' ]; then
+  pass "INTENT_AC_MISMATCH on one criterion is revisable; other units and structural codes are not (F62)"
+else
+  fail "classify F62" "$c"
+fi
 c=$(planner_draft_revise_classify '{"findings":[],"unavailable":true,"unverified_gaps":["x"]}')
 [ "$(jq -c '[.non_revisable[].id]' <<<"$c")" = '["SEMANTIC_UNVERIFIED","SEMANTIC_UNAVAILABLE"]' ] && pass "unverified gap and unavailable are non-revisable" || fail "classify unavailable" "$c"
 
