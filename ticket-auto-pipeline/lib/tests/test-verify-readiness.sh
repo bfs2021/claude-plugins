@@ -117,10 +117,10 @@ _vr_write_notes() { # kind td complexity
   local n="$2/notes.md"
   printf '## Complexity\n**Score:** %s\n' "$3" >"$n"
   case "$1" in
-  crit) printf '\n## Readiness Critique\n**Score:** 75\n**Status:** PASS\n' >>"$n" ;;
+  crit) printf '\n## Readiness Critique\n**Score:** 75\n**Status:** CLEAR\n' >>"$n" ;;
   navgap) printf '\n## Readiness Critique\n**Date:** 2026-06-25\n**Status:** WARNINGS\n**Score:** 65\n**WARNING count:** 1\n**BLOCKER count:** 0\n\n### Findings\n- [WARNING] No navigation path specified. Verifier will need to discover the feature location from code.\n' >>"$n" ;;
   vplan)
-    printf '\n## Readiness Critique\n**Score:** 75\n**Status:** PASS\n' >>"$n"
+    printf '\n## Readiness Critique\n**Score:** 75\n**Status:** CLEAR\n' >>"$n"
     printf '\n## Verification Plan\n**Date:** 2026-06-24\n\n### Per-Criterion Verification\n\n| # | Criterion | Role scope | Navigation path | Test data needed | Expected behavior | Verifiable |\n|---|---|---|---|---|---|---|\n| 1 | Thing works | global | /handover/ | none | It works | ✓ |\n' >>"$n"
     ;;
   nocrit) : ;;

@@ -63,11 +63,11 @@ The router brackets auto-invoke prescan spawns as `MAINTENANCE|prescan|waiting`/
 
 ## Verdict tokens
 
-`spawn_agent_post` (in `lib/spawn-helper.sh`) accepts an optional `VERDICT=` parameter. When
-set, it is prepended to `MSG` as `{VERDICT} — {MSG}` before the `done`/`fail` line is written.
-This gives deterministic consumers (`detect-resume.sh`) a fixed token to grep instead of
-coupling to router free-text prose or emoji bytes — the router still writes whatever
-human-readable summary it wants in `MSG`, but the token in front of it is guaranteed stable.
+`spawn_agent_post` (`lib/spawn-helper.sh`) prepends `VERDICT=` to `MSG` as `{VERDICT} — {MSG}`,
+so `detect-resume.sh` greps a fixed token, never prose. For VERIFY `verify` / PR-REVIEW
+`pr-review` the token is bash's: `lib/phase-route.sh` maps the parser's first `META|phase-result`
+after post-spawn's `META|phase-route-anchor` (no record → FAIL / BLOCK), and `spawn_agent_post`
+downgrades a less conservative router claim (`META|route-override|warn|`).
 
 | Token   | Meaning                                  | Used by            |
 |---------|-------------------------------------------|--------------------|
@@ -96,22 +96,6 @@ already counts on it; the phase-result enum keeps `PASS` because it is shared ac
 three loop-bearing phases and a phase-specific synonym would make the enum
 phase-dependent. A consumer correlating the two channels for the same run must apply this
 mapping — it is the one place their vocabularies diverge.
-
-**Who picks the token (seam audit Track 0.2).** For the VERIFY `verify` and PR-REVIEW
-`pr-review` steps the token is bash's, not the router model's: `lib/phase-route.sh` maps the
-bracket's `META|phase-result` record (and, for VERIFY, a contradicting `META|claim-delta` on
-fresh evidence) with the table above, and `router-step.sh post-spawn` prints it as
-`ROUTE_RESULT`/`ROUTE_VERDICT`/`ROUTE_SOURCE`. A missing or invalid block is VERIFY `fail`/`FAIL`
-and PR-REVIEW `done`/`BLOCK`. Because the agent writes this log during its own bracket, post-spawn
-first writes `META|phase-route-anchor|info|<PHASE> attempt=<n>` (after the agent returned), and
-only the first `META|phase-result` (and `META|claim-delta`) after the last anchor counts — a
-record the agent wrote itself never does. `spawn_agent_post` enforces the route for every
-VERIFY `verify` / PR-REVIEW `pr-review` terminal, whatever flags the router passes: when the
-router's claim is less conservative it writes
-`META|route-override|warn|<PHASE>: router claimed <R>/<V>, PHASE_RESULT routes <R>/<V> (<source>)`
-and the routed values instead. It never upgrades a router FAIL/WARN/BLOCK. `auto-merge.sh`
-merges only after a `PR-REVIEW|pr-review|done|OK` terminal AND its own re-run of `phase-route.sh`
-routes OK from a parsed PHASE_RESULT (a `no-diff` route has no PR and never merges).
 
 Example:
 

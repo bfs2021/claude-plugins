@@ -109,13 +109,18 @@ get_critique_status() {
     return 2
   fi
 
+  # Seam audit Track 0.3: the label is matched case-insensitively and in both
+  # bold forms (`**Status:**` and `**Status**:`), and the value is
+  # case-folded — "Blocked" is BLOCKED. A value outside the enum prints
+  # nothing; the gate reads that as CRITIQUE_STATUS_MISSING, never as clear.
   local status
   status=$(tail -n "+$start_line" "$notes" 2>/dev/null |
     sed -n '1,/^## /p' |
-    grep '^\*\*Status:' |
+    grep -iE '^\*\*Status(:\*\*|\*\*:)' |
     head -1 |
-    sed 's/.*\*\*Status:\*\* *//' |
-    grep -oP '(BLOCKED|WARNINGS|CLEAR)' || true)
+    sed -E 's/^\*\*[Ss][Tt][Aa][Tt][Uu][Ss](:\*\*|\*\*:)[[:space:]]*//' |
+    tr '[:lower:]' '[:upper:]' |
+    grep -oE '^(BLOCKED|WARNINGS|CLEAR)\b' || true)
 
   if [ -n "$status" ]; then
     echo "$status"
@@ -123,6 +128,34 @@ get_critique_status() {
   fi
 
   return 2
+}
+
+# get_open_needs_human_count <ticket-dir>
+# Counts the open `[needs-human]` questions under notes.md `## Open Questions`
+# (seam audit Track 0.3 — the entry gate holds an auto-approval on them).
+# Tolerant of the shapes agents write: the heading in any case with an
+# optional trailing colon, `###` subsections inside it, `-`/`*`/`+` bullets,
+# an unticked `[ ]` box, and bold `**[needs-human]**`. A struck bullet
+# (`- ~~[needs-human] …~~`) or a ticked box (`- [x] [needs-human]`) is answered.
+# Lines inside ``` / ~~~ fences are skipped. Prints an integer, always.
+# Exit codes: 0 = counted (may be 0), 1 = notes.md unreadable
+get_open_needs_human_count() {
+  local notes="$1/notes.md"
+  if [ ! -f "$notes" ]; then
+    echo 0
+    return 1
+  fi
+  awk '
+    /^[ ]*(```|~~~)/ { fence = !fence; next }
+    fence { next }
+    /^##[ \t]/ && !/^###/ {
+      h = tolower($0); sub(/^##[ \t]+/, "", h); sub(/[ \t:]+$/, "", h)
+      f = (h == "open questions"); next
+    }
+    f && tolower($0) ~ /^[ \t]*[-*+][ \t]+(\[[ \t]\][ \t]+)?(\*\*)?\[needs-human\]/ { n++ }
+    END { print n + 0 }
+  ' "$notes" 2>/dev/null || echo 0
+  return 0
 }
 
 # get_ac_count <ticket-dir>

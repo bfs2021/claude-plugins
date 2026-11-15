@@ -18,9 +18,11 @@
 #     The text the probes scan: the file, or every *.md under an openspec
 #     change directory (proposal, design, tasks, specs), sorted.
 #
-#   verify_readiness_score <artifact> <mode-text> <vplan-found> <vplan-verifiable>
-#     A verifiable plan row marks all prerequisites found; otherwise the
-#     artifact is scanned. The ticket mode comes from verify-mode.sh
+#   verify_readiness_score <artifact> <mode-text> <vplan-found> <vplan-verifiable> [<vplan-cols>]
+#     <vplan-cols> = "ROLE NAV DATA EXPECTED" (verify_readiness_vplan_cols):
+#     the table vouches for a prerequisite only when every verifiable row
+#     fills its column (seam audit Track 0.3); every other prerequisite is
+#     scanned for in the artifact. The ticket mode comes from verify-mode.sh
 #     (verify_mode_gate_profile over <mode-text>, the text verify itself
 #     classifies). Sets:
 #       VR_TEST_USER VR_NAV VR_EXPECTED VR_ENV       probe counts (0 = missing)
@@ -59,11 +61,12 @@ fi
 
 verify_readiness_vplan() {
   local tid="${1:-}" td="${2:-.}" text="" pdir=""
-  VR_VPLAN_FOUND="" VR_VPLAN_SOURCE="none" VR_VPLAN_ROWS=0 VR_VPLAN_VERIFIABLE=0
+  VR_VPLAN_FOUND="" VR_VPLAN_SOURCE="none" VR_VPLAN_ROWS=0 VR_VPLAN_VERIFIABLE=0 VR_VPLAN_COLS="0 0 0 0"
   declare -f vplan_parse >/dev/null 2>&1 || return 0
   [ -f "$td/notes.md" ] && text=$(cat "$td/notes.md" 2>/dev/null || true)
   if vplan_parse "$text" 2>/dev/null; then
     VR_VPLAN_FOUND=1 VR_VPLAN_SOURCE="notes.md" VR_VPLAN_ROWS="$VPLAN_ROWS" VR_VPLAN_VERIFIABLE="$VPLAN_VERIFIABLE"
+    VR_VPLAN_COLS="$(verify_readiness_vplan_cols)"
     return 0
   fi
   if declare -f resolve_planner_dir >/dev/null 2>&1; then
@@ -72,6 +75,7 @@ verify_readiness_vplan() {
       text=$(cat "$pdir/body.md" 2>/dev/null || true)
       if vplan_parse "$text" 2>/dev/null; then
         VR_VPLAN_FOUND=1 VR_VPLAN_SOURCE="body.md" VR_VPLAN_ROWS="$VPLAN_ROWS" VR_VPLAN_VERIFIABLE="$VPLAN_VERIFIABLE"
+        VR_VPLAN_COLS="$(verify_readiness_vplan_cols)"
       fi
     fi
   fi
@@ -111,33 +115,56 @@ _vr_hit() {
   grep -iPm1 "$1" <<<"$2" 2>/dev/null | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/|/\\|/g' | cut -c1-100 || true
 }
 
+# verify_readiness_vplan_cols — "ROLE NAV DATA EXPECTED" from the last
+# vplan_parse call: verifiable rows filling each column (vplan-parse.sh).
+verify_readiness_vplan_cols() {
+  printf '%s %s %s %s\n' "${VPLAN_V_ROLE:-0}" "${VPLAN_V_NAV:-0}" "${VPLAN_V_DATA:-0}" "${VPLAN_V_EXPECTED:-0}"
+}
+
 verify_readiness_score() {
-  local artifact="${1:-}" mode_text="${2:-}" vfound="${3:-}" vverif="${4:-0}" text role
+  local artifact="${1:-}" mode_text="${2:-}" vfound="${3:-}" vverif="${4:-0}" vcols="${5:-0 0 0 0}" text role
   VR_TEST_USER=0 VR_NAV=0 VR_EXPECTED=0 VR_ENV=0 VR_BUILD_COMMAND=0 VR_BUILD_OUTCOME=0
   VR_HIT_TEST_USER="" VR_HIT_NAV="" VR_HIT_EXPECTED="" VR_HIT_ENV="" VR_HIT_BUILD_COMMAND="" VR_HIT_BUILD_OUTCOME=""
   if [ -n "$vfound" ] && [ "${vverif:-0}" -gt 0 ] 2>/dev/null; then
-    # At least one criterion is fully verifiable: every prerequisite is
-    # present for it (vplan_parse reads only the Verifiable column, #514).
-    VR_TEST_USER=1 VR_NAV=1 VR_EXPECTED=1 VR_ENV=1 VR_BUILD_COMMAND=1 VR_BUILD_OUTCOME=1
+    # Seam audit Track 0.3: the table vouches for a prerequisite only when
+    # EVERY verifiable row fills that column (vplan_parse's per-column
+    # counts). A self-ticked ✓ next to a blank user or nav cell vouches for
+    # nothing; that column falls through to the artifact scan below, and
+    # VR_PLAN_* (critique cross-validation) stays 0 for it.
+    local c_role c_nav c_data c_exp
+    read -r c_role c_nav c_data c_exp <<<"$vcols"
+    [ "${c_role:-0}" = "$vverif" ] && VR_TEST_USER=1
+    [ "${c_nav:-0}" = "$vverif" ] && VR_NAV=1
+    [ "${c_data:-0}" = "$vverif" ] && VR_ENV=1
+    if [ "${c_exp:-0}" = "$vverif" ]; then
+      VR_EXPECTED=1 VR_BUILD_OUTCOME=1
+    fi
   fi
   VR_PLAN_TEST_USER=$VR_TEST_USER VR_PLAN_NAV=$VR_NAV VR_PLAN_EXPECTED=$VR_EXPECTED VR_PLAN_ENV=$VR_ENV
 
   text=$(verify_readiness_artifact_text "$artifact")
+  # Tightened probes (v2): each needs context, not a bare substring. Only the
+  # prerequisites the table did not vouch for are scanned.
+  role=$(_vr_role_pattern)
+  local p_user p_nav p_exp p_env
+  p_user='(\*\*User:\*\*\s*\S|email[:\s]*\S+@\S+\.\S+|log in as \S|test as \S|role[:\s]*('"$role"'))'
+  p_nav='((navigate|go to|open|visit|click).{0,60}(/(handover|admin|user-permission|organisation|portfolio)/)|(/(handover|admin|user-permission|organisation|portfolio)/).{0,60}(navigate|go to|open|visit|click)|menu path.{0,30}\[|navigate to \S|go to \S)'
+  p_exp='(acceptance criteria|expected (behavi|result|outcome)|^\s*\d+[\.\)]\s.*(should |must )|verify that|pass criter|##\s*(Expected|Acceptance|Verification Plan)|AC[-:]\s|###\s*(Acceptance|Expected))'
+  p_env='(seed[- ]?data|(test|data|environment|seed)\s+\w+\s+setup|setup\s+(test|data|seed)\s|prerequisite|before (testing|running)|database|migration|service.{0,10}start|data\.sql|fixture|test data)'
   if [ "$VR_TEST_USER" = 0 ]; then
-    # Tightened probes (v2): each needs context, not a bare substring.
-    role=$(_vr_role_pattern)
-    local p_user p_nav p_exp p_env
-    p_user='(\*\*User:\*\*\s*\S|email[:\s]*\S+@\S+\.\S+|log in as \S|test as \S|role[:\s]*('"$role"'))'
-    p_nav='((navigate|go to|open|visit|click).{0,60}(/(handover|admin|user-permission|organisation|portfolio)/)|(/(handover|admin|user-permission|organisation|portfolio)/).{0,60}(navigate|go to|open|visit|click)|menu path.{0,30}\[|navigate to \S|go to \S)'
-    p_exp='(acceptance criteria|expected (behavi|result|outcome)|^\s*\d+[\.\)]\s.*(should |must )|verify that|pass criter|##\s*(Expected|Acceptance|Verification Plan)|AC[-:]\s|###\s*(Acceptance|Expected))'
-    p_env='(seed[- ]?data|(test|data|environment|seed)\s+\w+\s+setup|setup\s+(test|data|seed)\s|prerequisite|before (testing|running)|database|migration|service.{0,10}start|data\.sql|fixture|test data)'
     VR_TEST_USER=$(_vr_count "$p_user" "$text")
-    VR_NAV=$(_vr_count "$p_nav" "$text")
-    VR_EXPECTED=$(_vr_count "$p_exp" "$text")
-    VR_ENV=$(_vr_count "$p_env" "$text")
     VR_HIT_TEST_USER=$(_vr_hit "$p_user" "$text")
+  fi
+  if [ "$VR_NAV" = 0 ]; then
+    VR_NAV=$(_vr_count "$p_nav" "$text")
     VR_HIT_NAV=$(_vr_hit "$p_nav" "$text")
+  fi
+  if [ "$VR_EXPECTED" = 0 ]; then
+    VR_EXPECTED=$(_vr_count "$p_exp" "$text")
     VR_HIT_EXPECTED=$(_vr_hit "$p_exp" "$text")
+  fi
+  if [ "$VR_ENV" = 0 ]; then
+    VR_ENV=$(_vr_count "$p_env" "$text")
     VR_HIT_ENV=$(_vr_hit "$p_env" "$text")
   fi
 
@@ -190,11 +217,12 @@ verify_readiness_score() {
 # _vr_notes_section <date> — the ## Verification Readiness block for notes.md.
 _vr_notes_section() {
   local d="$1"
-  # $1 label, $2 count, $3 first matching plan line (artifact scan only)
+  # $1 label, $2 count, $3 first matching plan line (artifact scan only),
+  # $4 1 when the Verification Plan table vouched for it
   _vr_row() {
     if [ "$2" = 0 ]; then
       echo "| $1 | missing | not specified |"
-    elif [ "$VR_PLAN_TEST_USER" != 0 ]; then
+    elif [ "${4:-0}" != 0 ]; then
       echo "| $1 | found | Verification Plan ($VR_VPLAN_SOURCE) |"
     else
       echo "| $1 | found | plan: ${3:-artifact scan} |"
@@ -209,13 +237,13 @@ _vr_notes_section() {
   echo "| Prerequisite | Status | Source |"
   echo "|-------------|--------|--------|"
   if [ "$VR_MODE" = build-only ]; then
-    _vr_row "Build command" "$VR_BUILD_COMMAND" "$VR_HIT_BUILD_COMMAND"
-    _vr_row "Build outcome" "$VR_BUILD_OUTCOME" "$VR_HIT_BUILD_OUTCOME"
+    _vr_row "Build command" "$VR_BUILD_COMMAND" "$VR_HIT_BUILD_COMMAND" 0
+    _vr_row "Build outcome" "$VR_BUILD_OUTCOME" "$VR_HIT_BUILD_OUTCOME" "$VR_PLAN_EXPECTED"
   else
-    _vr_row "Test user" "$VR_TEST_USER" "$VR_HIT_TEST_USER"
-    _vr_row "Navigation target" "$VR_NAV" "$VR_HIT_NAV"
-    _vr_row "Expected behavior" "$VR_EXPECTED" "$VR_HIT_EXPECTED"
-    _vr_row "Environment prerequisites" "$VR_ENV" "$VR_HIT_ENV"
+    _vr_row "Test user" "$VR_TEST_USER" "$VR_HIT_TEST_USER" "$VR_PLAN_TEST_USER"
+    _vr_row "Navigation target" "$VR_NAV" "$VR_HIT_NAV" "$VR_PLAN_NAV"
+    _vr_row "Expected behavior" "$VR_EXPECTED" "$VR_HIT_EXPECTED" "$VR_PLAN_EXPECTED"
+    _vr_row "Environment prerequisites" "$VR_ENV" "$VR_HIT_ENV" "$VR_PLAN_ENV"
   fi
 }
 
@@ -295,7 +323,7 @@ _verify_readiness_main() {
   local mode_plan="$art"
   [ -d "$art" ] && mode_plan="$td/notes.md"
   verify_readiness_vplan "$tid" "$td"
-  verify_readiness_score "$art" "$(verify_mode_text "$mode_plan" "$td")" "$VR_VPLAN_FOUND" "$VR_VPLAN_VERIFIABLE"
+  verify_readiness_score "$art" "$(verify_mode_text "$mode_plan" "$td")" "$VR_VPLAN_FOUND" "$VR_VPLAN_VERIFIABLE" "$VR_VPLAN_COLS"
 
   echo "VR_STATUS=$VR_STATUS"
   echo "VR_MODE=$VR_MODE"
