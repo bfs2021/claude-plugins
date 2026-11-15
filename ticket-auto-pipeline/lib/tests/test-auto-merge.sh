@@ -39,6 +39,7 @@ _setup() {
   # Default gh: `pr view` prints a ticket head ref, `pr merge` succeeds.
   _stub_gh 'feat/cre-2' 0 0
   cat >"$_ws/log" <<'EOF'
+2026-10-01T00:00:00Z|META|branch-context|info|base=develop;integration=;source=default;ticket=feat/cre-2;uat-policy=per-ticket;merge-policy=
 2026-10-01T00:00:00Z|META|outcome-label|info|Smooth
 2026-10-01T00:00:01Z|PR-REVIEW|checkout-pr|done|12
 EOF
@@ -232,6 +233,70 @@ test_dry_run_never_merges() {
   [ "$ok" = 1 ]
 }
 
+# ── Track 0.1: merge identity (seam audit) ───────────────────────────────────
+# The PR number comes from an agent-written log line, so it must be exactly a
+# number, and the PR's head ref must be the ticket's recorded branch
+# (META|branch-context ticket=). Anything else refuses to merge.
+
+# Must-fail: prose on the checkout-pr line used to yield its first number.
+test_non_numeric_pr_number_refuses() {
+  _setup
+  echo '2026-10-01T00:00:02Z|PR-REVIEW|checkout-pr|done|12 (see also #34)' >>"$_ws/log"
+  _am
+  local ok=1
+  [ "$_rc" = 3 ] && ! grep -q '^pr ' "$_ws/gh.calls" &&
+    grep -q '|META|pr-auto-merge|skip|PR_NUMBER_INVALID' "$_ws/log" || ok=0
+  _teardown
+  [ "$ok" = 1 ]
+}
+
+# Must-pass: a leading # is tolerated.
+test_hash_prefixed_pr_number_merges() {
+  _setup
+  echo '2026-10-01T00:00:02Z|PR-REVIEW|checkout-pr|done|#12' >>"$_ws/log"
+  _am
+  local ok=1
+  [ "$_rc" = 0 ] && _merged || ok=0
+  _teardown
+  [ "$ok" = 1 ]
+}
+
+# Must-fail: the PR's head is not the ticket branch (another ticket's PR).
+test_head_ref_mismatch_refuses() {
+  _setup
+  _stub_gh 'feat/cre-9-other' 0 0
+  _am
+  local ok=1
+  [ "$_rc" = 3 ] && ! _merged &&
+    grep -q '|META|pr-auto-merge|skip|PR_HEAD_MISMATCH' "$_ws/log" || ok=0
+  _teardown
+  [ "$ok" = 1 ]
+}
+
+# Must-fail: no recorded ticket branch → nothing to compare against.
+test_no_ticket_branch_refuses() {
+  _setup
+  grep -v 'branch-context' "$_ws/log" >"$_ws/log.new" && mv "$_ws/log.new" "$_ws/log"
+  _am
+  local ok=1
+  [ "$_rc" = 3 ] && ! _merged &&
+    grep -q '|META|pr-auto-merge|skip|TICKET_BRANCH_UNRECORDED' "$_ws/log" || ok=0
+  _teardown
+  [ "$ok" = 1 ]
+}
+
+# Must-fail: the head ref is read even with no integration branch, and an
+# unreadable one never merges.
+test_gh_view_failure_without_integration_fails_closed() {
+  _setup
+  _stub_gh '' 1 0
+  _am
+  local ok=1
+  [ "$_rc" = 3 ] && ! _merged && grep -q 'PR_HEAD_UNREADABLE' "$_ws/log" || ok=0
+  _teardown
+  [ "$ok" = 1 ]
+}
+
 test_usage_rc2() {
   local rc=0
   bash "$AM" CRE-2 >/dev/null 2>&1 || rc=$?
@@ -262,6 +327,11 @@ _run "gh pr view failure fails closed" test_gh_view_failure_fails_closed
 _run "gh pr merge failure is soft rc 4" test_gh_merge_failure_is_soft_rc4
 _run "repo scoped from META|pr-created" test_repo_scoped_from_pr_created
 _run "dry-run never merges" test_dry_run_never_merges
+_run "non-numeric PR number refuses" test_non_numeric_pr_number_refuses
+_run "#-prefixed PR number merges" test_hash_prefixed_pr_number_merges
+_run "head ref != ticket branch refuses" test_head_ref_mismatch_refuses
+_run "no recorded ticket branch refuses" test_no_ticket_branch_refuses
+_run "unreadable head ref without integration branch refuses" test_gh_view_failure_without_integration_fails_closed
 _run "usage error rc 2" test_usage_rc2
 _run "router delegates to auto-merge.sh" test_router_delegates_to_script
 

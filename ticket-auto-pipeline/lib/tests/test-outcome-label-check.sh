@@ -240,6 +240,72 @@ test_outcome_prefixed_value_accepted() {
   [ "$rc" -eq 0 ] && [ -n "$meta_line" ]
 }
 
+# ── Track 0.1: the prose fallback may only withhold a merge ─────────────────
+# With no dedicated IMPLEMENT|implement-outcome line, the agent's own prose on
+# IMPLEMENT|implement|done| is a self-grade. It may record Rough/Hard (which
+# withholds auto-merge) but never Smooth (which would unlock it).
+
+# Must-fail: "not Hard, Smooth" used to recover Smooth (tail -1) → auto-merge.
+test_prose_fallback_never_records_smooth() {
+  _setup
+  _plog_raw "IMPLEMENT" "implement" "done" "outcome not Hard, Smooth"
+  local rc=0
+  _outcome_label_check || rc=$?
+  local smooth
+  smooth=$(grep '|META|outcome-label|info|' "$LOG_FILE" 2>/dev/null | grep -c 'Smooth' || true)
+  _teardown
+  [ "$rc" -eq 0 ] && [ "$smooth" = "0" ]
+}
+
+# Must-fail: prose that names only Smooth records nothing (unrecorded → no merge).
+test_prose_fallback_smooth_only_is_unrecorded() {
+  _setup
+  _plog_raw "IMPLEMENT" "implement" "done" "Smooth run, 2 files changed"
+  local rc=0
+  _outcome_label_check || rc=$?
+  local line
+  line=$(grep '|META|outcome-label|info|' "$LOG_FILE" 2>/dev/null || true)
+  _teardown
+  [ "$rc" -ne 0 ] && [ -z "$line" ]
+}
+
+# Must-pass: prose naming Rough still withholds (recorded as Rough).
+test_prose_fallback_records_rough() {
+  _setup
+  _plog_raw "IMPLEMENT" "implement" "done" "Rough — two fix cycles"
+  local rc=0
+  _outcome_label_check || rc=$?
+  local line
+  line=$(grep '|META|outcome-label|info|Rough$' "$LOG_FILE" 2>/dev/null || true)
+  _teardown
+  [ "$rc" -eq 0 ] && [ -n "$line" ]
+}
+
+# Must-pass: the worst token wins, never the last one.
+test_prose_fallback_worst_token_wins() {
+  _setup
+  _plog_raw "IMPLEMENT" "implement" "done" "Hard parts were Rough, ended Smooth"
+  local rc=0
+  _outcome_label_check || rc=$?
+  local line
+  line=$(grep '|META|outcome-label|info|' "$LOG_FILE" 2>/dev/null | tail -1 || true)
+  _teardown
+  [ "$rc" -eq 0 ] && [[ "$line" == *"|Hard" ]]
+}
+
+# Must-pass: the dedicated (script-written) line still records Smooth.
+test_dedicated_smooth_beats_prose() {
+  _setup
+  _plog_raw "IMPLEMENT" "implement" "done" "not Hard"
+  _plog_raw "IMPLEMENT" "implement-outcome" "info" "Smooth"
+  local rc=0
+  _outcome_label_check || rc=$?
+  local line
+  line=$(grep '|META|outcome-label|info|Smooth$' "$LOG_FILE" 2>/dev/null || true)
+  _teardown
+  [ "$rc" -eq 0 ] && [ -n "$line" ]
+}
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # Dispatcher
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -259,7 +325,12 @@ for fn in \
   test_outcome_mirrored_to_manifest_when_already_present \
   test_outcome_mirrored_to_manifest_after_applying_label \
   test_outcome_mirror_is_best_effort_without_manifest \
-  test_outcome_prefixed_value_accepted; do
+  test_outcome_prefixed_value_accepted \
+  test_prose_fallback_never_records_smooth \
+  test_prose_fallback_smooth_only_is_unrecorded \
+  test_prose_fallback_records_rough \
+  test_prose_fallback_worst_token_wins \
+  test_dedicated_smooth_beats_prose; do
   [ -z "$FILTER" ] || [[ "$fn" == *"$FILTER"* ]] || continue
   _run "$fn" "$fn"
 done
