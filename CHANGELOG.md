@@ -17,6 +17,21 @@ marketplace. Where a release also moved `ticket-planner`, `fleet-controller`, or
 > - **0.19.0 never existed.** `plugin.json` went 0.18.0 → 0.20.0. The Phase 2
 >   commit message claims `0.19.0→0.20.0`, but no 0.19.0 was ever committed.
 
+## ticket-planner 0.43.5 (2026-11-15) — dispatch-rehearsal iteration 07 finding
+
+- **New warn-level Crosscheck check `CODE_SPAN_EDGE_SPACE` (F53).** A slug test
+  in a spec used the title `` `  Hello,  World!! ` ``. CommonMark drops one space
+  from each end of an inline code span that starts and ends with a space, so
+  readers, and Linear when it stores the ticket, saw `` ` Hello,  World!!` ``. The
+  trailing-space case of the test was lost, and the draft-to-Linear body
+  comparison marked the ticket changed and forced a fresh semantic scan.
+  `lib/planner-crosscheck-codespan.sh` reports every such span (outside fences;
+  INDEX.md and synth-marked test-data specs skipped) with the value readers
+  actually see, and asks for a quoted value instead. Specify's Part 4 self-lint
+  runs it too, so the agent fixes its own specs before Review. Warn only; no
+  existing finding or halt changes. The body normaliser deliberately does not
+  learn this markdown rule, since that would hide the change in meaning.
+
 ## ticket-planner 0.43.4 (2026-11-14) — dispatch-rehearsal iteration 07 finding
 
 - **Ownership edges: an `append` writer no longer blocks every reader (F52).**

@@ -103,6 +103,8 @@ _planner_crosscheck_source_if_missing "planner_crosscheck_testdata" \
   "${_PLANNER_CROSSCHECK_LIB_DIR}/planner-crosscheck-testdata.sh"
 _planner_crosscheck_source_if_missing "planner_crosscheck_ac_coverage" \
   "${_PLANNER_CROSSCHECK_LIB_DIR}/planner-crosscheck-ac-coverage.sh"
+_planner_crosscheck_source_if_missing "planner_crosscheck_codespan" \
+  "${_PLANNER_CROSSCHECK_LIB_DIR}/planner-crosscheck-codespan.sh"
 _planner_crosscheck_source_if_missing "planner_crosscheck_params" \
   "${_PLANNER_CROSSCHECK_LIB_DIR}/planner-crosscheck-params.sh"
 _planner_crosscheck_source_if_missing "planner_crosscheck_ownership" \
@@ -144,7 +146,7 @@ _planner_crosscheck_source_if_missing "planner_state_write" \
 # the key) and AC_PRECONDITION_NO_SOURCE (an unsupported stack) never block.
 # planner-goldfish-review: GOLDFISH_UNADDRESSED judges Consensus's bookkeeping
 # of the goldfish findings, never the plan, so it never blocks.
-PLANNER_CROSSCHECK_WARN_CODES="DISCOVERY_GAP_UNRESOLVED CONTRACT_UNDEFINED TEST_DATA_UNSOURCED_LEGACY CITED_ARTIFACTS_SECTION_MISSING TEST_DATA_INVENTORY_MISSING TEST_DATA_IMPLIED_WEAK VERIFICATION_NOTES_MISSING_LEGACY OWN_NEAR_MATCH OWN_UNDECLARED_REF OWN_EXTERNAL_UNANCHORED OWN_EDGES_DIVERGED AC_PRECONDITION_PLANNED AC_PRECONDITION_NO_SOURCE GOLDFISH_UNADDRESSED"
+PLANNER_CROSSCHECK_WARN_CODES="DISCOVERY_GAP_UNRESOLVED CONTRACT_UNDEFINED TEST_DATA_UNSOURCED_LEGACY CITED_ARTIFACTS_SECTION_MISSING TEST_DATA_INVENTORY_MISSING TEST_DATA_IMPLIED_WEAK VERIFICATION_NOTES_MISSING_LEGACY OWN_NEAR_MATCH OWN_UNDECLARED_REF OWN_EXTERNAL_UNANCHORED OWN_EDGES_DIVERGED AC_PRECONDITION_PLANNED AC_PRECONDITION_NO_SOURCE GOLDFISH_UNADDRESSED CODE_SPAN_EDGE_SPACE"
 
 # Per-instance codes (planner-crosscheck-ownership D10). A listed code is
 # accepted one instance at a time and never code-wide: emit matches each
@@ -536,6 +538,12 @@ planner_crosscheck_run() {
   total_accepted=$((total_accepted + a))
 
   read -r b w a < <(_planner_crosscheck_run_family "$initiative_id" planner_crosscheck_ac_coverage "$initiative_id")
+  total_blocking=$((total_blocking + b))
+  total_warn=$((total_warn + w))
+  total_accepted=$((total_accepted + a))
+
+  # Code-span family (F53): edge spaces markdown drops from inline code.
+  read -r b w a < <(_planner_crosscheck_run_family "$initiative_id" planner_crosscheck_codespan "$initiative_id")
   total_blocking=$((total_blocking + b))
   total_warn=$((total_warn + w))
   total_accepted=$((total_accepted + a))

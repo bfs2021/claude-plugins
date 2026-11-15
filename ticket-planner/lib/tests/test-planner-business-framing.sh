@@ -385,7 +385,10 @@ _prompt_has "EpicGen" "$EPICGEN_PROMPT" \
   'Deferred decision:'
 
 # The Specify prompt must not move a byte by accident. Last deliberate
-# re-capture: the sibling rules (rehearsal F38/F43): one
+# re-capture: the code-span self-lint (rehearsal F53): two command lines after
+# the citations self-lint in Part 4 and a one-paragraph note below that block;
+# test-planner-specify-params.sh strips them before its own pins. Before that:
+# the sibling rules (rehearsal F38/F43): one
 # `$(planner_sibling_blocker_rule)` block after the blocked-by bullets and one
 # `$(planner_sibling_citation_rule)` bullet in the TargetSymbols grammar;
 # test-planner-specify-params.sh strips both before its own pins. Before that:
@@ -399,7 +402,7 @@ _prompt_has "EpicGen" "$EPICGEN_PROMPT" \
 # Pinned as the sha256 of the prompt captured with that change, with the
 # scratch REPOS_ROOT normalised. If a later change edits the Specify prompt on
 # purpose, re-capture: printf '%s' "${SPECIFY_PROMPT//$TMP_ROOT/<REPOS_ROOT>}" | sha256sum
-SPECIFY_PROMPT_SHA="9e21b7c9ad80bb49c0ac3475027b6908b790c53d155be2e1b0582c677043756b"
+SPECIFY_PROMPT_SHA="70f5af9ceb674df514b61d3d9077fb09e246b38e93051bef57670e99bab54332"
 got_sha=$(printf '%s' "${SPECIFY_PROMPT//$TMP_ROOT/<REPOS_ROOT>}" | sha256sum | cut -d' ' -f1)
 if [ "$got_sha" = "$SPECIFY_PROMPT_SHA" ]; then
   pass "Specify prompt is byte-identical to the pre-change capture"
