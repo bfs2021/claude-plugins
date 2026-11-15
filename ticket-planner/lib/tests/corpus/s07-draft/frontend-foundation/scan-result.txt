@@ -1,0 +1,14 @@
+=== DOR_SEMANTIC_SCAN ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-frontend-foundation
+BODY_HASH: sha256:f56a21180eb14f19df197cdb533272dfebc40b57b67265124b73a698af7ac9a4
+PARAPHRASE: Scaffold the frontend/ Vite + vanilla JS app on strict port 5173 with an /api dev proxy to the backend on 3000, a History-API path router with one :param segment, a localStorage jwt token helper, a status-and-body API client that throws NetworkError only on fetch rejection, and the signed-out header.
+GAP_REQUIREMENT_COMPLETENESS: clear
+GAP_REQUIREMENT_COMPLETENESS_REASON: Every proposed change (dev server, strict port, build, proxy, router navigation/back/forward/params/fallback, header signed-out links, token helper, API client status/body/auth/content-type/NetworkError) has a matching criterion.
+GAP_CONTRADICTORY_REQUIREMENTS: clear
+GAP_CONTRADICTORY_REQUIREMENTS_REASON: The criteria, Scope table and Verification Plan rows agree with each other and with the Proposed Changes and Technical Context.
+GAP_DEEP_SCOPE_AMBIGUITY: clear
+GAP_DEEP_SCOPE_AMBIGUITY_REASON: Scope is bounded to the named frontend/ files and modules, with pages and the signed-in header explicitly out of scope.
+GAP_EDGE_CASE_SUFFICIENCY: clear
+GAP_EDGE_CASE_SUFFICIENCY_REASON: Busy port, backend down, non-JSON body, 404, fetch rejection, missing token, unknown path and direct deep-path load are all covered by criteria.
+=== END DOR_SEMANTIC_SCAN ===

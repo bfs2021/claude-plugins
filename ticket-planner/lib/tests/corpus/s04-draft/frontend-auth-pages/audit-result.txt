@@ -1,0 +1,7 @@
+=== DOR_SEMANTIC_AUDIT ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-frontend-auth-pages
+BODY_HASH: sha256:11df781e57f8663ed4457a18178f87a8041b9594805c6bcf051376e6dc91688c
+SCORE_PLAUSIBLE: yes
+SCORE_REASON: No dor_quality_score is present; the deterministic status "ready" with empty missing/advisory arrays is plausible because every behaviour in Proposed Behaviour (both pages, error lines, kept values, blank-field errors, signed-in header, reload persistence, 401 token clearing) has an atomic AC with a matching Verification Plan row, and the jake seed plus a fresh backend for alice are covered.
+=== END DOR_SEMANTIC_AUDIT ===

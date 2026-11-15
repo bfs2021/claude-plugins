@@ -1,0 +1,11 @@
+=== DOR_SEMANTIC_AUDIT ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-backend-foundation-test-data
+BODY_HASH: sha256:2ef78de7a5b411b84f6282cbafe9b5b17ffc72b5caa8028f4da1248403fbe1f2
+MISSED_1_CODE: INTENT_AC_MISMATCH
+MISSED_1_REASON: The only seeded item is "1 empty temporary directory", yet the criterion "Every seeded foreign key resolves to a seeded or existing parent record" (and its VPLAN row "verify target reports no orphan rows") assumes relational records; a directory has no foreign keys, so this criterion does not serve the stated intent.
+MISSED_2_CODE: SCOPE_AMBIGUOUS
+MISSED_2_REASON: "`td-1794584184-3869-1` — 1 empty temporary directory" never states where the directory is created or how the consumer learns its path to set VERIFY_REPO_PATH_APP, nor how a "temporary" directory persists until the consumer runs; verify cannot check "the stated state" without a stated path.
+SCORE_PLAUSIBLE: yes
+SCORE_REASON: No dor_quality_score is present; a "ready" status with empty missing/advisory arrays is plausible for the mechanical checks, since the gaps above are semantic, not structural.
+=== END DOR_SEMANTIC_AUDIT ===

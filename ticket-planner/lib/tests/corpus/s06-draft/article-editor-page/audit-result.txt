@@ -1,0 +1,7 @@
+=== DOR_SEMANTIC_AUDIT ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-article-editor-page
+BODY_HASH: sha256:207e9fd5f6859e819dd066b5f9dad808d67d1cc6345e4e1d27a9219c65326aa3
+SCORE_PLAUSIBLE: yes
+SCORE_REASON: No dor_quality_score is present in the deterministic result; its status "ready" with empty missing/advisory arrays is consistent with a body whose 13 criteria are each concrete, covered by a Verification Plan row and backed by the listed seeded user and article.
+=== END DOR_SEMANTIC_AUDIT ===

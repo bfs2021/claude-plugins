@@ -1,0 +1,19 @@
+=== DOR_SEMANTIC_SCAN ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-frontend-editor
+BODY_HASH: sha256:1b2404b0724b33bfb649ade6ccb9c3334d6b9d120492b1d1eefe7a62201541e3
+FINDING_1_CODE: SCOPE_AMBIGUOUS
+FINDING_1_QUOTE: The last steps of the brief's walkthrough: `jake` publishes "My first post" and lands on `/article/my-first-post`; signed out, the "New Article" link is not shown and `/editor` redirects to `/login`.
+FINDING_1_DETAIL: Nobody clearly owns the header "New Article" link. AC4 clicks it, and the Background says it is hidden when signed out. But the Scope table covers only "editor page, editor route guard", Technical Context lists no header change, and it says only that "the signed-in header" comes from the sign-in/sign-up ticket. It never says whether that header already has a "New Article" link that shows only when signed in. If it does not, AC4 cannot pass and nothing in this ticket adds the link. The signed-out "link is not shown" behaviour also has no criterion here, and the body does not say it belongs to another ticket.
+FINDING_2_CODE: EDGE_CASE_GAP
+FINDING_2_QUOTE: Publishing sends `POST /api/articles` with the typed values. On 201 it navigates to `/article/<slug>` using the slug the API returned, and that page shows the new article.
+FINDING_2_DETAIL: Nothing stops a second submit while the first POST is still running. The button is not disabled and there is no in-flight guard. A double-click on "Publish Article" creates two articles, my-first-post and my-first-post-2. That breaks the slug sequence that AC10 and AC19 depend on, and the run cannot recover it without restarting the backend, which would wipe the earlier publish.
+GAP_REQUIREMENT_COMPLETENESS: clear
+GAP_REQUIREMENT_COMPLETENESS_REASON: Each behaviour in Proposed Behaviour (both guard paths, the link, the fields, publish and redirect, the home list, error lines, the suffixed slug, the stale token on publish) has a matching acceptance criterion. The unowned header-link behaviour is reported under scope.
+GAP_CONTRADICTORY_REQUIREMENTS: clear
+GAP_CONTRADICTORY_REQUIREMENTS_REASON: Proposed Behaviour, Technical Context, acceptance criteria, test data and the verification plan agree on the routes, slugs, error handling and backend-restart rules.
+GAP_DEEP_SCOPE_AMBIGUITY: finding
+GAP_DEEP_SCOPE_AMBIGUITY_REASON: It is unclear whether the header "New Article" link, and hiding it when signed out, is in this ticket's scope or already provided by the sign-in/sign-up ticket.
+GAP_EDGE_CASE_SUFFICIENCY: finding
+GAP_EDGE_CASE_SUFFICIENCY_REASON: Stale/malformed tokens, blank fields and duplicate titles are covered. Double-submitting Publish while a request is still running is not.
+=== END DOR_SEMANTIC_SCAN ===

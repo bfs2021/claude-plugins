@@ -1,0 +1,11 @@
+# Cases today's code gets wrong. A row is a check and a bash glob over case
+# ids (<snap>/<unit>@<operator>). Every case a row matches must still fail;
+# when a fix makes one pass, test-planner-corpus-replay.sh fails until the row
+# is removed or narrowed, and the case is then expected. Rows may only go.
+# check	case-glob	reason	source
+semantic_parse	s04-draft/*/audit@bullets	a leading "- " on a KEY line fails the key pattern, so the whole block is invalid	seam audit 2 row 1; E-test-strategy §2 (measured)
+semantic_parse	s0[5-9]*-draft/*@bullets	a leading "- " on a KEY line fails the key pattern, so the whole block is invalid	seam audit 2 row 1; E-test-strategy §2 (measured)
+semantic_parse	s04-draft/*/audit@casing	"Clear"/"Yes" is outside the closed enum (case-sensitive), so the whole block is invalid	seam audit 2 row 3
+semantic_parse	s0[5-9]*-draft/*@casing	"Clear"/"Yes" is outside the closed enum (case-sensitive), so the whole block is invalid	seam audit 2 row 3
+semantic_parse	s04-draft/*/audit@wrap	a wrapped DETAIL/REASON continuation line has no ":", so the whole block is malformed	E-test-strategy §2 (measured)
+semantic_parse	s0[5-9]*-draft/*@wrap	a wrapped DETAIL/REASON continuation line has no ":", so the whole block is malformed	E-test-strategy §2 (measured)

@@ -46,6 +46,26 @@ marketplace. Where a release also moved `ticket-planner`, `fleet-controller`, or
   checkout now fails doctor; point it at the sandbox repositories only.
 - **Runbook:** every rehearsal halt becomes a scrubbed corpus case, committed red, before
   its fix (`docs/runbooks/dispatch-rehearsal.md` § 3).
+- **Rehearsal corpus, iterations 01–10 (slice 5b).** `scripts/corpus-harvest.sh` picks,
+  from the rehearsal folder, only what a replay reads: every state log, each spec set at
+  Crosscheck cut to slug, Title and the synth marker, and all 102 draft-readiness
+  scan/audit blocks with their `dor-result.json` (tainted run, prompts, grill work,
+  telemetry, ticket and draft bodies, Crosscheck output and before-fix copies left out).
+  Scrubbed, it adds 18 snapshots (11 runs, 7 draft gates; about 326 KB with the labels) to
+  `ticket-planner/lib/tests/corpus/`;
+  `MANIFEST.tsv` gains `read_against` and `contracts` columns. The unscrubbed copy stays
+  local, outside the repository.
+- **`test-planner-corpus-replay.sh`** replays them through the real readers:
+  `planner_position_derive` + `planner_crosscheck_findings_summary` (11 logs),
+  `planner_specify_result_ensure` + `planner_crosscheck_carve_scope` (10 spec sets) and
+  `parse_dor_semantic` (102 blocks). Each base verdict must equal its `labels.tsv`
+  `expected`. Harmless operators (CRLF, trailing spaces, casing, bullets, wrapping,
+  number words) must keep the verdict, and harmful ones must carry the blocking code:
+  20 `CARVE_SCOPE_LOST`, 50 `CHECK_ERRORED` and 570 `PARSE_INVALID` fixtures. Cases
+  today's code gets wrong are listed in `corpus/known.tsv`: every scan and audit
+  flips to invalid under a bullet, a capitalised enum or a wrapped line (285 cases).
+  The list may only shrink: a known case that starts passing fails the test until its
+  row is removed.
 
 ## grill-me 0.7.0 (2026-11-15) — seam-bash-derives slice 4: the seal reads result.json
 

@@ -1,0 +1,14 @@
+=== DOR_SEMANTIC_SCAN ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-backend-foundation
+BODY_HASH: sha256:575eea8525ded3cb354f59555949fe77e78d00f2dfd10737cfd17ca2711256e6
+PARAPHRASE: Scaffold the app backend package: an Express 5 app factory and server on port 3000, an in-memory store seeded with two fixed authors and two fixed articles, shared HttpError/blankErrors/error-middleware JSON error handling, a Jest + Supertest test runner behind npm test, and one new BE server row in CLAUDE.md; no endpoints.
+GAP_REQUIREMENT_COMPLETENESS: clear
+GAP_REQUIREMENT_COMPLETENESS_REASON: The criteria cover npm test, server start, seed contents, hash cost and reuse, store lookups, error middleware status and body, blankErrors, randomized order, and the CLAUDE.md row.
+GAP_CONTRADICTORY_REQUIREMENTS: clear
+GAP_CONTRADICTORY_REQUIREMENTS_REASON: The edited criteria and Verification Plan rows match Technical Context, including the 500 response for a malformed JSON body, which follows from the rule that any non-HttpError renders 500.
+GAP_DEEP_SCOPE_AMBIGUITY: clear
+GAP_DEEP_SCOPE_AMBIGUITY_REASON: Scope is bounded to named new files under backend/ plus one CLAUDE.md row. Endpoints, auth and the frontend are explicitly out of scope.
+GAP_EDGE_CASE_SUFFICIENCY: clear
+GAP_EDGE_CASE_SUFFICIENCY_REASON: The criteria cover blank-field variants (whitespace, non-string, missing), case-insensitive email versus exact username lookup, store isolation, hash reuse, randomized test order and malformed JSON.
+=== END DOR_SEMANTIC_SCAN ===

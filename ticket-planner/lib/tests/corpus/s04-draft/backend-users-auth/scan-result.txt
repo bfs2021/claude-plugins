@@ -1,0 +1,16 @@
+=== DOR_SEMANTIC_SCAN ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-backend-users-auth
+BODY_HASH: sha256:24eb2a61809f38dfe638587d1897a27397f6989632745ef8b863240bad8be673
+FINDING_1_CODE: EDGE_CASE_GAP
+FINDING_1_QUOTE: Trim before the blank check.
+FINDING_1_DETAIL: The ticket never says whether the trimmed or the original value is what gets stored and compared, and the password is the risky case. If register trims `password` before hashing but login does not (or the other way round), a user who registers with a password such as ` Pass-123 ` (leading or trailing spaces) can never log in. The same gap applies to usernames and emails with surrounding whitespace (` jake ` could slip past the case-sensitive uniqueness check). No acceptance criterion pins this behaviour.
+GAP_REQUIREMENT_COMPLETENESS: clear
+GAP_REQUIREMENT_COMPLETENESS_REASON: Every core behaviour (register, login, current user, token shape and secret, no password leak, loginAs helper) has explicit acceptance criteria.
+GAP_CONTRADICTORY_REQUIREMENTS: clear
+GAP_CONTRADICTORY_REQUIREMENTS_REASON: Proposed Behaviour, Technical Context and Acceptance Criteria agree on status codes, error bodies, case rules and check order.
+GAP_DEEP_SCOPE_AMBIGUITY: clear
+GAP_DEEP_SCOPE_AMBIGUITY_REASON: Scope is bounded to three endpoints, one auth module, tests and one helper; Out of Scope lists the adjacent features.
+GAP_EDGE_CASE_SUFFICIENCY: finding
+GAP_EDGE_CASE_SUFFICIENCY_REASON: Blank, uniqueness and token edge cases are well covered; nothing says whether surrounding whitespace is kept or stripped in stored values, especially the password.
+=== END DOR_SEMANTIC_SCAN ===

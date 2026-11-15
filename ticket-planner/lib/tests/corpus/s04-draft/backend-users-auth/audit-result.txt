@@ -1,0 +1,7 @@
+=== DOR_SEMANTIC_AUDIT ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-backend-users-auth
+BODY_HASH: sha256:24eb2a61809f38dfe638587d1897a27397f6989632745ef8b863240bad8be673
+SCORE_PLAUSIBLE: yes
+SCORE_REASON: No dor_quality_score is present; the deterministic status "ready" with empty missing/advisory is consistent with a body whose every proposed behaviour (register, login, current user, token claims, secret fallback, password exclusion, loginAs helper) has concrete ACs, a full per-criterion verification plan, and seeded test data with a named source.
+=== END DOR_SEMANTIC_AUDIT ===

@@ -1,0 +1,7 @@
+=== DOR_SEMANTIC_AUDIT ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-frontend-editor
+BODY_HASH: sha256:00bda19d114aa6775c363f93a888b8f19f064a33b5fff1298801e8f64e71120e
+SCORE_PLAUSIBLE: yes
+SCORE_REASON: No dor_quality_score is present; status "ready" with empty missing/advisory is consistent with a body whose every behaviour (open, form, publish, errors, guard incl. rejected token, safe text) has a concrete AC, a VPLAN row and sourced test data.
+=== END DOR_SEMANTIC_AUDIT ===

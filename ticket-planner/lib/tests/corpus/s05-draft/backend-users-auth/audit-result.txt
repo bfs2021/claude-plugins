@@ -1,0 +1,7 @@
+=== DOR_SEMANTIC_AUDIT ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-backend-users-auth
+BODY_HASH: sha256:229a84a84abd32376ef070ee99f687c986ee90ae43e2d80cf7dddeb98c0aa9e5
+SCORE_PLAUSIBLE: yes
+SCORE_REASON: No dor_quality_score is present in the deterministic result; its status "ready" with empty missing and advisory arrays is plausible, since every described behaviour (seed, register, login, current user, token rules, secret handling, loginAs helper) has a concrete criterion and the seeded test data is listed with its source.
+=== END DOR_SEMANTIC_AUDIT ===

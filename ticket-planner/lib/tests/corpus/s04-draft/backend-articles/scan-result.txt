@@ -1,0 +1,13 @@
+=== DOR_SEMANTIC_SCAN ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-backend-articles
+BODY_HASH: sha256:f5d94bd694b0aeed3c2ececabc3bae9a7d187cbf0572c65f4ce41d7165436da2
+GAP_REQUIREMENT_COMPLETENESS: clear
+GAP_REQUIREMENT_COMPLETENESS_REASON: Every Proposed Behaviour bullet (create shape, slug rule and collisions, trimming, blank/empty-slug 422s, 401 variants, no-password, read-one 200/404, list ordering, tie-break, paging defaults/fallbacks, limit=0, offset past end, author filter) has at least one matching acceptance criterion.
+GAP_CONTRADICTORY_REQUIREMENTS: clear
+GAP_CONTRADICTORY_REQUIREMENTS_REASON: Summary, Proposed Behaviour, Technical Context and Acceptance Criteria agree on status codes, error bodies, ordering (createdAt desc then seq desc) and paging rules.
+GAP_DEEP_SCOPE_AMBIGUITY: clear
+GAP_DEEP_SCOPE_AMBIGUITY_REASON: Scope is bounded to three endpoints, two helpers and their tests in app/backend, with an explicit Out of Scope list.
+GAP_EDGE_CASE_SUFFICIENCY: clear
+GAP_EDGE_CASE_SUFFICIENCY_REASON: The clarified edge cases (invalid/negative paging, offset past end, unknown author, whitespace-only fields, empty slug, no request body, expired/Bearer/malformed token, slug collisions, createdAt tie) are each specified and tested.
+=== END DOR_SEMANTIC_SCAN ===

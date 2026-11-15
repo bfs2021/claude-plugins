@@ -1,0 +1,9 @@
+=== DOR_SEMANTIC_AUDIT ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-users-api
+BODY_HASH: sha256:e96e9e0137457fca30ab01591f16c40ed394442132c0123afb2ac3dccf50d2d5
+MISSED_1_CODE: CONTRADICTORY_REQUIREMENTS
+MISSED_1_REASON: "Assumption: Email comparisons for duplicates and login ignore leading and trailing spaces as well as letter case" (and AC "Registering a new username with a seeded author's email followed by one trailing space returns 422...") conflicts with Technical Context "The email is stored as submitted; only comparisons ignore letter case." and Duplicates "an email that already exists (ignoring letter case)"; findUserByEmail is described as ignoring only letter case, so the trimming rule has no stated home and login trimming has no criterion.
+SCORE_PLAUSIBLE: yes
+SCORE_REASON: No dor_quality_score present; empty missing/advisory with status ready is plausible for a body this thoroughly specified, apart from the email-trimming inconsistency.
+=== END DOR_SEMANTIC_AUDIT ===

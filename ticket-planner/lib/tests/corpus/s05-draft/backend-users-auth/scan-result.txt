@@ -1,0 +1,14 @@
+=== DOR_SEMANTIC_SCAN ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-backend-users-auth
+BODY_HASH: sha256:229a84a84abd32376ef070ee99f687c986ee90ae43e2d80cf7dddeb98c0aa9e5
+PARAPHRASE: Add user accounts to the Express backend: seed authors jake and jane with bcrypt-hashed passwords, and add register, login and current-user endpoints that issue and check 24-hour HS256 JWTs, return the brief's exact error bodies, never expose a password or hash, plus a loginAs test helper for later tickets.
+GAP_REQUIREMENT_COMPLETENESS: clear
+GAP_REQUIREMENT_COMPLETENESS_REASON: Every described behaviour (seed, reset, register success and errors, login success and errors, current user, each token rejection, token shape, both secret cases, no password leak, loginAs) has a criterion and a matching Verification Plan row.
+GAP_CONTRADICTORY_REQUIREMENTS: clear
+GAP_CONTRADICTORY_REQUIREMENTS_REASON: Acceptance criteria, the Scope assumption on multi-blank login and the Verification Plan rows agree with Proposed Behaviour and Technical Context; statuses, bodies and case rules are consistent throughout.
+GAP_DEEP_SCOPE_AMBIGUITY: clear
+GAP_DEEP_SCOPE_AMBIGUITY_REASON: Scope names one backend service and concrete areas that match the files in Technical Context, and Out of Scope excludes articles, profiles, user updates, sign-out and frontend.
+GAP_EDGE_CASE_SUFFICIENCY: clear
+GAP_EDGE_CASE_SUFFICIENCY_REASON: Blank and missing fields, missing body, combined errors, blank-before-uniqueness order, email and username case rules, seven token rejection cases, first-request seed readiness and shell JWT_SECRET independence are all covered by criteria.
+=== END DOR_SEMANTIC_SCAN ===

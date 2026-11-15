@@ -1,0 +1,17 @@
+=== DOR_SEMANTIC_SCAN ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-frontend-read-pages
+BODY_HASH: sha256:20dee9a6d26f46c052bef13d7145e37b4ffe5856693147979e845b18f0a2cb47
+PARAPHRASE: Scaffold the Vite vanilla-JS frontend (router, API client, signed-out header, placeholder auth/editor routes) and add the two anonymous read pages: a home page listing articles newest first and an article page by slug, with not-found and load-failure messages.
+FINDING_1_CODE: TEST_DATA_GAP
+FINDING_1_QUOTE: - [ ] With the 2 seeded articles, the first title on the home page is "Welcome to Conduit"
+FINDING_1_DETAIL: The ordering criteria (first/second title) only prove "newest first" if the seed makes welcome-to-conduit newer than how-to-train-your-dragon; Test Data Prerequisites lists the 2 seeded records but not their relative createdAt values (nor the body "Seed body text." the article page check expects), so the verifier cannot tell whether the expected order reflects newest-first sorting or just the seed insertion order.
+GAP_REQUIREMENT_COMPLETENESS: clear
+GAP_REQUIREMENT_COMPLETENESS_REASON: Header, home list, article page, deep link, Back button, not-found and load-failure behaviours each have acceptance criteria; no human decision is open.
+GAP_CONTRADICTORY_REQUIREMENTS: clear
+GAP_CONTRADICTORY_REQUIREMENTS_REASON: Proposed behaviour, technical context, criteria and out-of-scope list agree with each other.
+GAP_DEEP_SCOPE_AMBIGUITY: clear
+GAP_DEEP_SCOPE_AMBIGUITY_REASON: Scope table names every file, and out-of-scope excludes auth, editor, signed-in header, tags, comments and paging.
+GAP_EDGE_CASE_SUFFICIENCY: clear
+GAP_EDGE_CASE_SUFFICIENCY_REASON: Unknown slug, backend down, direct load and Back navigation are covered; no other specific plausible edge case is left open for this read-only scope.
+=== END DOR_SEMANTIC_SCAN ===

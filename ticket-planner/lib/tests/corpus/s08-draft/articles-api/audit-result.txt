@@ -1,0 +1,9 @@
+=== DOR_SEMANTIC_AUDIT ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-articles-api
+BODY_HASH: sha256:08fd35c0546097337be2fe112c2964706cca7664e29669b6d00e9f586e1e243d
+MISSED_1_CODE: CONTRADICTORY_REQUIREMENTS
+MISSED_1_REASON: Proposed Behaviour defines the slug by "characters that are not letters or digits" and rejects only "A title that has no letters or digits", but Technical Context specifies "replace `/[^a-z0-9]+/g` with `-`", so a title made only of non-ASCII letters (e.g. "Café" -> "caf", or an all-CJK title -> empty slug -> 422) behaves differently under the two definitions and no criterion settles which one wins.
+SCORE_PLAUSIBLE: yes
+SCORE_REASON: No dor_quality_score is present; the deterministic status "ready" with empty missing/advisory arrays is plausible for a ticket whose criteria, test data and verification plan are concrete and complete apart from the one slug-definition conflict above.
+=== END DOR_SEMANTIC_AUDIT ===

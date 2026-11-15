@@ -1,0 +1,7 @@
+=== DOR_SEMANTIC_AUDIT ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-auth-pages
+BODY_HASH: sha256:14b4b631061b804b9153a358a75946ff4dd8fc287c58b16d2ea5a35eef04281f
+SCORE_PLAUSIBLE: yes
+SCORE_REASON: No dor_quality_score is present; status "ready" with empty missing/advisory is plausible given concrete ACs covering sign-in, sign-up, error lines, 5xx/network fallback and stored-token check, with seeded test data sourced and a per-criterion verification plan.
+=== END DOR_SEMANTIC_AUDIT ===

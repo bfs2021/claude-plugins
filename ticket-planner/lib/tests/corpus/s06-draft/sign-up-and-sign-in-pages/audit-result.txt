@@ -1,0 +1,7 @@
+=== DOR_SEMANTIC_AUDIT ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-sign-up-and-sign-in-pages
+BODY_HASH: sha256:39e0d1b17fbec231d08bac1f113fe132a0349164da885713ffeac3d2c4d97bf7
+SCORE_PLAUSIBLE: yes
+SCORE_REASON: No dor_quality_score is present in the deterministic result; its status "ready" with empty missing and advisory arrays is consistent with the body, where every Proposed Behaviour statement has an acceptance criterion, the seeded user is listed with a source, and the uncovered error and stale-token cases are explicitly declared out of the criteria.
+=== END DOR_SEMANTIC_AUDIT ===

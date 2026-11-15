@@ -1,0 +1,17 @@
+=== DOR_SEMANTIC_SCAN ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-users-api
+BODY_HASH: sha256:97f5caa9ca8ec7fccbb213ab882ba88666fe2f75b8ab805e5be197f2e0a13262
+PARAPHRASE: Implement the backend register, login and current-user endpoints in the scaffolded users router, with bcrypt cost-10 password hashing, 24-hour HS256 tokens, a reusable requireAuth token-check middleware that returns one 401 body for every token failure, and a backend test file covering each success and error case.
+FINDING_1_CODE: TEST_DATA_GAP
+FINDING_1_QUOTE: The 200 current-user response for `jake` shows `bio` equal to `null`.
+FINDING_1_DETAIL: The criterion (and its sibling for `image`) needs the 1 seeded user `jake` to have `bio` null and `image` null. Test Data Prerequisites lists `jake` only as "in state registered" and the body states null bio/image only for a newly registered user; if backend-scaffold seeds `jake` with a bio or image, a correct implementation fails these two criteria. State the seeded `jake` record's `bio` and `image` values (null) in the prerequisites.
+GAP_REQUIREMENT_COMPLETENESS: finding
+GAP_REQUIREMENT_COMPLETENESS_REASON: Every described behaviour (register, login, current user, token rules, hashing, concurrency) has a criterion; the one gap is that the seeded jake record's bio/image state, which two criteria assert, is not stated in the test data.
+GAP_CONTRADICTORY_REQUIREMENTS: clear
+GAP_CONTRADICTORY_REQUIREMENTS_REASON: Proposed Behaviour, Technical Context, parameters, criteria and Verification Plan rows agree on status codes, error bodies, check order, case rules, token lifetime and secret fallback.
+GAP_DEEP_SCOPE_AMBIGUITY: clear
+GAP_DEEP_SCOPE_AMBIGUITY_REASON: Scope names three concrete files, the scaffold-owned helpers it reuses, and an explicit Out of Scope list (pages, articles, user update, format rules, rate limiting, refresh).
+GAP_EDGE_CASE_SUFFICIENCY: clear
+GAP_EDGE_CASE_SUFFICIENCY_REASON: Blank variants, missing wrapper, check order, case-sensitivity, both-taken, concurrent registration and every token failure mode (missing, wrong scheme, bad signature, expired, alg none, unknown id) are specified and covered.
+=== END DOR_SEMANTIC_SCAN ===

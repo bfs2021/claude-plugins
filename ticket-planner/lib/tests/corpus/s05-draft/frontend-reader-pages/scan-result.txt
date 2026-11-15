@@ -1,0 +1,14 @@
+=== DOR_SEMANTIC_SCAN ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-frontend-reader-pages
+BODY_HASH: sha256:388a6983ac79dd64194f09879ee727bdd124d0af743eebc01b505406deaa9c43
+PARAPHRASE: Scaffold the Vite + vanilla JS frontend (router with not-found fallback, /api proxy, fetch wrapper, signed-out header) and build the anonymous reader's home list and article pages, extending env-start.sh to also restart the frontend dev server on port 5173.
+GAP_REQUIREMENT_COMPLETENESS: clear
+GAP_REQUIREMENT_COMPLETENESS_REASON: Every described behaviour (header links, ordered list, preview fields, SPA navigation, deep-link reload, 404 and unknown-path text, proxy, build, env-start restart/install/worktree/failure) has a matching criterion and Verification Plan row.
+GAP_CONTRADICTORY_REQUIREMENTS: clear
+GAP_CONTRADICTORY_REQUIREMENTS_REASON: Summary, Proposed Behaviour, Technical Context, criteria and Out of Scope describe the same frontend scaffold plus reader pages consistently.
+GAP_DEEP_SCOPE_AMBIGUITY: clear
+GAP_DEEP_SCOPE_AMBIGUITY_REASON: Scope names the exact files, routes, ports and the frontend half of env-start.sh, and Out of Scope excludes sign-in, editor, pagination and backend changes.
+GAP_EDGE_CASE_SUFFICIENCY: clear
+GAP_EDGE_CASE_SUFFICIENCY_REASON: Missing slug, unknown path, direct load/reload, rerun of the start script, alternate worktree and missing frontend directory are all addressed; test data for each is listed with sources.
+=== END DOR_SEMANTIC_SCAN ===

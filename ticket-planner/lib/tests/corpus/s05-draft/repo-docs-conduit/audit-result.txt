@@ -1,0 +1,7 @@
+=== DOR_SEMANTIC_AUDIT ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-repo-docs-conduit
+BODY_HASH: sha256:aca789a6349053ac62f52cffec750bc7143a00507692a45309be5a4d039b6155
+SCORE_PLAUSIBLE: yes
+SCORE_REASON: No dor_quality_score is present; status "ready" with empty missing/advisory arrays is consistent with a bounded docs-only ticket whose every proposed change has a text-presence or text-absence criterion and a matching Verification Plan row.
+=== END DOR_SEMANTIC_AUDIT ===

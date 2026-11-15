@@ -1,0 +1,7 @@
+=== DOR_SEMANTIC_AUDIT ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-frontend-read-pages
+BODY_HASH: sha256:20dee9a6d26f46c052bef13d7145e37b4ffe5856693147979e845b18f0a2cb47
+SCORE_PLAUSIBLE: yes
+SCORE_REASON: No dor_quality_score is present; the deterministic status "ready" with empty missing/advisory arrays is consistent with a body whose every proposed behaviour (header links, newest-first list, article page, deep link, Back button, both error messages) has a testable AC, a Verification Plan row and seeded test data with a named source.
+=== END DOR_SEMANTIC_AUDIT ===

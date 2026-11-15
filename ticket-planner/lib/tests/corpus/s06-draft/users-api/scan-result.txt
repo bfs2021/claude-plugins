@@ -1,0 +1,14 @@
+=== DOR_SEMANTIC_SCAN ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-users-api
+BODY_HASH: sha256:e4eaf0792c533af7261eccc19037e075e8af812067627fd104bd41b05abdfb9f
+PARAPHRASE: Add register, login and current-user endpoints to the in-memory Express backend, with bcrypt-hashed passwords, an HS256 JWT token check for protected endpoints, fixed 401/422 error bodies, and two author accounts (jake, jane) seeded on every server start, all covered by one node:test file.
+GAP_REQUIREMENT_COMPLETENESS: clear
+GAP_REQUIREMENT_COMPLETENESS_REASON: Every behaviour in Proposed Behaviour (register, login, current user, validation, uniqueness rules, bcrypt cost, token claims and secret, restart reseeding) has a criterion and a matching Verification Plan row; no open human decision remains.
+GAP_CONTRADICTORY_REQUIREMENTS: clear
+GAP_CONTRADICTORY_REQUIREMENTS_REASON: The changed sections agree with each other and with Proposed Behaviour; the Technical Context remark that no criterion covers a valid token for a vanished user is stale against the Scope assumption and the last criterion, but it states no opposing behaviour.
+GAP_DEEP_SCOPE_AMBIGUITY: clear
+GAP_DEEP_SCOPE_AMBIGUITY_REASON: Scope names one layer, one repository and concrete files, Out of Scope excludes settings, profiles, follow, pages and article endpoints, and the one assumption is stated and backed by a criterion.
+GAP_EDGE_CASE_SUFFICIENCY: clear
+GAP_EDGE_CASE_SUFFICIENCY_REASON: Missing and empty fields, duplicate email and username with case rules, wrong credentials, five token failure modes and the post-restart token for a discarded user are all covered; the remaining malformed-body cases are explicitly declared undefined by the brief.
+=== END DOR_SEMANTIC_SCAN ===

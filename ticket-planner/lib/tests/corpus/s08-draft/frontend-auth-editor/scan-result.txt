@@ -1,0 +1,14 @@
+=== DOR_SEMANTIC_SCAN ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-frontend-auth-editor
+BODY_HASH: sha256:66d36487617c30d1ede34b020f8400f1f43635263ef233059fab82b78108ea1a
+PARAPHRASE: Add the frontend sign-up (/register), sign-in (/login) and article editor (/editor) pages so a visitor can register or sign in (token stored as jwt) and a signed-in author can publish an article and land on its page, with field-level error lines, a signed-out /editor guard redirecting to /login, and a 401-on-publish path that clears the token and returns to /login.
+GAP_REQUIREMENT_COMPLETENESS: clear
+GAP_REQUIREMENT_COMPLETENESS_REASON: Every proposed behaviour (register, login, form errors, editor publish, editor errors, 401 on publish, guard with no or rejected token) has at least one acceptance criterion, and no open decision is left to a human.
+GAP_CONTRADICTORY_REQUIREMENTS: clear
+GAP_CONTRADICTORY_REQUIREMENTS_REASON: Summary, Proposed Behaviour, Technical Context, criteria and Verification Plan describe the same redirects, token handling and error-line format consistently.
+GAP_DEEP_SCOPE_AMBIGUITY: clear
+GAP_DEEP_SCOPE_AMBIGUITY_REASON: Scope is bounded to three named page files plus the router guard, with explicit Out of Scope items and named owner tickets for session, api, header and article page.
+GAP_EDGE_CASE_SUFFICIENCY: clear
+GAP_EDGE_CASE_SUFFICIENCY_REASON: Duplicate email, blank fields, wrong password, invalid stored token at load, token rejected at publish and HTML-in-title escaping are all covered, and the run order prevents already-taken collisions on retry.
+=== END DOR_SEMANTIC_SCAN ===

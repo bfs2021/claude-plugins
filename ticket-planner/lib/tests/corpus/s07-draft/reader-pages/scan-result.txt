@@ -1,0 +1,14 @@
+=== DOR_SEMANTIC_SCAN ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-reader-pages
+BODY_HASH: sha256:d4a7cea7779a3766ea2bb39491667c18b1aa62eaa9797b2e5ed1dba7873ff12f
+PARAPHRASE: Add two signed-out frontend pages: a home page listing article previews (title, author, description) newest first with client-side links, and an article page showing one article's title, author and body, with "Article not found" on 404 and "Something went wrong. Try again." on network/5xx failure; unknown paths show the home page.
+GAP_REQUIREMENT_COMPLETENESS: clear
+GAP_REQUIREMENT_COMPLETENESS_REASON: Every described behavior (newest-first list, preview fields, client-side navigation, direct load, 404, unknown-path fallback, failure message on both pages) has a criterion and a matching Verification Plan row.
+GAP_CONTRADICTORY_REQUIREMENTS: clear
+GAP_CONTRADICTORY_REQUIREMENTS_REASON: Criteria and Verification Plan rows agree with the Proposed Behaviour and Technical Context; no two requirements conflict.
+GAP_DEEP_SCOPE_AMBIGUITY: clear
+GAP_DEEP_SCOPE_AMBIGUITY_REASON: Changed sections stay within the two named page files and the bounded behaviors; Out of Scope excludes paging, tags, comments and editing.
+GAP_EDGE_CASE_SUFFICIENCY: clear
+GAP_EDGE_CASE_SUFFICIENCY_REASON: The plausible edge cases (unknown slug, unknown path, backend down on each page, direct deep-link load, full-reload detection) each have a criterion; seed data comes from a freshly restarted backend.
+=== END DOR_SEMANTIC_SCAN ===

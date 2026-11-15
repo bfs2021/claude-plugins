@@ -1,0 +1,17 @@
+=== DOR_SEMANTIC_SCAN ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-users-api
+BODY_HASH: sha256:e96e9e0137457fca30ab01591f16c40ed394442132c0123afb2ac3dccf50d2d5
+PARAPHRASE: Add the backend account API (register, login, current user) plus the JWT token-check middleware (requireAuth/optionalAuth), with blank-field, duplicate, wrong-login and bad-token error bodies, bcrypt cost-10 password storage and HS256 24h tokens, all covered by Jest + Supertest tests.
+FINDING_1_CODE: EDGE_CASE_GAP
+FINDING_1_QUOTE: - Assumption: Email comparisons for duplicates and login ignore leading and trailing spaces as well as letter case, while the email is still stored as submitted and usernames keep their exact comparison.
+FINDING_1_DETAIL: The Scope assumption extends space-insensitive email matching to login, but the only new criterion (trailing space on register) covers the duplicate check alone; logging in as " jake@conduit.test" (leading space) or "jake@conduit.test " with Jake-Pass-123 has no criterion, so an implementer who trims only inside the register path, or relies on findUserByEmail which the Technical Context describes as only ignoring letter case, would return 401 on login and still pass every test.
+GAP_REQUIREMENT_COMPLETENESS: clear
+GAP_REQUIREMENT_COMPLETENESS_REASON: Every core behaviour in the changed sections (register, login, current user, token check, optionalAuth, trimmed duplicate email) has at least one acceptance criterion and a matching Verification Plan row.
+GAP_CONTRADICTORY_REQUIREMENTS: clear
+GAP_CONTRADICTORY_REQUIREMENTS_REASON: The Scope assumption adds space-trimming to email comparison, which goes further than Proposed Behaviour's letter-case rule but does not conflict with it; the criteria and Verification Plan rows match their criteria one-to-one.
+GAP_DEEP_SCOPE_AMBIGUITY: clear
+GAP_DEEP_SCOPE_AMBIGUITY_REASON: Scope names the repo, layer and exact files (auth.js, routes/users.js, users tests), and Out of Scope excludes articles, profiles, settings, sign-out and frontend.
+GAP_EDGE_CASE_SUFFICIENCY: finding
+GAP_EDGE_CASE_SUFFICIENCY_REASON: Space-insensitive email matching on login, stated in the Scope assumption, has no criterion (FINDING_1).
+=== END DOR_SEMANTIC_SCAN ===

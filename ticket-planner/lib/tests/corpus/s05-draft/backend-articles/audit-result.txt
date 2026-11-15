@@ -1,0 +1,7 @@
+=== DOR_SEMANTIC_AUDIT ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-backend-articles
+BODY_HASH: sha256:20128d7fd320d539c08b07c980c2b6c8875e2d841154b429809893587616984c
+SCORE_PLAUSIBLE: yes
+SCORE_REASON: The deterministic result carries no dor_quality_score; its status "ready" with empty missing and advisory arrays is consistent with the body, where every described behaviour (seed, slug rule, suffixing, 401/422/404 bodies, paging defaults, author filter, tie-break, no password leak) has a concrete criterion, a Verification Plan row and listed test data.
+=== END DOR_SEMANTIC_AUDIT ===

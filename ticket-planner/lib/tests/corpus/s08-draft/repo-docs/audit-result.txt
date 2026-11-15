@@ -1,0 +1,9 @@
+=== DOR_SEMANTIC_AUDIT ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-repo-docs
+BODY_HASH: sha256:1d9aadf120e6ee44c994c72df6b9f02c76059dfb692f40b94e8c8bf6ca5becc4
+MISSED_1_CODE: MISSING_CORE_AC
+MISSED_1_REASON: Proposed Changes says "`README.md`: describe Conduit-lite" but no criterion requires README.md to name Conduit-lite; the README criteria cover only the absence of "calculator", the commands, ports, seeded account and JWT_SECRET, so a README with the old description removed and no new one would still pass.
+SCORE_PLAUSIBLE: yes
+SCORE_REASON: No dor_quality_score is present; a "ready" status with no missing codes is plausible for a docs-only ticket, since its criteria are grep-checkable and its blockers are named, apart from the one README description gap noted above.
+=== END DOR_SEMANTIC_AUDIT ===

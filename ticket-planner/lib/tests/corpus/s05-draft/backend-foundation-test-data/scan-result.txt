@@ -1,0 +1,20 @@
+=== DOR_SEMANTIC_SCAN ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-backend-foundation-test-data
+BODY_HASH: sha256:2ef78de7a5b411b84f6282cbafe9b5b17ffc72b5caa8028f4da1248403fbe1f2
+PARAPHRASE: Add idempotent Make targets that create, verify and reset one empty temporary directory (record td-1794584184-3869-1) so the backend-foundation consumer can point VERIFY_REPO_PATH_APP at it and check env-start.sh fails, plus a README mapping the key to that criterion.
+FINDING_1_CODE: INTENT_AC_MISMATCH
+FINDING_1_QUOTE: - [ ] Every seeded foreign key resolves to a seeded or existing parent record
+FINDING_1_DETAIL: The only seeded item is one empty directory, which has no foreign keys or parent records, so this criterion passes vacuously and does not check anything the seed is for. A useful criterion would check that the directory exists at its stated path and is empty.
+FINDING_2_CODE: EDGE_CASE_GAP
+FINDING_2_QUOTE: - `td-1794584184-3869-1` — 1 empty temporary directory — for `backend-foundation`: With `VERIFY_REPO_PATH_APP` set to an empty directory, `bash scripts/env-start.sh` exits with a non-zero code
+FINDING_2_DETAIL: No stable path is given for the directory, so the consumer cannot know what to set VERIFY_REPO_PATH_APP to. A "temporary" directory under /tmp can be removed by a tmp cleaner or a reboot between seeding and the consumer's verification. git does not track empty directories. If env-start.sh writes anything into the directory, it is no longer empty on the next run. The verify target needs to check that the directory both exists and is empty at a fixed, documented path.
+GAP_REQUIREMENT_COMPLETENESS: clear
+GAP_REQUIREMENT_COMPLETENESS_REASON: Every proposed change (seed, verify, reset targets and the README) has a matching acceptance criterion.
+GAP_CONTRADICTORY_REQUIREMENTS: clear
+GAP_CONTRADICTORY_REQUIREMENTS_REASON: No two requirements disagree. Test Data Prerequisites "None" fits, because this ticket's own criteria need no pre-existing data.
+GAP_DEEP_SCOPE_AMBIGUITY: clear
+GAP_DEEP_SCOPE_AMBIGUITY_REASON: Scope is limited to three named Make targets, the seed scripts and a README, and consumer behaviour is explicitly out of scope.
+GAP_EDGE_CASE_SUFFICIENCY: finding
+GAP_EDGE_CASE_SUFFICIENCY_REASON: The directory's location, whether it survives until the consumer uses it, and whether it stays empty are all left unaddressed (see FINDING_2).
+=== END DOR_SEMANTIC_SCAN ===

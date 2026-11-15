@@ -1,0 +1,7 @@
+=== DOR_SEMANTIC_AUDIT ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-backend-articles
+BODY_HASH: sha256:f5d94bd694b0aeed3c2ececabc3bae9a7d187cbf0572c65f4ce41d7165436da2
+SCORE_PLAUSIBLE: yes
+SCORE_REASON: No dor_quality_score present; status ready with empty missing/advisory is plausible because every Proposed Behaviour bullet has a concrete AC, each AC's data appears in Test Data Prerequisites with a source, and dependencies (scaffold store/helpers, users/auth requireAuth/loginAs, jsonwebtoken) are named.
+=== END DOR_SEMANTIC_AUDIT ===

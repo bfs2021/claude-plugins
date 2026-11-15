@@ -1,0 +1,7 @@
+=== DOR_SEMANTIC_AUDIT ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-frontend-shell
+BODY_HASH: sha256:9ec68ec347873c2c1bbe9a34de511806dbbf6cd86261acb102cd8d59a1f17127
+SCORE_PLAUSIBLE: yes
+SCORE_REASON: No dor_quality_score present; the deterministic status "ready" with empty missing/advisory is consistent with a body whose every proposed behaviour has a testable criterion, sourced test data and a matching Verification Plan row.
+=== END DOR_SEMANTIC_AUDIT ===

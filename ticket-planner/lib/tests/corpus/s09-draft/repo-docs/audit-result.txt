@@ -1,0 +1,9 @@
+=== DOR_SEMANTIC_AUDIT ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-repo-docs
+BODY_HASH: sha256:a3d1a63d785acc3d51f145e5a95a33a2db2a7e778b3c4a486a93e0ef5d116449
+MISSED_1_CODE: MISSING_CORE_AC
+MISSED_1_REASON: Technical Context says the CLAUDE.md:7 Purpose paragraph "also says the codebase is empty at the start" and the Enables section names "says the repo is empty" as the harm, but the only empty-wording AC greps the exact phrase "repo is empty", so a Purpose paragraph that keeps "codebase is empty" would still pass.
+SCORE_PLAUSIBLE: yes
+SCORE_REASON: No dor_quality_score is present. The result has status ready with empty missing/advisory arrays, which fits a well-specified docs-only ticket with grep-testable ACs and a full Verification Plan.
+=== END DOR_SEMANTIC_AUDIT ===

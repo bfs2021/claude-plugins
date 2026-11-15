@@ -1,0 +1,119 @@
+2026-11-13T15:36:24Z|META|schema|start|1
+2026-11-13T15:36:24Z|META|initiative-id|start|INIT-0000000000-1247
+2026-11-13T15:36:24Z|META|idea|start|Build the first slice of a blogging app modelled on the RealWorld Conduit spec in the app repo: register, login, current user, create/read/list articles, and five frontend pages, replacing the calculator placeholder. 
+2026-11-13T15:36:24Z|META|contract|start|test-data-source-v1
+2026-11-13T15:36:24Z|META|no-tests-rule|done|false
+2026-11-13T15:36:24Z|META|intent|done|80,ready,1d0d42f0921150c5251a111506a927550962d65a72c4eff4ca77e06487afe150
+2026-11-13T15:36:48Z|Appraisal|scope|start|Interpreting idea: Build the first slice of a blogging app modelled on the RealWorld Conduit spec in the app repo: register, login, current user, create/read/list articles, and five frontend pages, replacing the calculator placeholder.
+2026-11-13T15:37:37Z|Appraisal|scope|done|Scope summary written to artifacts/appraisal.md
+2026-11-13T15:38:15Z|Discovery|explore|start|Exploring affected repositories
+2026-11-13T15:38:15Z|META|discovery|repo-ref|app@main@54d88f7c38c68fe8229b5bd0d135ca9b6e6c78fb
+2026-11-13T15:39:19Z|Discovery|explore|done|Discovery report: 1 services, 5 symbols resolved
+2026-11-13T15:39:51Z|Architecture|design|start|Evaluating technical approaches
+2026-11-13T15:40:55Z|Architecture|design|done|Architecture decision: modular CommonJS Express 5 + Jest/supertest backend, Vite vanilla SPA with History router and /api proxy; 7-step backend-first order
+2026-11-13T15:41:02Z|META|contract|start|specify-parameters-v1
+2026-11-13T15:41:02Z|META|contract|start|spec-ownership-v1
+2026-11-13T15:41:02Z|META|contract|start|ac-precondition-v1
+2026-11-13T15:43:42Z|Specify|synthesize|start|Synthesizing proposal and writing specs for 7 tickets
+2026-11-13T15:52:14Z|Specify|synthesize|done|Proposal written, 7 ticket specs in artifacts/specs/, self-lint clean
+2026-11-13T15:52:23Z|META|goldfish|skip|0a8906f08cfa DISABLED
+2026-11-13T15:52:34Z|Review|critique|start|Critiquing proposal for gaps and risks
+2026-11-13T15:55:55Z|Review|critique|done|Review complete: 0 blockers, 4 major, 5 minor, 2 nit; verdict needs-revision
+2026-11-13T15:56:23Z|Consensus|resolve|start|Resolving 11 review findings
+2026-11-13T16:02:47Z|META|ac-precondition|done|0 checked, 0 unchecked, 6 planned, 11 input
+2026-11-13T16:04:14Z|Consensus|resolve|done|Consensus: 9 accepted, 1 rejected, 0 deferred (F6 partly accepted); readiness ready-for-spec; operator precondition: workspace env-start.sh wrapper
+2026-11-13T16:04:30Z|Crosscheck|check|start|running testdata-synth + citation + propagation + bypass + contracts + signals + deps + testdata checks
+2026-11-13T16:04:30Z|Crosscheck|testdata-synth|start|synthesizing test-data specs for unowned needs
+2026-11-13T16:04:34Z|Crosscheck|testdata-synth|done|2 TD spec(s), 4 need(s)
+2026-11-13T16:04:34Z|META|ownership-edges|done|6 edge(s)
+2026-11-13T16:04:37Z|META|crosscheck|fail|CITATION_UNRESOLVED ~/work/e2e-conduit/.ticket-auto/initiatives/INIT-0000000000-1247/artifacts/specs/frontend-reader-pages.md:132 → app/scripts/env-start.sh (no file under REPOS_ROOT matches 'app/scripts/env-start.sh')
+2026-11-13T16:06:51Z|META|crosscheck|warn|info DISCOVERY_GAP_UNRESOLVED ~/work/e2e-conduit/.ticket-auto/initiatives/INIT-0000000000-1247/artifacts/discovery.md:120 → "- **RealWorld OpenAPI spec — not explored.** It is an external reference; the brief already spells out every field, status and error key t" not recorded in proposal.md Out of Scope
+2026-11-13T16:07:29Z|META|crosscheck|fail|TEST_DATA_IMPLIED repo-docs-conduit.md [c2234d00] match="intentionally empty at the start" (strong: entity) — every Verification Notes row says Test data none, but this criterion implies data must exist first: "`app/CLAUDE.md` does not contain the text `intentionally empty at the start`" — derive the need from its Given/When with a Source, or answer TESTDATA_CONFIRM: `repo-docs-conduit` [c2234d00] in consensus.md (none, generate: <what>, exists:<where>, external:<who>)
+2026-11-13T16:07:29Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/backend-articles.md:60 ## Technical Context names keys neither ## Writes nor ## Reads declares: articles.list_default_limit, articles.list_default_offset, articles.invalid_paging, articles.slug_suffix, articles.empty_slug_base, validation.blank_rule — declare each in the table it belongs to
+2026-11-13T16:07:30Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/backend-foundation.md:38 ## Technical Context names keys neither ## Writes nor ## Reads declares: auth.dev_jwt_secret, backend.port, api.unknown_route, api.malformed_json — declare each in the table it belongs to
+2026-11-13T16:07:30Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/backend-users-auth.md:65 ## Technical Context names keys neither ## Writes nor ## Reads declares: auth.bcrypt_cost, auth.token_ttl, auth.dev_jwt_secret, validation.blank_rule, users.email_uniqueness — declare each in the table it belongs to
+2026-11-13T16:07:30Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/frontend-auth-pages.md:55 ## Technical Context names keys neither ## Writes nor ## Reads declares: frontend.token_storage_key — declare each in the table it belongs to
+2026-11-13T16:07:30Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/frontend-editor.md:41 ## Technical Context names keys neither ## Writes nor ## Reads declares: frontend.token_storage_key — declare each in the table it belongs to
+2026-11-13T16:07:30Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/frontend-reader-pages.md:62 ## Technical Context names keys neither ## Writes nor ## Reads declares: frontend.port, backend.port — declare each in the table it belongs to
+2026-11-13T16:07:30Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/repo-docs-conduit.md:29 ## Technical Context names keys neither ## Writes nor ## Reads declares: backend.port, frontend.port, auth.dev_jwt_secret — declare each in the table it belongs to
+2026-11-13T16:07:30Z|META|ac-precondition|done|0 checked, 0 unchecked, 6 planned, 11 input
+2026-11-13T16:07:30Z|Crosscheck|check|fail|2 blocking finding(s), 8 warn, 0 accepted — see META crosscheck entries
+2026-11-13T16:38:28Z|Crosscheck|check|start|running testdata-synth + citation + propagation + bypass + contracts + signals + deps + testdata checks
+2026-11-13T16:38:28Z|Crosscheck|testdata-synth|start|synthesizing test-data specs for unowned needs
+2026-11-13T16:38:32Z|Crosscheck|testdata-synth|done|2 TD spec(s), 4 need(s)
+2026-11-13T16:40:51Z|META|crosscheck|warn|info DISCOVERY_GAP_UNRESOLVED ~/work/e2e-conduit/.ticket-auto/initiatives/INIT-0000000000-1247/artifacts/discovery.md:120 → "- **RealWorld OpenAPI spec — not explored.** It is an external reference; the brief already spells out every field, status and error key t" not recorded in proposal.md Out of Scope
+2026-11-13T16:41:33Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/backend-articles.md:60 ## Technical Context names keys neither ## Writes nor ## Reads declares: articles.list_default_limit, articles.list_default_offset, articles.invalid_paging, articles.slug_suffix, articles.empty_slug_base, validation.blank_rule — declare each in the table it belongs to
+2026-11-13T16:41:33Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/backend-foundation.md:38 ## Technical Context names keys neither ## Writes nor ## Reads declares: auth.dev_jwt_secret, backend.port, api.unknown_route, api.malformed_json — declare each in the table it belongs to
+2026-11-13T16:41:33Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/backend-users-auth.md:65 ## Technical Context names keys neither ## Writes nor ## Reads declares: auth.bcrypt_cost, auth.token_ttl, auth.dev_jwt_secret, validation.blank_rule, users.email_uniqueness — declare each in the table it belongs to
+2026-11-13T16:41:33Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/frontend-auth-pages.md:55 ## Technical Context names keys neither ## Writes nor ## Reads declares: frontend.token_storage_key — declare each in the table it belongs to
+2026-11-13T16:41:33Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/frontend-editor.md:41 ## Technical Context names keys neither ## Writes nor ## Reads declares: frontend.token_storage_key — declare each in the table it belongs to
+2026-11-13T16:41:33Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/frontend-reader-pages.md:62 ## Technical Context names keys neither ## Writes nor ## Reads declares: frontend.port, backend.port — declare each in the table it belongs to
+2026-11-13T16:41:33Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/repo-docs-conduit.md:29 ## Technical Context names keys neither ## Writes nor ## Reads declares: backend.port, frontend.port, auth.dev_jwt_secret — declare each in the table it belongs to
+2026-11-13T16:41:34Z|META|ac-precondition|done|0 checked, 0 unchecked, 6 planned, 11 input
+2026-11-13T16:41:34Z|Crosscheck|check|done|clean (8 warn, 0 accepted)
+2026-11-13T16:41:42Z|META|draft-readiness|start|evaluator=dor-semantic-v4
+2026-11-13T16:42:38Z|META|draft-readiness|info|round=0 revise=0 reevaluate=4 spawns=4/72
+2026-11-13T16:43:59Z|META|draft-readiness|info|round=0 revise=0 reevaluate=4 spawns=8/72
+2026-11-13T16:45:20Z|META|draft-readiness|info|round=0 revise=0 reevaluate=4 spawns=12/72
+2026-11-13T16:46:41Z|META|draft-readiness|info|round=0 revise=0 reevaluate=4 spawns=16/72
+2026-11-13T16:47:58Z|META|draft-readiness|info|round=0 revise=0 reevaluate=1 spawns=17/72
+2026-11-13T16:49:10Z|META|draft-readiness|info|round=0 revise=0 reevaluate=1 spawns=18/72
+2026-11-13T16:50:15Z|META|draft-readiness|info|round=1 revise=6 reevaluate=0 spawns=24/72
+2026-11-13T16:50:15Z|META|draft-revise|start|backend-articles round=1 findings=1
+2026-11-13T16:50:15Z|META|draft-revise|start|backend-foundation-test-data round=1 findings=1
+2026-11-13T16:50:15Z|META|draft-revise|start|backend-users-auth round=1 findings=1
+2026-11-13T16:50:15Z|META|draft-revise|start|frontend-auth-pages round=1 findings=1
+2026-11-13T16:50:15Z|META|draft-revise|start|init-0000000000-1247-test-data-pack round=1 findings=2
+2026-11-13T16:50:15Z|META|draft-revise|start|repo-docs-conduit round=1 findings=1
+2026-11-13T17:20:17Z|META|draft-revise|info|backend-articles ASSUMED EDGE_CASE_GAP f-c4c37fa17e68 "A title, description or body that is not a string, or that holds only whitespace, counts as blank and returns 422 with the can't be blank message for that field."
+2026-11-13T17:20:17Z|META|draft-revise|done|backend-articles round=1 status=applied resolved=0 rebutted=0 unaddressed=0 added=3 extended=0 assumed=1
+2026-11-13T17:21:08Z|META|draft-revise|fail|backend-foundation-test-data round=1 TESTDATA_REGRESSION "TEST_DATA_UNOWNED 3 test-data need(s) across 1 spec(s) [backend-foundation-test-data] have no owning spec and synthesis could not take them: backend-foundation-test-data.md#7 (missing Source); backend-foundation-test-data.md#8 (missing Source); backend-foundation-test-data.md#9 (missing Source)"
+2026-11-13T17:22:07Z|META|draft-revise|info|backend-users-auth ASSUMED EDGE_CASE_GAP f-119cf2244ae0 "A login request with more than one blank field lists every blank field in the one errors object, each as can't be blank, the same way register does."
+2026-11-13T17:22:07Z|META|draft-revise|done|backend-users-auth round=1 status=applied resolved=0 rebutted=0 unaddressed=0 added=2 extended=0 assumed=1
+2026-11-13T17:23:02Z|META|draft-revise|info|frontend-auth-pages ASSUMED EDGE_CASE_GAP f-59958e8ebd2c "When the start-up current-user check fails with a network error or a 5xx status, the app keeps the stored jwt, shows the signed-out header links, and settles ready so nothing waiting on it hangs."
+2026-11-13T17:23:02Z|META|draft-revise|done|frontend-auth-pages round=1 status=applied resolved=0 rebutted=0 unaddressed=0 added=3 extended=0 assumed=1
+2026-11-13T17:23:53Z|META|draft-revise|info|init-0000000000-1247-test-data-pack ASSUMED SCOPE_AMBIGUOUS f-ea20bb6b6ec2 "The seed target writes each record key and the absolute path of its worktree, one per line, to a paths file named in the README, and recreates any seeded worktree whose directory no longer exists."
+2026-11-13T17:23:53Z|META|draft-revise|done|init-0000000000-1247-test-data-pack round=1 status=applied resolved=1 rebutted=0 unaddressed=0 added=4 extended=0 assumed=1
+2026-11-13T17:24:44Z|META|draft-revise|done|repo-docs-conduit round=1 status=applied resolved=1 rebutted=0 unaddressed=0 added=2 extended=0
+2026-11-13T17:24:44Z|Crosscheck|check|start|running testdata-synth + citation + propagation + bypass + contracts + signals + deps + testdata checks
+2026-11-13T17:24:44Z|Crosscheck|testdata-synth|start|synthesizing test-data specs for unowned needs
+2026-11-13T17:24:49Z|Crosscheck|testdata-synth|done|2 TD spec(s), 4 need(s)
+2026-11-13T17:25:12Z|META|crosscheck|warn|info DISCOVERY_GAP_UNRESOLVED ~/work/e2e-conduit/.ticket-auto/initiatives/INIT-0000000000-1247/artifacts/discovery.md:120 → "- **RealWorld OpenAPI spec — not explored.** It is an external reference; the brief already spells out every field, status and error key t" not recorded in proposal.md Out of Scope
+2026-11-13T17:25:47Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/backend-articles.md:60 ## Technical Context names keys neither ## Writes nor ## Reads declares: articles.list_default_limit, articles.list_default_offset, articles.invalid_paging, articles.slug_suffix, articles.empty_slug_base, validation.blank_rule — declare each in the table it belongs to
+2026-11-13T17:25:47Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/backend-foundation.md:38 ## Technical Context names keys neither ## Writes nor ## Reads declares: auth.dev_jwt_secret, backend.port, api.unknown_route, api.malformed_json — declare each in the table it belongs to
+2026-11-13T17:25:47Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/backend-users-auth.md:65 ## Technical Context names keys neither ## Writes nor ## Reads declares: auth.bcrypt_cost, auth.token_ttl, auth.dev_jwt_secret, validation.blank_rule, users.email_uniqueness — declare each in the table it belongs to
+2026-11-13T17:25:48Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/frontend-auth-pages.md:55 ## Technical Context names keys neither ## Writes nor ## Reads declares: frontend.token_storage_key — declare each in the table it belongs to
+2026-11-13T17:25:48Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/frontend-editor.md:41 ## Technical Context names keys neither ## Writes nor ## Reads declares: frontend.token_storage_key — declare each in the table it belongs to
+2026-11-13T17:25:48Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/frontend-reader-pages.md:62 ## Technical Context names keys neither ## Writes nor ## Reads declares: frontend.port, backend.port — declare each in the table it belongs to
+2026-11-13T17:25:48Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/repo-docs-conduit.md:29 ## Technical Context names keys neither ## Writes nor ## Reads declares: backend.port, frontend.port, auth.dev_jwt_secret — declare each in the table it belongs to
+2026-11-13T17:25:48Z|META|ac-precondition|done|0 checked, 0 unchecked, 6 planned, 11 input
+2026-11-13T17:25:48Z|Crosscheck|check|done|clean (8 warn, 0 accepted)
+2026-11-13T17:26:18Z|META|draft-readiness|info|round=1 revise=0 reevaluate=4 spawns=28/72
+2026-11-13T17:27:57Z|META|draft-readiness|info|round=1 revise=0 reevaluate=4 spawns=32/72
+2026-11-13T17:29:11Z|META|draft-readiness|info|round=2 revise=2 reevaluate=0 spawns=34/72
+2026-11-13T17:29:12Z|META|draft-revise|start|backend-foundation-test-data round=2 findings=1
+2026-11-13T17:29:12Z|META|draft-revise|start|init-0000000000-1247-test-data-pack round=2 findings=2
+2026-11-13T17:31:08Z|META|draft-revise|info|backend-foundation-test-data ASSUMED EDGE_CASE_GAP f-4ffc4f106257 "The empty directory is created by the seed command at the fixed path .test-data/empty-dir under the app repository root, and every seed run empties it again."
+2026-11-13T17:31:08Z|META|draft-revise|done|backend-foundation-test-data round=2 status=applied resolved=0 rebutted=0 unaddressed=0 added=3 extended=0 assumed=1
+2026-11-13T17:31:58Z|META|draft-revise|info|init-0000000000-1247-test-data-pack ASSUMED SCOPE_AMBIGUOUS f-ea20bb6b6ec2 "Each seeded worktree is created at a fixed path under the system temporary directory, in a directory named after its record key, and the seed command prints each path so a verifier can point the repo path variable at it."
+2026-11-13T17:31:58Z|META|draft-revise|done|init-0000000000-1247-test-data-pack round=2 status=applied resolved=1 rebutted=0 unaddressed=0 added=4 extended=0 assumed=1
+2026-11-13T17:31:58Z|Crosscheck|check|start|running testdata-synth + citation + propagation + bypass + contracts + signals + deps + testdata checks
+2026-11-13T17:31:58Z|Crosscheck|testdata-synth|start|synthesizing test-data specs for unowned needs
+2026-11-13T17:32:03Z|Crosscheck|testdata-synth|done|2 TD spec(s), 4 need(s)
+2026-11-13T17:32:24Z|META|crosscheck|warn|info DISCOVERY_GAP_UNRESOLVED ~/work/e2e-conduit/.ticket-auto/initiatives/INIT-0000000000-1247/artifacts/discovery.md:120 → "- **RealWorld OpenAPI spec — not explored.** It is an external reference; the brief already spells out every field, status and error key t" not recorded in proposal.md Out of Scope
+2026-11-13T17:32:58Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/backend-articles.md:60 ## Technical Context names keys neither ## Writes nor ## Reads declares: articles.list_default_limit, articles.list_default_offset, articles.invalid_paging, articles.slug_suffix, articles.empty_slug_base, validation.blank_rule — declare each in the table it belongs to
+2026-11-13T17:32:58Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/backend-foundation.md:38 ## Technical Context names keys neither ## Writes nor ## Reads declares: auth.dev_jwt_secret, backend.port, api.unknown_route, api.malformed_json — declare each in the table it belongs to
+2026-11-13T17:32:58Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/backend-users-auth.md:65 ## Technical Context names keys neither ## Writes nor ## Reads declares: auth.bcrypt_cost, auth.token_ttl, auth.dev_jwt_secret, validation.blank_rule, users.email_uniqueness — declare each in the table it belongs to
+2026-11-13T17:32:58Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/frontend-auth-pages.md:55 ## Technical Context names keys neither ## Writes nor ## Reads declares: frontend.token_storage_key — declare each in the table it belongs to
+2026-11-13T17:32:58Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/frontend-editor.md:41 ## Technical Context names keys neither ## Writes nor ## Reads declares: frontend.token_storage_key — declare each in the table it belongs to
+2026-11-13T17:32:59Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/frontend-reader-pages.md:62 ## Technical Context names keys neither ## Writes nor ## Reads declares: frontend.port, backend.port — declare each in the table it belongs to
+2026-11-13T17:32:59Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/repo-docs-conduit.md:29 ## Technical Context names keys neither ## Writes nor ## Reads declares: backend.port, frontend.port, auth.dev_jwt_secret — declare each in the table it belongs to
+2026-11-13T17:32:59Z|META|ac-precondition|done|0 checked, 0 unchecked, 6 planned, 11 input
+2026-11-13T17:32:59Z|Crosscheck|check|done|clean (8 warn, 0 accepted)
+2026-11-13T17:33:48Z|META|draft-readiness|info|backend-foundation-test-data DEMOTED EDGE_CASE_GAP round-limit assumed f-4ffc4f106257
+2026-11-13T17:33:48Z|META|draft-readiness|info|init-0000000000-1247-test-data-pack DEMOTED SCOPE_AMBIGUOUS round-limit assumed f-ea20bb6b6ec2
+2026-11-13T17:33:48Z|META|draft-readiness|info|init-0000000000-1247-test-data-pack DEMOTED EDGE_CASE_GAP round-limit revised f-c6e33f63faaf
+2026-11-13T17:33:48Z|META|draft-readiness|fail|backend-foundation-test-data INTENT_AC_MISMATCH "- [ ] Every seeded foreign key resolves to a seeded or existing parent record"
+2026-11-13T17:33:48Z|META|draft-readiness|fail|frontend-editor UNSTATED_DEPENDENCY "All paths are under `app/frontend/`. The router (with its guard hook), `api.js` and the article page come from the reader-pages ticket; `auth.js` (with its exported `ready` promise), `errors.js` and the signed-in header with the 'New Article' link come from the sign-in ticket."
+2026-11-13T17:33:48Z|META|draft-readiness|fail|init-0000000000-1247-test-data-pack INTENT_AC_MISMATCH "- [ ] Every seeded foreign key resolves to a seeded or existing parent record"
+2026-11-13T17:33:48Z|META|draft-readiness|done|blocked 3/9

@@ -1,0 +1,7 @@
+=== DOR_SEMANTIC_AUDIT ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-auth-api
+BODY_HASH: sha256:c0af3b600f1fcb347d26b377bbda162623ff56db2bfa2b5f3dc82506166caac0
+SCORE_PLAUSIBLE: yes
+SCORE_REASON: No dor_quality_score present; status ready with empty missing/advisory is consistent with a body whose criteria are concrete, each mapped to a Verification Plan row, and whose test data (seeded jake, auth-api token helpers) is listed with sources.
+=== END DOR_SEMANTIC_AUDIT ===

@@ -1,0 +1,9 @@
+=== DOR_SEMANTIC_AUDIT ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-frontend-foundation
+BODY_HASH: sha256:f56a21180eb14f19df197cdb533272dfebc40b57b67265124b73a698af7ac9a4
+MISSED_1_CODE: UNSTATED_DEPENDENCY
+MISSED_1_REASON: "With the backend running, `apiGet('/no-such-route')` run in the browser console at port 5173 resolves with `body` `null`." holds only if backend-foundation answers unknown /api routes with a non-JSON 404 (Express's default HTML page); the ticket never states that, and a JSON 404 handler in backend-foundation (common for this API style) would make the body non-null and fail this criterion.
+SCORE_PLAUSIBLE: yes
+SCORE_REASON: No dor_quality_score is present; the status "ready" with empty missing/advisory arrays fits a ticket whose criteria are concrete, each mapped to a Verification Plan row, and need no seeded data.
+=== END DOR_SEMANTIC_AUDIT ===
