@@ -38,6 +38,8 @@ Stdlib only.
 """
 
 import os
+import re
+import sys
 import subprocess
 import time
 from collections import namedtuple
@@ -220,6 +222,15 @@ def run_auto_merge(item, ctx, lib_dir=None, timeout=120):
     An integration PR is one whose *head* is the epic branch. A ticket PR
     merely targets it as a base, which is the ordinary case and must still
     merge.
+
+    The PR number is agent-written, so it is checked before any merge
+    (Track 0.1, fail closed): it must be a bare number, and the PR's live
+    `headRefName` must equal the ticket's recorded branch (`ticket=` in the
+    last `META|branch-context`). A malformed number, no recorded branch, an
+    unreadable head or a different head each skip the merge with a
+    `META|pr-auto-merge|skip|<CODE>` line (`PR_NUMBER_INVALID`,
+    `PR_BRANCH_UNRECORDED`, `PR_HEAD_UNREADABLE`, `PR_HEAD_MISMATCH`). This is
+    stricter than `auto-merge.sh`, which still takes the first digits it finds.
     """
     log_file = ctx.get('LOG_FILE') or ''
     autonomy = (ctx.get('autonomy') or '').strip()
@@ -249,23 +260,39 @@ def run_auto_merge(item, ctx, lib_dir=None, timeout=120):
     if not pr_num:
         return StepResult('auto_merge', SKIPPED, 'no PR number recorded',
                           False, None)
+    # Track 0.1: the number is agent-written text (`plog ... checkout-pr done
+    # "{number}"`). Only a bare number is a PR number; anything else is
+    # refused before `gh` sees it, never mined for digits.
+    if not _PR_NUMBER_RE.fullmatch(pr_num):
+        return _refuse_merge(log_file, 'PR_NUMBER_INVALID',
+                             f'recorded PR number {pr_num!r} is not numeric')
 
-    if integration:
-        head = _gh(['pr', 'view', pr_num, '--json', 'headRefName', '--jq',
-                    '.headRefName'], timeout)
-        if head is None:
-            # Cannot establish that this is not an integration PR. Refusing to
-            # merge is the only safe reading: the guard exists because an
-            # auto-merged integration PR is not undoable by the pipeline.
-            return StepResult('auto_merge', SKIPPED,
-                              f'could not read PR {pr_num} head ref', False,
-                              None)
-        if head == integration:
-            _append(log_file, f'|META|pr-auto-merge|skip|INTEGRATION_PR_GUARD: '
-                              f'{pr_num} is an integration PR, not '
-                              f'auto-merging')
-            return StepResult('auto_merge', SKIPPED,
-                              f'{pr_num} is an integration PR', False, None)
+    # Track 0.1: a valid number from another ticket (a stale context, a copied
+    # line) would merge that ticket's PR. The PR's head must be this ticket's
+    # own branch as the preamble recorded it, read live, before any merge.
+    ticket_branch = _recorded_ticket_branch(log_file)
+    if not ticket_branch:
+        return _refuse_merge(log_file, 'PR_BRANCH_UNRECORDED',
+                             f'no ticket branch in META|branch-context to '
+                             f'check PR {pr_num} against')
+    head = _gh(['pr', 'view', pr_num, '--json', 'headRefName', '--jq',
+                '.headRefName'], timeout)
+    if not head:
+        # Cannot establish whose PR this is, nor that it is not an
+        # integration PR. Refusing is the only safe reading: a merge is not
+        # undoable by the pipeline.
+        return _refuse_merge(log_file, 'PR_HEAD_UNREADABLE',
+                             f'could not read PR {pr_num} head ref')
+    if integration and head == integration:
+        _append(log_file, f'|META|pr-auto-merge|skip|INTEGRATION_PR_GUARD: '
+                          f'{pr_num} is an integration PR, not '
+                          f'auto-merging')
+        return StepResult('auto_merge', SKIPPED,
+                          f'{pr_num} is an integration PR', False, None)
+    if head != ticket_branch:
+        return _refuse_merge(log_file, 'PR_HEAD_MISMATCH',
+                             f'PR {pr_num} head {head!r} is not this '
+                             f'ticket\'s branch {ticket_branch!r}')
 
     merged = _gh(['pr', 'merge', pr_num, '--squash', '--auto'], timeout)
     if merged is None:
@@ -274,6 +301,31 @@ def run_auto_merge(item, ctx, lib_dir=None, timeout=120):
         return StepResult('auto_merge', FAILED, f'gh pr merge {pr_num} failed',
                           False, None)
     return StepResult('auto_merge', OK, f'merged {pr_num}', False, 0)
+
+
+_PR_NUMBER_RE = re.compile(r'[0-9]+')
+
+
+def _recorded_ticket_branch(log_file):
+    """The `ticket=` field of the last `META|branch-context` line, or ''.
+
+    The preamble writes that line once and rehydrates it on every resume, so
+    it is the ticket's branch of record (ticket-preamble.sh).
+    """
+    ctx_line = _last_log_msg(log_file, '|META|branch-context|info|')
+    for field in ctx_line.split(';'):
+        key, sep, value = field.partition('=')
+        if sep and key.strip() == 'ticket':
+            return value.strip()
+    return ''
+
+
+def _refuse_merge(log_file, code, reason):
+    """Skip the merge, and say why in the pipeline log and on stderr."""
+    _append(log_file, f'|META|pr-auto-merge|skip|{code}: {reason}, '
+                      f'not auto-merging')
+    print(f'fleetd: auto-merge refused ({code}): {reason}', file=sys.stderr)
+    return StepResult('auto_merge', SKIPPED, f'{code}: {reason}', False, None)
 
 
 def _gh(args, timeout):

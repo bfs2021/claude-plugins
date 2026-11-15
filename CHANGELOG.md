@@ -17,6 +17,31 @@ marketplace. Where a release also moved `ticket-planner`, `fleet-controller`, or
 > - **0.19.0 never existed.** `plugin.json` went 0.18.0 → 0.20.0. The Phase 2
 >   commit message claims `0.19.0→0.20.0`, but no 0.19.0 was ever committed.
 
+## fleet-controller 0.54.0 (2026-11-15) — fail closed where fleet code read model-written text (seam audit Track 0)
+
+- **Auto-merge checks the PR before merging (Track 0.1).** `orchestration.run_auto_merge`
+  took the PR number from the agent-written `PR-REVIEW|checkout-pr|done|` line and merged
+  it. It now refuses unless the number is a bare number and the PR's live `headRefName`
+  equals the ticket's recorded branch (`ticket=` in the last `META|branch-context`). Each
+  refusal skips the merge and logs `META|pr-auto-merge|skip|<CODE>`: `PR_NUMBER_INVALID`,
+  `PR_BRANCH_UNRECORDED`, `PR_HEAD_UNREADABLE`, `PR_HEAD_MISMATCH`. The head is now read for
+  every PR, not only under an epic integration branch. fleetd does not run STEP_4_6's
+  `post_dispatch` yet, so this hardens a path before it goes live.
+- **`detect_planner_feedback` finds collected feedback (Track 0.4).** It grepped for
+  `"source_tid":"<tid>"`, but `fleet-feedback.sh` writes its files through `jq .`
+  (`"source_tid": "<tid>"`), so the grep never matched and every planned ticket with
+  feedback showed `planner-feedback(S1)` until it finished. It now reads `.tickets[].source_tid`
+  with jq; an unparseable file still counts as not collected.
+- **Phase dispatch fails closed on a missing verdict (Track 0.5).** `classify_phase` returned
+  `done` for a loop-bearing phase (IMPLEMENT, VERIFY, PR-REVIEW) that exited 0 with no
+  usable `META|phase-result`, so a VERIFY agent that forgot its block passed. It now
+  returns `fail`. Rung 5 is reachable: `classify_phase` applies its `overrides`, and the
+  supervisor passes `phase_dispatch.verifier_overrides` (VERIFY `META|claim-delta`
+  `direction: optimistic`, IMPLEMENT `RETURN_INCOMPLETE`). Only `router-step.sh post-spawn`
+  writes these records, so fleetd refuses to start with `FLEET_PHASE_DISPATCH_ENABLE=true`
+  and `FLEET_ROUTER_STEP_SHELL` off (`FLEETD_PHASE_DISPATCH_NEEDS_ROUTER_STEP`). Both flags
+  default off, so nothing changes on a host that has not opted in.
+
 ## ticket-planner 0.43.6 (2026-11-15) — dispatch-rehearsal iteration 09 finding
 
 - **Draft gate: an `INTENT_AC_MISMATCH` on one criterion gets a revise round (F62).**

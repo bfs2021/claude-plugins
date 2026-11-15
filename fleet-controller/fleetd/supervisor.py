@@ -5012,8 +5012,12 @@ class Supervisor:
         # fresh one's outcome.
         bracket_lines = all_lines[offset:]
 
+        # Rung 5 (Track 0.5): the bash-written independent checks in this
+        # bracket (claim-delta, RETURN_INCOMPLETE) override the agent's claim.
         result = _phase_mod.classify_phase(
-            phase_token, bracket_lines, exit_code=exit_code)
+            phase_token, bracket_lines, exit_code=exit_code,
+            overrides=_phase_mod.verifier_overrides(
+                phase_token, bracket_lines))
 
         is_bug = False
         if step_id == 'STEP_1':

@@ -78,5 +78,69 @@ class TestRunStartupEnvCheck(unittest.TestCase):
         self.assertEqual(notify.call_args[0][1], Path('/tmp/resolved'))
 
 
+class TestPhaseDispatchGate(unittest.TestCase):
+    """Track 0.5: classify_phase fails a loop-bearing phase closed when no
+    verdict was recorded, and only router-step.sh post-spawn records one on
+    the phase-dispatch path. Phase dispatch without FLEET_ROUTER_STEP_SHELL
+    would fail every VERIFY, so fleetd refuses to start that combination."""
+
+    def _gate(self, env):
+        calls = []
+        with mock.patch.dict('os.environ', env, clear=False), \
+             mock.patch.object(main_mod, '_notify_gate_stop',
+                               lambda *a, **kw: calls.append(a)), \
+             mock.patch.object(sys, 'exit', side_effect=SystemExit) as exit_mock:
+            raised = False
+            try:
+                main_mod._run_phase_dispatch_gate('/tmp/fake-state-dir')
+            except SystemExit:
+                raised = True
+        return calls, exit_mock.called and raised
+
+    def test_phase_dispatch_without_router_steps_refuses_to_start(self):
+        for router in ('false', '', 'TRUE', '1'):
+            with self.subTest(router=router):
+                calls, exited = self._gate({
+                    'FLEET_PHASE_DISPATCH_ENABLE': 'true',
+                    'FLEET_ROUTER_STEP_SHELL': router})
+                self.assertTrue(exited)
+                self.assertEqual(len(calls), 1)
+                self.assertEqual(calls[0][3],
+                                 'FLEETD_PHASE_DISPATCH_NEEDS_ROUTER_STEP')
+
+    def test_phase_dispatch_with_router_steps_starts(self):
+        calls, exited = self._gate({'FLEET_PHASE_DISPATCH_ENABLE': 'true',
+                                    'FLEET_ROUTER_STEP_SHELL': 'true'})
+        self.assertFalse(exited)
+        self.assertEqual(calls, [])
+
+    def test_ticket_level_dispatch_is_unaffected(self):
+        for router in ('true', 'false'):
+            with self.subTest(router=router):
+                calls, exited = self._gate({
+                    'FLEET_PHASE_DISPATCH_ENABLE': 'false',
+                    'FLEET_ROUTER_STEP_SHELL': router})
+                self.assertFalse(exited)
+                self.assertEqual(calls, [])
+
+    def test_the_env_check_opt_out_does_not_skip_it(self):
+        calls, exited = self._gate({'FLEET_PHASE_DISPATCH_ENABLE': 'true',
+                                    'FLEET_ROUTER_STEP_SHELL': 'false',
+                                    'FLEET_STARTUP_ENV_CHECK': 'false'})
+        self.assertTrue(exited)
+
+    def test_main_runs_the_gate_before_building_the_supervisor(self):
+        order = []
+        with mock.patch.object(main_mod, '_run_startup_env_check',
+                               lambda *a: order.append('env')), \
+             mock.patch.object(main_mod, '_run_phase_dispatch_gate',
+                               lambda *a: order.append('phase')), \
+             mock.patch.object(main_mod, 'Supervisor') as sup_cls, \
+             mock.patch.object(sys, 'argv', ['fleetd']):
+            sup_cls.side_effect = lambda **kw: order.append('sup') or mock.Mock()
+            main_mod.main()
+        self.assertEqual(order, ['env', 'phase', 'sup'])
+
+
 if __name__ == '__main__':
     unittest.main()

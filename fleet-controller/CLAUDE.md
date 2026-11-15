@@ -101,8 +101,12 @@ parses their eval-safe output, and maps every failure (missing script,
 `OSError`, timeout, non-zero exit, output without the result keys) to the
 fail-closed or advisory value. It holds no decision logic.
 
-Gated by `FLEET_ROUTER_STEP_SHELL` (default `false`, read on every call, so
-unsetting it is a full rollback). With it on, under phase-level dispatch:
+Gated by `FLEET_ROUTER_STEP_SHELL` (default `false`, read on every call).
+Phase-level dispatch requires it: fleetd refuses to start with
+`FLEET_PHASE_DISPATCH_ENABLE=true` and this flag off
+(`__main__.phase_dispatch_refusal`, gate-stop code
+`FLEETD_PHASE_DISPATCH_NEEDS_ROUTER_STEP`, not skipped by `FLEET_STARTUP_ENV_CHECK=false`), so rolling it back means
+turning phase dispatch off as well. With it on, under phase-level dispatch:
 
 - **STEP_6** uses `router-step.sh retro-check --no-drift-log` instead of
   `phase_dispatch.needs_retro`. The supervisor still writes the
@@ -112,8 +116,16 @@ unsetting it is a full rollback). With it on, under phase-level dispatch:
   `router-step.sh post-spawn` on the worker's return text (capture,
   `META|phase-result`, VERIFY verdict recompute, IMPLEMENT return
   completeness) and then re-reads the log, so `classify_phase` rung 2 sees the
-  phase-result record. With the flag off nothing writes that record on the
-  phase-dispatch path, and classification falls to the exit-code rung.
+  phase-result record, and rung 5 sees the independent checks
+  (`phase_dispatch.verifier_overrides`: a VERIFY `META|claim-delta` with
+  `direction: optimistic`, an IMPLEMENT `RETURN_INCOMPLETE` gate-warn). With
+  the flag off nothing writes those records on the phase-dispatch path.
+  **Fail closed (Track 0.5):** a loop-bearing phase that exits 0 with no
+  usable verdict (no record, or `UNKNOWN`) classifies `fail`, never `done`, so
+  a VERIFY whose agent forgot its PHASE_RESULT block retries implement against
+  its loop cap instead of reaching PR review. IMPLEMENT's result does not
+  change its transition (`next_step` advances it to VERIFY either way), and a
+  PR-REVIEW with no verdict was already a terminal "pr-review blocked".
   `classify_phase` and `next_step` stay Python: the router has no bash
   counterpart, because its RESULT/VERDICT is the agent's judgement.
 - **Then `router-step.sh inspector`.** When it asks for an inspector, fleetd
@@ -150,6 +162,21 @@ tested; fleetd still dispatches every ticket through the ticket-level path
 by default. Moving the default to phase-level is a separate, later step —
 feature-flag first, compare outcomes on a subset, then promote — tracked
 outside this file.
+
+**Before enabling `FLEET_PHASE_DISPATCH_ENABLE`** (checklist; every item must
+hold on the host):
+
+- [ ] `FLEET_ROUTER_STEP_SHELL=true` on the same fleetd (enforced at boot).
+- [ ] One real ticket run with both flags on shows a `META|phase-result` line
+      after every IMPLEMENT, VERIFY and PR-REVIEW bracket, and a
+      `META|claim-delta` after every VERIFY. A VERIFY with no verdict now
+      retries implement (Track 0.5), so a missing record shows up as a
+      `VERIFY_EXHAUSTED` gate-stop, not as a passed ticket.
+- [ ] `run_auto_merge` (STEP_4_6 `post_dispatch`) is not executed by fleetd
+      yet; before it is, it refuses any PR whose number is not numeric or whose
+      head is not the ticket's `META|branch-context` `ticket=` branch
+      (Track 0.1). Confirm a real ticket's `branch-context` line carries
+      `ticket=`.
 
 ## Worker exit records & recovery
 
@@ -587,7 +614,7 @@ All settings use `${VAR:-default}` pattern for env-var overrides:
 | `FLEET_HOLD_MAX_ATTEMPTS` | 3 | Bound on the ask → partial-answer → re-ask loop (`gate_hold.human_hold_attempt_exceeds_max`). A request that would push a ticket's `hold_attempts` past this writes `META\|gate-stop\|fail\|HUMAN_HOLD_EXHAUSTED` instead of creating another hold — matches `RECONCILE_EXHAUSTED`'s shape. `hold_attempts` never resets on release |
 | `FLEET_STORE_ENABLE` | true | Set `false` to disable the state store entirely — fleetd stops writing it and every detection engine falls back to reading the log files, which is the pre-store behaviour |
 | `FLEET_STORE_EVENT_RETENTION_DAYS` | 30 | Age past which `log_events`/`activity_events` projection rows are pruned. Projections only — nothing fleetd authored is ever pruned, and anything dropped returns on a rebuild |
-| `FLEET_ROUTER_STEP_SHELL` | false | Phase-level dispatch runs the router's own `router-step.sh`/`prescan-run.sh` steps (post-spawn, inspector, retro-check, prescan) — see "Router-step delegation". Off: the Python retro port, and no post-spawn, inspector or prescan on that path |
+| `FLEET_ROUTER_STEP_SHELL` | false | Phase-level dispatch runs the router's own `router-step.sh`/`prescan-run.sh` steps (post-spawn, inspector, retro-check, prescan) — see "Router-step delegation". Off: the Python retro port, and no post-spawn, inspector or prescan on that path. Required by `FLEET_PHASE_DISPATCH_ENABLE=true`: fleetd refuses to start without it |
 | `FLEET_ROUTER_STEP_TIMEOUT` | (per step) | Seconds; overrides every router-step call's timeout (defaults 30/60/180) |
 | `FLEET_ACTIVITY_LOG_MAX_LINES` | 500 | Ring cap on `{tid}-activity.log`. Read by the hook, not the detector: only the last line's age and the current bracket's line count have consumers |
 | `FLEET_RUNAWAY_CALL_THRESHOLD` | 300 | Tool calls within one open spawn bracket above which `detect_runaway_calls` emits WARN. The mirror image of the activity-stall signal: a stalled agent stops calling tools, a runaway one never stops, and both keep the router's watchdog chirping. Counted per bracket rather than per log, so a long ticket is not flagged for being long. Must stay below `FLEET_ACTIVITY_LOG_MAX_LINES` — the activity log is ring-capped, so the count saturates there and a threshold above the cap is unreachable. WARN-only by design; a high call count is evidence, never proof |
