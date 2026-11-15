@@ -17,6 +17,30 @@ marketplace. Where a release also moved `ticket-planner`, `fleet-controller`, or
 > - **0.19.0 never existed.** `plugin.json` went 0.18.0 → 0.20.0. The Phase 2
 >   commit message claims `0.19.0→0.20.0`, but no 0.19.0 was ever committed.
 
+## ticket-planner 0.47.1 (2026-11-15) — seam-gate-safety G3: gate ledger seed (data only)
+
+- **`ticket-planner/gates/gate-ledger.tsv`** records every gate fire seen in dispatch
+  rehearsal iterations 01–10 (and the 05b rerun): 117 rows, 246 fires. Each row names the
+  gate, round, code, class, outcome, spec slug, count, a label (`true`, `false`,
+  `debatable`), the cause, whether that cause is fixed and — for a false fire — whether
+  it is still live on main, the finding id and a `<file>:<line>` pointer into the
+  rehearsal record. It applies deep-dive D's corrections (RESOLUTION_NOT_PROPAGATED, F25,
+  is false; UNSTATED_DEPENDENCY, F43, is debatable). Fire counts: 52 true, 172 false,
+  22 debatable (20 of them had no label recorded at run time). A separate reviewer agent
+  checked the labels against the run records.
+- **`ticket-planner/gates/gate-ledger-summary.sh`** is a read-only count by label, cause
+  and code, plus the codes G4 may consider for demotion: a false fire whose cause is
+  still live and a class today that is not warn (read from the planner libs; it fails
+  closed when it cannot read them). Today: Refinement `MISSING_CORE_AC` (1 live false,
+  8 true), draft `EDGE_CASE_GAP` (1 live false, 15 true), draft `INTENT_AC_MISMATCH`
+  (1 live false, F62) and the revise guard `ASSUMPTION_INVALID` (1 live false, F58).
+  Nothing is demoted.
+- **No gate changes.** Nothing reads the ledger to decide anything.
+- Test: `test-planner-gate-ledger.sh` (shape, label consistency, D's corrections, fixed
+  checker bugs never live, pinned candidate list, fail-closed summary; pointer resolution
+  when `GATE_LEDGER_EVIDENCE_DIR` names the local rehearsal folder).
+  `test-corpus-privacy.sh` now also scans every plugin's `gates/` directory.
+
 ## ticket-planner 0.47.0 (2026-11-15) — seam-bash-derives slice 5: corpus scrub, privacy gate, doctor guard
 
 - **`scripts/corpus-scrub.sh <src> <dst>`** copies real planner output into a corpus tree
