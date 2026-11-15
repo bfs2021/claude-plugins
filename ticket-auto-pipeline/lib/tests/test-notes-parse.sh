@@ -298,9 +298,57 @@ test_blast_section_absent_exit_2() {
   [ "$rc" -eq 2 ]
 }
 
+# Seam audit Track 0.3 follow-up: markup around the status value.
+_np_status() { # notes-body → status
+  local d out
+  d=$(mktemp -d)
+  printf '%s' "$1" >"$d/notes.md"
+  out=$(bash -c "source $LIB_DIR/notes-parse.sh; get_critique_status '$d'" 2>/dev/null || true)
+  rm -rf "$d"
+  echo "$out"
+}
+test_critique_status_bold_value() {
+  [ "$(_np_status $'## Readiness Critique\n**Status:** **CLEAR**\n**Score:** 90\n')" = "CLEAR" ]
+}
+test_critique_status_backticked_value() {
+  [ "$(_np_status $'## Readiness Critique\n**Status:** `WARNINGS`\n**Score:** 60\n')" = "WARNINGS" ]
+}
+test_critique_status_unknown_value_empty() {
+  [ -z "$(_np_status $'## Readiness Critique\n**Status:** **PASS**\n**Score:** 90\n')" ]
+}
+
+# get_open_needs_human_count — the shapes agents write.
+_np_open() { # notes-body → count
+  local d out
+  d=$(mktemp -d)
+  printf '%s' "$1" >"$d/notes.md"
+  out=$(bash -c "source $LIB_DIR/notes-parse.sh; get_open_needs_human_count '$d'" 2>/dev/null || true)
+  rm -rf "$d"
+  echo "$out"
+}
+test_open_questions_variants_counted() {
+  local body
+  body=$'## Open Questions (3)\n- [needs-human] plain\n1. [needs-human] numbered\n2) [needs-human] numbered paren\n- **Q1:** [needs-human] bold label\n* **[needs-human]** bold tag\n- [ ] [needs-human] unticked box\n### Sub\n+ [needs-human] in subsection\n'
+  [ "$(_np_open "$body")" = "7" ]
+}
+test_open_questions_answered_and_fenced_not_counted() {
+  local body
+  body=$'## Open questions:\n- ~~[needs-human] struck~~ answered\n- [x] [needs-human] ticked\n1. ~~[needs-human] struck numbered~~\n- **Q2:** ~~[needs-human] struck after label~~\n- [agent-resolvable] not human\n```\n- [needs-human] fenced example\n```\n## Other\n- [needs-human] other section\n'
+  [ "$(_np_open "$body")" = "0" ]
+}
+test_open_questions_heading_suffix_must_be_separate_word() {
+  [ "$(_np_open $'## Open Questionsx\n- [needs-human] q\n')" = "0" ]
+}
+
 FILTER="${1:-}"
 
 for fn in \
+  test_critique_status_bold_value \
+  test_critique_status_backticked_value \
+  test_critique_status_unknown_value_empty \
+  test_open_questions_variants_counted \
+  test_open_questions_answered_and_fenced_not_counted \
+  test_open_questions_heading_suffix_must_be_separate_word \
   test_extracts_simple \
   test_extracts_complex \
   test_missing_notes_file \

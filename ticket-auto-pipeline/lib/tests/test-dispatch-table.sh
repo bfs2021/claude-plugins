@@ -250,7 +250,7 @@ PYEOF
 
 test_skill_warn_routing_runs_pr_iterate_before_reapprove() {
   local line
-  line=$(grep -F 'VERDICT=WARN) AND ITERATION < 3' "$SKILL")
+  line=$(grep -F 'ROUTE_VERDICT=WARN AND ITERATION < 3' "$SKILL")
   [ -n "$line" ]
   python3 - "$line" <<'PYEOF'
 import sys

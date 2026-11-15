@@ -39,8 +39,13 @@ _setup() {
   # Default gh: `pr view` prints a ticket head ref, `pr merge` succeeds.
   _stub_gh 'feat/cre-2' 0 0
   cat >"$_ws/log" <<'EOF'
+2026-10-01T00:00:00Z|META|branch-context|info|base=develop;integration=;source=default;ticket=feat/cre-2;uat-policy=per-ticket;merge-policy=
 2026-10-01T00:00:00Z|META|outcome-label|info|Smooth
+2026-10-01T00:00:01Z|PR-REVIEW|pr-review|waiting|Agent launched — Review the PR
 2026-10-01T00:00:01Z|PR-REVIEW|checkout-pr|done|12
+2026-10-01T00:00:02Z|META|phase-route-anchor|info|PR-REVIEW attempt=1
+2026-10-01T00:00:02Z|META|phase-result|info|{"phase":"PR-REVIEW","claimed_verdict":"PASS","parse_status":"ok"}
+2026-10-01T00:00:02Z|PR-REVIEW|pr-review|done|OK — Verdict: all requirements addressed
 EOF
   : >"$_ws/env.sh"
 }
@@ -232,6 +237,138 @@ test_dry_run_never_merges() {
   [ "$ok" = 1 ]
 }
 
+# ── Track 0.1: merge identity (seam audit) ───────────────────────────────────
+# The PR number comes from an agent-written log line, so it must be exactly a
+# number, and the PR's head ref must be the ticket's recorded branch
+# (META|branch-context ticket=). Anything else refuses to merge.
+
+# Must-fail: prose on the checkout-pr line used to yield its first number.
+test_non_numeric_pr_number_refuses() {
+  _setup
+  echo '2026-10-01T00:00:02Z|PR-REVIEW|checkout-pr|done|12 (see also #34)' >>"$_ws/log"
+  _am
+  local ok=1
+  [ "$_rc" = 3 ] && ! grep -q '^pr ' "$_ws/gh.calls" &&
+    grep -q '|META|pr-auto-merge|skip|PR_NUMBER_INVALID' "$_ws/log" || ok=0
+  _teardown
+  [ "$ok" = 1 ]
+}
+
+# Must-pass: a leading # is tolerated.
+test_hash_prefixed_pr_number_merges() {
+  _setup
+  echo '2026-10-01T00:00:02Z|PR-REVIEW|checkout-pr|done|#12' >>"$_ws/log"
+  _am
+  local ok=1
+  [ "$_rc" = 0 ] && _merged || ok=0
+  _teardown
+  [ "$ok" = 1 ]
+}
+
+# Must-fail: the PR's head is not the ticket branch (another ticket's PR).
+test_head_ref_mismatch_refuses() {
+  _setup
+  _stub_gh 'feat/cre-9-other' 0 0
+  _am
+  local ok=1
+  [ "$_rc" = 3 ] && ! _merged &&
+    grep -q '|META|pr-auto-merge|skip|PR_HEAD_MISMATCH' "$_ws/log" || ok=0
+  _teardown
+  [ "$ok" = 1 ]
+}
+
+# Must-fail: no recorded ticket branch → nothing to compare against.
+test_no_ticket_branch_refuses() {
+  _setup
+  grep -v 'branch-context' "$_ws/log" >"$_ws/log.new" && mv "$_ws/log.new" "$_ws/log"
+  _am
+  local ok=1
+  [ "$_rc" = 3 ] && ! _merged &&
+    grep -q '|META|pr-auto-merge|skip|TICKET_BRANCH_UNRECORDED' "$_ws/log" || ok=0
+  _teardown
+  [ "$ok" = 1 ]
+}
+
+# Must-fail: the head ref is read even with no integration branch, and an
+# unreadable one never merges.
+test_gh_view_failure_without_integration_fails_closed() {
+  _setup
+  _stub_gh '' 1 0
+  _am
+  local ok=1
+  [ "$_rc" = 3 ] && ! _merged && grep -q 'PR_HEAD_UNREADABLE' "$_ws/log" || ok=0
+  _teardown
+  [ "$ok" = 1 ]
+}
+
+# ── Track 0.2: the merge needs bash's own PR-REVIEW OK ───────────────────────
+# The latest PR-REVIEW|pr-review terminal is what spawn_agent_post wrote from
+# the parsed PHASE_RESULT. Anything but done|OK refuses the merge, whatever
+# the router model concluded.
+test_pr_review_block_refuses() {
+  _setup
+  echo '2026-10-01T00:00:03Z|PR-REVIEW|pr-review|done|BLOCK — no PHASE_RESULT' >>"$_ws/log"
+  _am
+  local ok=1
+  [ "$_rc" = 3 ] && ! grep -q '^pr ' "$_ws/gh.calls" &&
+    grep -q '|META|pr-auto-merge|skip|PR_REVIEW_NOT_OK' "$_ws/log" || ok=0
+  _teardown
+  [ "$ok" = 1 ]
+}
+
+test_pr_review_warn_refuses() {
+  _setup
+  echo '2026-10-01T00:00:03Z|PR-REVIEW|pr-review|done|WARN — gaps' >>"$_ws/log"
+  _am
+  local ok=1
+  [ "$_rc" = 3 ] && ! _merged || ok=0
+  _teardown
+  [ "$ok" = 1 ]
+}
+
+# Must-fail: a done|OK terminal written by anyone (router skipping
+# enforcement, an agent) does not merge when the parser's record says BLOCK.
+test_ok_terminal_with_block_record_refuses() {
+  _setup
+  sed -i 's/"claimed_verdict":"PASS"/"claimed_verdict":"BLOCK"/' "$_ws/log"
+  _am
+  local ok=1
+  [ "$_rc" = 3 ] && ! _merged && grep -q 'PR_REVIEW_NOT_OK' "$_ws/log" || ok=0
+  _teardown
+  [ "$ok" = 1 ]
+}
+
+# Must-fail: a no-diff route never merges (there is no PR of its own).
+test_no_diff_route_refuses() {
+  _setup
+  cat >"$_ws/log" <<'EOF'
+2026-10-01T00:00:00Z|META|branch-context|info|base=develop;integration=;source=default;ticket=feat/cre-2;uat-policy=per-ticket;merge-policy=
+2026-10-01T00:00:00Z|META|outcome-label|info|Smooth
+2026-10-01T00:00:00Z|IMPLEMENT|implement|waiting|Agent launched
+2026-10-01T00:00:00Z|IMPLEMENT|commit-push|skip|no diff
+2026-10-01T00:00:01Z|PR-REVIEW|pr-review|waiting|Agent launched — Review the PR
+2026-10-01T00:00:01Z|PR-REVIEW|pr-review|done|N/A — no PR
+2026-10-01T00:00:02Z|META|phase-route-anchor|info|PR-REVIEW attempt=1
+2026-10-01T00:00:02Z|META|phase-result|info|{"phase":"PR-REVIEW","claimed_verdict":"UNKNOWN","parse_status":"absent"}
+2026-10-01T00:00:02Z|PR-REVIEW|pr-review|done|OK — no diff
+EOF
+  _am
+  local ok=1
+  [ "$_rc" = 3 ] && ! grep -q '^pr ' "$_ws/gh.calls" && grep -q 'PR_REVIEW_NOT_OK' "$_ws/log" || ok=0
+  _teardown
+  [ "$ok" = 1 ]
+}
+
+test_no_pr_review_terminal_refuses() {
+  _setup
+  grep -v '|PR-REVIEW|pr-review|' "$_ws/log" >"$_ws/log.new" && mv "$_ws/log.new" "$_ws/log"
+  _am
+  local ok=1
+  [ "$_rc" = 3 ] && ! _merged || ok=0
+  _teardown
+  [ "$ok" = 1 ]
+}
+
 test_usage_rc2() {
   local rc=0
   bash "$AM" CRE-2 >/dev/null 2>&1 || rc=$?
@@ -262,6 +399,16 @@ _run "gh pr view failure fails closed" test_gh_view_failure_fails_closed
 _run "gh pr merge failure is soft rc 4" test_gh_merge_failure_is_soft_rc4
 _run "repo scoped from META|pr-created" test_repo_scoped_from_pr_created
 _run "dry-run never merges" test_dry_run_never_merges
+_run "non-numeric PR number refuses" test_non_numeric_pr_number_refuses
+_run "#-prefixed PR number merges" test_hash_prefixed_pr_number_merges
+_run "head ref != ticket branch refuses" test_head_ref_mismatch_refuses
+_run "no recorded ticket branch refuses" test_no_ticket_branch_refuses
+_run "unreadable head ref without integration branch refuses" test_gh_view_failure_without_integration_fails_closed
+_run "PR-REVIEW BLOCK terminal refuses" test_pr_review_block_refuses
+_run "PR-REVIEW WARN terminal refuses" test_pr_review_warn_refuses
+_run "no PR-REVIEW terminal refuses" test_no_pr_review_terminal_refuses
+_run "done|OK terminal with a BLOCK record refuses" test_ok_terminal_with_block_record_refuses
+_run "no-diff route refuses" test_no_diff_route_refuses
 _run "usage error rc 2" test_usage_rc2
 _run "router delegates to auto-merge.sh" test_router_delegates_to_script
 

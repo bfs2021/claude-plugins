@@ -22,9 +22,16 @@
 #      an unset AUTONOMY never auto-merges from the router.
 #   2. COMPLEXITY must be `simple`.
 #   3. The latest META|outcome-label|info| must read `Smooth`.
-#   4. A PR number must be recorded (PR-REVIEW|checkout-pr|done|<n>).
-#   5. With INTEGRATION_BRANCH set, the PR head ref must be readable AND
-#      differ from it (an unreadable head ref skips — never merges).
+#   3b. The latest PR-REVIEW|pr-review terminal must be done|OK, AND
+#      phase-route.sh, re-run here on the log, must route OK from a parsed
+#      PHASE_RESULT (not no-diff, not missing) — PR_REVIEW_NOT_OK.
+#   4. A PR number must be recorded (PR-REVIEW|checkout-pr|done|<n>), and the
+#      whole message must be that number (`#<n>` tolerated) — PR_NUMBER_INVALID.
+#      The ticket branch must be recorded (META|branch-context ticket=, else
+#      TICKET_BRANCH from the env file) — TICKET_BRANCH_UNRECORDED.
+#   5. The PR head ref must be readable (PR_HEAD_UNREADABLE), differ from
+#      INTEGRATION_BRANCH when one is set (INTEGRATION_PR_GUARD), and equal
+#      the ticket branch (PR_HEAD_MISMATCH). Every miss skips, never merges.
 #   6. gh pr merge <n> --squash --auto.
 #
 # Inputs: flags win over the agent env file ($(ticket_tmp_dir)/ticket-auto-<TID>-env.sh,
@@ -36,7 +43,8 @@
 #             4 `gh pr merge` failed (soft — the caller continues); 2 usage.
 #
 # Log lines written: META|pr-auto-merge|skip|<reason> for the policy skip,
-# the integration guard and the unreadable head ref; META|pr-auto-merge|done|<n>
+# the integration guard, the unreadable head ref and the step-4/5 identity
+# codes above; META|pr-auto-merge|done|<n>
 # on a merge. Plain eligibility skips (complexity, outcome, no PR) are silent,
 # as they were before.
 #
@@ -159,11 +167,62 @@ main() {
     return 3
   fi
 
-  # 4. PR number — resolved BEFORE the integration guard.
-  local pr_num
-  pr_num=$(_am_last_msg "$_AM_LOG" '|PR-REVIEW|checkout-pr|done|' | grep -oE '[0-9]+' | head -1) || pr_num=""
-  if [ -z "$pr_num" ]; then
+  # 3b. The latest PR-REVIEW|pr-review terminal must be `done|OK`. That line
+  # is spawn_agent_post's, routed from the parsed PHASE_RESULT
+  # (lib/phase-route.sh, seam audit Track 0.2) — a missing or invalid review
+  # verdict reads BLOCK there, so it can never reach a merge here.
+  local review
+  review=$(grep -E '^[^|]*\|PR-REVIEW\|pr-review\|(done|fail)\|' "$_AM_LOG" 2>/dev/null | tail -1 |
+    cut -d'|' -f4-) || review=""
+  case "$review" in
+  "done|OK"*) ;;
+  *)
+    _am_log skip "PR_REVIEW_NOT_OK: latest PR review terminal is not done|OK, not auto-merging"
+    _am_out skipped "PR review verdict is not OK"
+    return 3
+    ;;
+  esac
+  # …and the route itself is re-derived here rather than trusted from that
+  # line: OK from a parsed PHASE_RESULT only. A no-diff route has no PR to
+  # merge, and any other source is not a review verdict.
+  local route=""
+  # shellcheck source=phase-route.sh
+  source "$_AM_DIR/phase-route.sh" 2>/dev/null && route=$(phase_route PR-REVIEW "$_AM_LOG" 2>/dev/null) || route=""
+  if ! grep -qx 'ROUTE_VERDICT=OK' <<<"$route" || ! grep -qx 'ROUTE_SOURCE=phase-result' <<<"$route"; then
+    _am_log skip "PR_REVIEW_NOT_OK: PR review route is not OK from a parsed PHASE_RESULT ($(sed -n 's/^ROUTE_SOURCE=//p' <<<"$route")), not auto-merging"
+    _am_out skipped "PR review route is not OK"
+    return 3
+  fi
+
+  # 4. PR number — resolved BEFORE the integration guard. The checkout-pr
+  # line is agent-written, so its whole message must be the number (an
+  # optional leading `#` and surrounding blanks tolerated). Prose such as
+  # "12 (see also #34)" used to yield its first number; now it refuses.
+  local pr_raw pr_num
+  pr_raw=$(_am_last_msg "$_AM_LOG" '|PR-REVIEW|checkout-pr|done|')
+  if [ -z "$pr_raw" ]; then
     _am_out skipped "no PR number recorded"
+    return 3
+  fi
+  pr_num=$(printf '%s' "$pr_raw" | sed -E 's/^[[:space:]]*#?//; s/[[:space:]]+$//')
+  if ! [[ "$pr_num" =~ ^[0-9]+$ ]]; then
+    _am_log skip "PR_NUMBER_INVALID: checkout-pr message is not a PR number, not auto-merging"
+    _am_out skipped "PR number not numeric"
+    return 3
+  fi
+
+  # 4b. The ticket's recorded branch (META|branch-context ticket=, written
+  # once by ticket-preamble.sh, else TICKET_BRANCH from the env file). The
+  # PR's head must equal it — no recorded branch means nothing to compare
+  # against, so no merge.
+  local ticket_branch
+  ticket_branch=$(grep '^[^|]*|META|branch-context|info|' "$_AM_LOG" 2>/dev/null | tail -1 |
+    awk -F'|' '{s=$5; for(i=6;i<=NF;i++) s=s"|"$i; print s}' |
+    tr ';' '\n' | sed -n 's/^ticket=//p' | head -1) || ticket_branch=""
+  [ -n "$ticket_branch" ] || ticket_branch="${TICKET_BRANCH:-}"
+  if [ -z "$ticket_branch" ]; then
+    _am_log skip "TICKET_BRANCH_UNRECORDED: no ticket branch recorded, not auto-merging ${pr_num}"
+    _am_out skipped "no ticket branch recorded"
     return 3
   fi
 
@@ -178,20 +237,24 @@ main() {
     fi
   fi
 
-  # 5. Integration-PR guard — fail closed.
-  if [ -n "${INTEGRATION_BRANCH:-}" ]; then
-    local head rc=0
-    head=$(gh pr view "$pr_num" "${repo_args[@]}" --json headRefName --jq '.headRefName' 2>/dev/null) || rc=$?
-    if [ "$rc" -ne 0 ] || [ -z "$head" ]; then
-      _am_log skip "PR_HEAD_UNREADABLE: could not read PR ${pr_num} head ref, not auto-merging"
-      _am_out skipped "could not read PR ${pr_num} head ref"
-      return 3
-    fi
-    if [ "$head" = "$INTEGRATION_BRANCH" ]; then
-      _am_log skip "INTEGRATION_PR_GUARD: ${pr_num} is integration PR, not auto-merging"
-      _am_out skipped "${pr_num} is an integration PR"
-      return 3
-    fi
+  # 5. Head ref — always read, fail closed. First the integration-PR guard,
+  # then the PR must be this ticket's own (head == recorded ticket branch).
+  local head rc=0
+  head=$(gh pr view "$pr_num" "${repo_args[@]}" --json headRefName --jq '.headRefName' 2>/dev/null) || rc=$?
+  if [ "$rc" -ne 0 ] || [ -z "$head" ]; then
+    _am_log skip "PR_HEAD_UNREADABLE: could not read PR ${pr_num} head ref, not auto-merging"
+    _am_out skipped "could not read PR ${pr_num} head ref"
+    return 3
+  fi
+  if [ -n "${INTEGRATION_BRANCH:-}" ] && [ "$head" = "$INTEGRATION_BRANCH" ]; then
+    _am_log skip "INTEGRATION_PR_GUARD: ${pr_num} is integration PR, not auto-merging"
+    _am_out skipped "${pr_num} is an integration PR"
+    return 3
+  fi
+  if [ "$head" != "$ticket_branch" ]; then
+    _am_log skip "PR_HEAD_MISMATCH: PR ${pr_num} head ${head} is not the ticket branch ${ticket_branch}, not auto-merging"
+    _am_out skipped "PR ${pr_num} head is not the ticket branch"
+    return 3
   fi
 
   if [ "$dry_run" = 1 ]; then
