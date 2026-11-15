@@ -1173,7 +1173,7 @@ test_bug_no_repro_high_score_still_stops() {
   _setup
   _scaffold_exec_done "simple" "auto" "simple-fix" "${_ws}/simple-fix.md"
   _scaffold_context_md 3 "bug" "false" # 3 AC, bug, no repro
-  _scaffold_critique 75 CLEAR           # score 75 would normally clear
+  _scaffold_critique 75 CLEAR          # score 75 would normally clear
   _scaffold_artifact_with_prereqs "${_ws}/simple-fix.md"
 
   _gate_entry
@@ -3114,18 +3114,60 @@ test_t0_critique_result_file_malformed_stops() {
   _teardown
   return $ok
 }
-# Must-pass: a CLEAR result file passes, and its BLOCKERS count (not a grep
-# over the section, which double-counts echoed findings) feeds plausibility.
+# Must-pass: a CLEAR result file agreeing with notes.md passes.
 test_t0_critique_result_file_clear_passes() {
   _setup
   _scaffold_exec_done "simple" "auto" "simple-fix" "${_ws}/simple-fix.md"
-  _scaffold_critique_with_findings 80 CLEAR "- noted: an earlier [BLOCKER] was resolved"
+  _scaffold_critique_with_findings 80 CLEAR "- [WARNING] minor wording"
   _scaffold_artifact_with_prereqs "${_ws}/simple-fix.md"
   _t0_result CLEAR 80 0
   local rc=0
   _gate_entry || rc=$?
   local ok=0
   [ "$rc" -eq 0 ] && ! grep -q 'gate-stop' "$LOG_FILE" || ok=1
+  _teardown
+  return $ok
+}
+
+# Must-fail: a stale CLEAR file never loosens a stricter notes.md critique.
+test_t0_critique_stale_clear_file_never_loosens_blocked_notes() {
+  _setup
+  _scaffold_exec_done "simple" "auto" "simple-fix" "${_ws}/simple-fix.md"
+  _scaffold_critique 75 BLOCKED
+  _scaffold_artifact_with_prereqs "${_ws}/simple-fix.md"
+  _t0_result CLEAR 95 0
+  local rc=0
+  _gate_entry || rc=$?
+  local ok=0
+  [ "$rc" -eq 2 ] && _t0_stop CRITIQUE_BLOCKED || ok=1
+  _teardown
+  return $ok
+}
+test_t0_critique_stale_file_lower_notes_score_wins() {
+  _setup
+  _scaffold_exec_done "simple" "auto" "simple-fix" "${_ws}/simple-fix.md"
+  _scaffold_critique 35 WARNINGS
+  _scaffold_artifact_with_prereqs "${_ws}/simple-fix.md"
+  _t0_result CLEAR 90 0
+  local rc=0
+  _gate_entry || rc=$?
+  local ok=0
+  [ "$rc" -eq 1 ] && grep -q 'held: content quality score 35 < 40' "$LOG_FILE" || ok=1
+  _teardown
+  return $ok
+}
+# Must-fail: a result file written for another ticket stops the gate.
+test_t0_critique_file_for_other_ticket_stops() {
+  _setup
+  _scaffold_exec_done "simple" "auto" "simple-fix" "${_ws}/simple-fix.md"
+  _scaffold_critique 75 CLEAR
+  _scaffold_artifact_with_prereqs "${_ws}/simple-fix.md"
+  _t0_result CLEAR 75 0
+  sed -i 's/^TICKET: .*/TICKET: CRE-999/' "$(_t0_td)/critique-result.txt"
+  local rc=0
+  _gate_entry || rc=$?
+  local ok=0
+  [ "$rc" -eq 2 ] && _t0_stop CRITIQUE_STATUS_MISSING || ok=1
   _teardown
   return $ok
 }
@@ -3278,6 +3320,9 @@ for fn in \
   test_t0_critique_result_file_blocked_wins_over_notes \
   test_t0_critique_result_file_malformed_stops \
   test_t0_critique_result_file_clear_passes \
+  test_t0_critique_stale_clear_file_never_loosens_blocked_notes \
+  test_t0_critique_stale_file_lower_notes_score_wins \
+  test_t0_critique_file_for_other_ticket_stops \
   test_t0_complexity_missing_stops \
   test_t0_artifact_type_missing_stops \
   test_t0_artifact_type_first_word_wins \

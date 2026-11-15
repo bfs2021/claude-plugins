@@ -610,14 +610,18 @@ _gate_entry() {
 
   # Seam audit Track 0.3: ticket-critique's status is computed by
   # critique-status.sh, which also writes it (with the score and BLOCKER
-  # count it was given) as a CRITIQUE_RESULT block in the ticket dir. That
-  # bash-written block wins over the agent's notes.md transcription; an
-  # unparseable block stops the gate. Without one (a critique from before the
-  # file existed) the notes.md values stand, read case-insensitively.
+  # count it was given) as a CRITIQUE_RESULT block in the ticket dir. An
+  # unparseable block, or one for another ticket, stops the gate. A valid one
+  # is combined with the notes.md values strictly — never a replacement, so a
+  # stale file can only make the gate stricter: the stricter status
+  # (BLOCKED > WARNINGS > CLEAR), the lower score and the higher BLOCKER count
+  # win. Without a file (a critique from before it existed) the notes.md
+  # values stand, read case-insensitively.
   local critique_blocker_override=""
   if [ -f "$td/critique-result.txt" ]; then
     has_critique="true"
-    local _cr_status _cr_score _cr_blockers
+    local _cr_ticket _cr_status _cr_score _cr_blockers _cr_notes_blockers
+    _cr_ticket=$(_gate_critique_field "$td/critique-result.txt" TICKET)
     _cr_status=$(_gate_critique_field "$td/critique-result.txt" STATUS)
     _cr_score=$(_gate_critique_field "$td/critique-result.txt" SCORE)
     _cr_blockers=$(_gate_critique_field "$td/critique-result.txt" BLOCKERS)
@@ -625,14 +629,24 @@ _gate_entry() {
     BLOCKED | WARNINGS | CLEAR) ;;
     *) _cr_status="" ;;
     esac
-    if [ -z "$_cr_status" ] || ! [[ "$_cr_score" =~ ^[0-9]+$ ]] || ! [[ "$_cr_blockers" =~ ^[0-9]+$ ]]; then
-      _plog "$LOG_FILE" "META" "gate-stop" "fail" "CRITIQUE_STATUS_MISSING — critique-result.txt has no valid STATUS/SCORE/BLOCKERS; re-run /ticket-critique {ID} --from-appraise"
+    if [ "$_cr_ticket" != "$TICKET_ID" ] || [ -z "$_cr_status" ] ||
+      ! [[ "$_cr_score" =~ ^[0-9]+$ ]] || ! [[ "$_cr_blockers" =~ ^[0-9]+$ ]]; then
+      _plog "$LOG_FILE" "META" "gate-stop" "fail" "CRITIQUE_STATUS_MISSING — critique-result.txt is not a valid CRITIQUE_RESULT for $TICKET_ID (TICKET/STATUS/SCORE/BLOCKERS); re-run /ticket-critique $TICKET_ID --from-appraise"
       hb_gate "entry-gate" "fail" "critique status missing" "{\"source\":\"critique-result.txt\"}"
       return 2
     fi
-    critique_status="$_cr_status"
-    critique_score="$_cr_score"
+    case "$critique_status/$_cr_status" in
+    BLOCKED/* | */BLOCKED) critique_status="BLOCKED" ;;
+    WARNINGS/* | */WARNINGS) critique_status="WARNINGS" ;;
+    *) critique_status="CLEAR" ;;
+    esac
+    if ! [[ "$critique_score" =~ ^[0-9]+$ ]] || [ "$_cr_score" -lt "$critique_score" ]; then
+      critique_score="$_cr_score"
+    fi
+    _cr_notes_blockers=$(get_critique_blocker_count "$td" 2>/dev/null || echo "0")
+    [[ "$_cr_notes_blockers" =~ ^[0-9]+$ ]] || _cr_notes_blockers=0
     critique_blocker_override="$_cr_blockers"
+    [ "$_cr_notes_blockers" -le "$_cr_blockers" ] || critique_blocker_override="$_cr_notes_blockers"
   fi
 
   if [ "${has_critique}" = "true" ] && [ -n "$critique_score" ] && [ -z "$critique_status" ]; then
