@@ -908,6 +908,17 @@ disposition is the first word of a ` — ` segment after the id: `accepted`, `re
 and nit findings are never checked. Without any terminal goldfish line the family is silent,
 so legacy initiatives and the halt goldens are unchanged. It never blocks.
 
+**`CODE_SPAN_EDGE_SPACE` (Crosscheck, warn only; rehearsal F53).** `planner_crosscheck_codespan`
+(`lib/planner-crosscheck-codespan.sh`, after the AC coverage family) emits one warning per
+inline code span whose content starts and ends with a space and is not only spaces. CommonMark
+removes one space from each end of such a span, so a spec value like `` `  Hello,  World!! ` ``
+renders, and is stored by Linear, as `` ` Hello,  World!!` ``: a test that depends on the spaces
+silently loses them, and the draft-to-Linear body comparison reports the ticket as changed. The
+fix is to quote the value inside the span (`` `"  Hello,  World!! "` ``) or describe the spaces
+in words. A span is a backtick run and the next run of the same length on the same line; fenced
+lines, INDEX.md and synth-marked test-data specs are skipped. Specify's Part 4 self-lint runs
+the same check so the agent fixes its own specs. It never blocks.
+
 ### Resolving against the ref Discovery explored, not whatever REPOS_ROOT is now ([#217](https://github.com/willard-pro/claude-plugins/issues/217))
 
 REPOS_ROOT is a shared checkout — it can move to a different branch between

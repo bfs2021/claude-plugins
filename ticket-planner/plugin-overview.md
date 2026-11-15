@@ -38,6 +38,7 @@ Maintainer-facing overview of the ticket-planner plugin. Read this before adding
 | Goldfish lens | `lib/planner-goldfish.sh` | Context-withheld review before Review (planner-goldfish-review): due decision per proposal version, prompt and input copy, spawn-list NEXT/APPLY (requested by the Review `pre` gate's `SPAWN` line), result parse, not-run recording, status line, the Consensus block. Flag `PLANNER_GOLDFISH_REVIEW` (default off) |
 | Goldfish agent | `agents/goldfish-review-agent.md` | `tools: Read, Grep, Glob, Write`; reads only the proposal copy and the listed repositories; writes `goldfish/review-goldfish.md` |
 | Goldfish Crosscheck family | `lib/planner-crosscheck-goldfish.sh` | `GOLDFISH_UNADDRESSED` (warn only): undispositioned blocker/major goldfish findings or a missing status line in consensus.md |
+| Code-span Crosscheck family | `lib/planner-crosscheck-codespan.sh` | `CODE_SPAN_EDGE_SPACE` (warn only): an inline code span that starts and ends with a space, which markdown (and Linear) shortens by one space at each end; also run by Specify's self-lint |
 
 ### Linear integration
 

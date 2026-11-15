@@ -1220,7 +1220,13 @@ surface as a Crosscheck finding 3 phases later, outside this context window.
 $(_planner_prompt_repos_root_export)
 source "\${CLAUDE_PLUGIN_ROOT}/lib/planner-crosscheck-citations.sh"
 planner_crosscheck_citations "${initiative_id}"
+source "\${CLAUDE_PLUGIN_ROOT}/lib/planner-crosscheck-codespan.sh"
+planner_crosscheck_codespan "${initiative_id}"
 \`\`\`
+
+A \`CODE_SPAN_EDGE_SPACE\` line means an inline code value starts and ends
+with a space, which markdown drops: quote the value inside the span
+(\`"  a b "\`) so the spaces a test depends on survive.
 
 If it reports failures, read each \`planner-crosscheck-citations: <CODE>
 <file>:<line> → <detail>\` line, fix the cited file, and re-run. Up to 3
