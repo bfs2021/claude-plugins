@@ -115,7 +115,12 @@ None.
 MD
 
   if [ -n "$GRILL_SEAL" ]; then
-    bash "$GRILL_SEAL" generate "$doc" "product-idea" "$readiness" "$recommendation" "1" "2026-07-26T00:00:00Z" >/dev/null 2>&1 || true
+    # Seal with this checkout's generator (grill-me 0.7.0+: values come from
+    # a work dir's result.json); the gate verifies through its own resolver.
+    mkdir -p "${doc}.work"
+    printf '{"profile":"product-idea","round":1,"readiness":%s,"recommendation":"%s"}\n' \
+      "$readiness" "$recommendation" >"${doc}.work/result.json"
+    bash "$LIB_DIR/../../grill-me/lib/grill-seal.sh" generate "$doc" "${doc}.work" >/dev/null 2>&1 || true
   fi
 
   echo "$doc"
@@ -414,7 +419,8 @@ JSON
     source "$1/grill-input.sh"; source "$1/grill-render.sh"; source "$1/grill-seal.sh"
     grill_brief_verbatim "$(cat "$2")" >"$3/brief-verbatim.md"
     grill_render "$3/brief-result.json" "$3/brief-assessment.json" "$4" "$3/brief-verbatim.md"
-    grill_seal_generate "$4" product-idea 90 ready 1 2026-10-29T00:00:00Z
+    mkdir -p "$3/brief-work" && cp "$3/brief-result.json" "$3/brief-work/result.json"
+    grill_seal_generate "$4" "$3/brief-work"
   ' _ "$GRILL_LIB" "$BRIEF_RAW" "$SCRATCH" "$BRIEF_SEALED" </dev/null >/dev/null 2>&1 || true
 
   gate_rc=0

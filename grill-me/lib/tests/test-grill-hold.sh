@@ -230,7 +230,7 @@ else
 fi
 
 grill_render "$W/result.json" "$W/assessment.json" "$W/intent.md" >/dev/null 2>&1
-grill_seal_generate "$W/intent.md" product-idea "$(jq -r .readiness "$W/result.json")" "$(jq -r .recommendation "$W/result.json")" 2 "$TS" >/dev/null 2>&1
+grill_seal_generate "$W/intent.md" "$W" >/dev/null 2>&1
 if grill_seal_verify "$W/intent.md" >/dev/null 2>&1 &&
   grep -q 'Month-end export takes under a minute' "$W/intent.md" &&
   awk '/^## Resolved Questions/{f=1} f' "$W/intent.md" | grep -q 'Who exports invoices today'; then
@@ -310,7 +310,7 @@ answers "$SCRATCH/cap-op.json" 2 operator "r2-cap=seal-with-gaps"
 out=$(grill_answers_fold "$W" "$SCRATCH/cap-op.json" 2>&1)
 rec=$(grill_seal_with_gaps_prepare "$W" | sed 's/^GRILL_RECOMMENDATION=//')
 grill_render "$W/result.json" "$W/assessment.json" "$W/intent.md" >/dev/null 2>&1
-grill_seal_generate "$W/intent.md" product-idea "$(jq -r .readiness "$W/result.json")" "$rec" 2 "$TS" >/dev/null 2>&1
+grill_seal_generate "$W/intent.md" "$W" >/dev/null 2>&1
 gaps=$(awk '/^## Open Gaps/{f=1;next} /^## /{f=0} f' "$W/intent.md")
 if [[ "$out" == *"GRILL_CAP_DECISION=seal-with-gaps"* ]] && [ "$rec" != "ready" ] &&
   [[ "$gaps" == *users_problem* ]] && [[ "$gaps" == *success_criteria* ]] &&

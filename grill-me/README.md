@@ -1,6 +1,6 @@
 # grill-me — Pre-Work Readiness Gate
 
-Ask your idea the hard questions before you build anything. `/grill-me` assesses a business idea against a profile-driven dimension model, interactively grills you on the gaps, and produces a cryptographically sealed Validated Business Intent document that downstream consumers (like `ticket-planner`) can gate on.
+Ask your idea the hard questions before you build anything. `/grill-me` assesses a business idea against a profile-driven dimension model, interactively grills you on the gaps, and produces a tamper-evident sealed Validated Business Intent document that downstream consumers (like `ticket-planner`) can gate on.
 
 ## Quick start
 
@@ -107,6 +107,8 @@ See [docs/grill-me.md](docs/grill-me.md) for the full architecture, determinism 
 - No new runtime dependencies beyond what the existing plugins already require
 
 ## Version
+
+0.7.0 — the seal takes its readiness, recommendation, round and profile from the work directory's `result.json` (`grill_seal_generate <doc> <work_dir>`), never from values the agent passes; no score, a stale score or a malformed one seals nothing. The skill sources one entry lib, `lib/grill.sh`, so every function it calls is defined. Existing seals verify unchanged.
 
 0.6.0 — profile `product-idea` 1.2.0: the Assumptions dimension (now "Assumptions & Defaults") asks what already exists in the repository and never infers code the brief does not name, and tags chosen defaults `Default: ...` and unstated codebase claims `Unverified: ...`; Edge Cases asks what the user sees when an operation fails.
 

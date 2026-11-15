@@ -31,6 +31,16 @@ fail() {
 SCRATCH=$(mktemp -d)
 trap 'rm -rf "$SCRATCH"' EXIT
 
+# seal_from <doc> <readiness> <recommendation> <round>
+# grill_seal_generate reads its values from a work dir's result.json (0.7.0+).
+seal_from() {
+  local wd="${1}.work"
+  mkdir -p "$wd"
+  jq -n --argjson r "$2" --arg rec "$3" --argjson round "$4" \
+    '{profile: "product-idea", round: $round, readiness: $r, recommendation: $rec}' >"$wd/result.json"
+  grill_seal_generate "$1" "$wd"
+}
+
 # ── Helper: create a minimal result.json ──────────────────────────────────────
 # This is a product-idea 1.0.0 (v1, ten-dimension) result and keeps the 1.0.0
 # weights on purpose: it is the source of fixtures/render-v1-golden.md, the
@@ -145,7 +155,7 @@ fi
 echo "=== Seal verification round-trip ==="
 
 # Seal the rendered document
-grill_seal_generate "$OUTPUT_FILE" "product-idea" "88" "ready" "1" "2026-07-26T00:00:00Z" 2>/dev/null
+seal_from "$OUTPUT_FILE" 88 ready 1 2>/dev/null
 
 # Verify
 set +e
@@ -433,7 +443,7 @@ else
 fi
 
 # The seal still covers the rendered result, clarifications included.
-grill_seal_generate "$OUTPUT_SUP_FILE" "product-idea" "88" "ready" "3" "2026-07-26T00:00:00Z" 2>/dev/null
+seal_from "$OUTPUT_SUP_FILE" 88 ready 3 2>/dev/null
 set +e
 grill_seal_verify "$OUTPUT_SUP_FILE" >/dev/null 2>&1
 sup_verify_exit=$?
@@ -526,7 +536,7 @@ echo "=== Test Data section is sealed ==="
 
 OUTPUT_V11_SEAL_FILE="$SCRATCH/output-v11-seal.md"
 cp "$OUTPUT_V11_FILE" "$OUTPUT_V11_SEAL_FILE"
-grill_seal_generate "$OUTPUT_V11_SEAL_FILE" "product-idea" "88" "ready" "1" "2026-07-26T00:00:00Z" 2>/dev/null
+seal_from "$OUTPUT_V11_SEAL_FILE" 88 ready 1 2>/dev/null
 set +e
 grill_seal_verify "$OUTPUT_V11_SEAL_FILE" >/dev/null 2>&1
 td_verify_exit=$?
@@ -614,7 +624,7 @@ else
 fi
 
 seal_rc=0
-grill_seal_generate "$OUTPUT_BRIEF_FILE" product-idea 88 ready 1 2026-10-29T00:00:00Z 2>/dev/null || seal_rc=$?
+seal_from "$OUTPUT_BRIEF_FILE" 88 ready 1 2>/dev/null || seal_rc=$?
 verify_rc=0
 grill_seal_verify "$OUTPUT_BRIEF_FILE" >/dev/null 2>&1 || verify_rc=$?
 TAMPER_BRIEF_FILE="$SCRATCH/output-brief-tamper.md"
