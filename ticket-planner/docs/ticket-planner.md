@@ -1120,6 +1120,16 @@ its result files as `*-result.rejected.txt`.
 
 ### Revision loop: reasons, assumptions, security
 
+- **Which findings a round revises.** A verified, blocking, non-structural semantic
+  finding, or a deterministic code in the audit-demotable list. Structural codes
+  (`_dor_semantic_structural_codes`) halt the gate unrevised, with one exception
+  (rehearsal F62): an `INTENT_AC_MISMATCH` whose unit is a single acceptance criterion
+  (`Acceptance Criteria/ac:<hash>`) gets revise rounds, because narrowing or adding a
+  criterion is its fix (`PLANNER_DRAFT_REVISABLE_AC_CODES`, a constant). The revise
+  prompt then tells the agent that a rebuttal does not clear it. It stays structural for
+  demotion: rebutted (one round, the spec is unchanged) or still unfixed after the round
+  budget, it keeps blocking and the gate halts. Only the finding's first anchor (`unit`)
+  is read, so a quote that also touches another section counts as one criterion.
 - **Reason class per finding.** At the end of the loop every demoted finding records why
   it was not fixed, judged per finding: `assumed`, `rebutted`, `revised`, `reverted` or
   `failed` from the rounds the finding was given to (highest of that order wins), else

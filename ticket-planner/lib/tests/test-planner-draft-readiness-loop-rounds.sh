@@ -12,6 +12,8 @@
 #  2. budget of 2 rounds honoured across a simulated resume; round 3 is
 #     demoted round-limit with reason class `revised`
 #  3. a fixable spec is revised before a structural halt in another spec
+#  3b. rehearsal F62: an INTENT_AC_MISMATCH on one acceptance criterion is
+#      revised; unfixed, it is never demoted and still halts
 #  4. rebuttal: no re-evaluation, no second revision, demoted `rebutted`
 #  5. guard revert: spec restored, demoted `reverted`; DEMOTE_CEILING halts
 #  12. (every file) no Linear call, no ticket manifest, no snapshot left
@@ -83,7 +85,9 @@ fi
 echo "--- 3. fixable spec revised before a structural halt ---"
 _setup INIT-L3
 export FINDINGS_b_api="EDGE_CASE_GAP|Export responds with 200"
-export STRUCT_a_schema="INTENT_AC_MISMATCH|The Export button appears on the invoice list"
+# Quoted from the Summary, not a criterion: stays structural (F62 only
+# opens single-criterion findings to revision).
+export STRUCT_a_schema="INTENT_AC_MISMATCH|Persist invoice exports, in plain language."
 _gate
 if [ "$GATE_RC" -eq 3 ] && [ "$(_status b-api 1)" = "applied" ] && [ ! -e "${DR}/a-schema/findings.r1.json" ] &&
   _run_lines | grep -q '|META|draft-readiness|fail|a-schema INTENT_AC_MISMATCH ' &&
@@ -95,6 +99,49 @@ else
 fi
 desc=$(planner_stop_describe_json "$INIT")
 [ "$(echo "$desc" | jq -r .reason)" = "DRAFT_NOT_READY" ] && pass "describer: DRAFT_NOT_READY" || fail "describer" "$desc"
+
+# ── 3b. single-criterion INTENT_AC_MISMATCH (rehearsal F62) ──────────────
+echo "--- 3b. INTENT_AC_MISMATCH on one criterion is revisable ---"
+_setup INIT-L3B
+export FINDINGS_a_schema="INTENT_AC_MISMATCH|The Export button appears on the invoice list"
+_gate
+if [ "$GATE_RC" -eq 0 ] && [ "$(_status a-schema 1)" = "applied" ] &&
+  grep -qF 'INTENT_AC_MISMATCH' "${DR}/a-schema/findings.r1.json" &&
+  grep -qF 'A rebuttal does not clear it' "${DR}/a-schema/revise-prompt.r1.txt" &&
+  ! grep -qF 'A rebuttal does not clear it' "${DR}/b-api/revise-prompt.r1.txt" 2>/dev/null &&
+  _run_lines | grep -q '|META|draft-readiness|done|ready 2/2$'; then
+  pass "a-schema revised (prompt names the AC rule) and the gate passes"
+else
+  fail "F62 revisable" "rc=$GATE_RC a=$(_status a-schema 1) $(_run_lines | grep -E 'fail|done')"
+fi
+
+_setup INIT-L3C
+export FINDINGS_a_schema="INTENT_AC_MISMATCH|The Export button appears on the invoice list"
+export REVISE_a_schema=nofix
+_gate
+if [ "$GATE_RC" -eq 3 ] && [ "$(planner_draft_revise_rounds_used "$INIT" a-schema)" -eq 2 ] &&
+  jq -e '[.findings[] | select(.code == "INTENT_AC_MISMATCH" and .severity == "blocking" and .demoted == null)] | length == 1' \
+    "${DR}/a-schema/semantic.json" >/dev/null &&
+  _run_lines | grep -q '|META|draft-readiness|fail|a-schema INTENT_AC_MISMATCH ' &&
+  ! _run_lines | grep -q 'a-schema DEMOTED INTENT_AC_MISMATCH'; then
+  pass "unfixed after the round budget: never demoted, the gate halts on it"
+else
+  fail "F62 unfixed" "rc=$GATE_RC used=$(planner_draft_revise_rounds_used "$INIT" a-schema) $(jq -c '.findings' "${DR}/a-schema/semantic.json")"
+fi
+
+_setup INIT-L3D
+export FINDINGS_a_schema="INTENT_AC_MISMATCH|The Export button appears on the invoice list"
+export REVISE_a_schema=rebut
+_gate
+if [ "$GATE_RC" -eq 3 ] && [ "$(_status a-schema 1)" = "unchanged" ] &&
+  [ "$(planner_draft_revise_rounds_used "$INIT" a-schema)" -eq 1 ] &&
+  jq -e '[.findings[] | select(.code == "INTENT_AC_MISMATCH" and .severity == "blocking" and .demoted == null)] | length == 1' \
+    "${DR}/a-schema/semantic.json" >/dev/null &&
+  ! _run_lines | grep -q 'a-schema DEMOTED INTENT_AC_MISMATCH'; then
+  pass "rebutted: one round, never demoted, the gate halts on it"
+else
+  fail "F62 rebutted" "rc=$GATE_RC st=$(_status a-schema 1) used=$(planner_draft_revise_rounds_used "$INIT" a-schema) $(jq -c '.findings' "${DR}/a-schema/semantic.json")"
+fi
 
 # ── 4. rebuttal ──────────────────────────────────────────────────────────
 echo "--- 4. rebuttal ---"

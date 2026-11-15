@@ -17,6 +17,22 @@ marketplace. Where a release also moved `ticket-planner`, `fleet-controller`, or
 > - **0.19.0 never existed.** `plugin.json` went 0.18.0 → 0.20.0. The Phase 2
 >   commit message claims `0.19.0→0.20.0`, but no 0.19.0 was ever committed.
 
+## ticket-planner 0.43.6 (2026-11-15) — dispatch-rehearsal iteration 09 finding
+
+- **Draft gate: an `INTENT_AC_MISMATCH` on one criterion gets a revise round (F62).**
+  Iteration 09 halted `DRAFT_NOT_READY` 1/7 on a round-0 `INTENT_AC_MISMATCH` against
+  a criterion counting every `img` element on the home page; the evaluator's point was
+  that the count should be scoped to the new title. `INTENT_AC_MISMATCH` is a structural
+  code, and structural codes skipped the revise loop, so a one-qualifier fix halted the
+  run. `planner_draft_revise_classify` now treats a code in the new constant
+  `PLANNER_DRAFT_REVISABLE_AC_CODES` (`INTENT_AC_MISMATCH`) as revisable when the
+  finding's unit is a single acceptance criterion; on any other unit it is structural as
+  before. The revise prompt for such a round adds one rule: a rebuttal does not clear it,
+  so narrow the criterion or add one that tests the intended outcome. Every other revise
+  prompt is byte-identical. Demotion is unchanged: the code is still structural there, so
+  one that is rebutted or left unfixed is never demoted and still halts. ticket-auto-pipeline's structural
+  list, and Refinement, are untouched.
+
 ## ticket-planner 0.43.5 (2026-11-15) — dispatch-rehearsal iteration 07 finding
 
 - **New warn-level Crosscheck check `CODE_SPAN_EDGE_SPACE` (F53).** A slug test

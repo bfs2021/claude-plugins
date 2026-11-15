@@ -10,7 +10,11 @@
 #       {revisable:[...], non_revisable:[...]} — revisable = verified
 #       non-structural blocking semantic finding, or a deterministic code from
 #       _dor_audit_demotable_codes; everything else is non-revisable. Both
-#       lists come from the env-overridable ticket-auto functions.
+#       lists come from the env-overridable ticket-auto functions. Exception
+#       (rehearsal F62): a structural code in PLANNER_DRAFT_REVISABLE_AC_CODES
+#       is revisable when its finding's unit is one acceptance criterion
+#       (`Acceptance Criteria/ac:<hash>`). It stays structural everywhere
+#       else, so an unfixed one is never demoted and still halts the gate.
 #   planner_draft_revise_rounds_used <INIT> <slug>
 #       number of revise.r*.status files (the never-reset round budget, D11)
 #   planner_draft_revise_prepare <INIT> <slug> <N> <findings-json>
@@ -681,6 +685,14 @@ planner_draft_revise_check_text() {
 
 # ── Classifier (D8 step 2) ────────────────────────────────────────────────
 
+# Structural codes the revise agent may still try when they name a single
+# acceptance criterion (rehearsal F62). INTENT_AC_MISMATCH is, by its own
+# definition, "an acceptance criterion does not serve the stated intent":
+# narrowing or adding a criterion fixes it, so halting with no revise round
+# turned a one-line wording fix (iter 09: an `img` count that should have been
+# scoped to the title element) into a run halt. A constant, not an env knob.
+PLANNER_DRAFT_REVISABLE_AC_CODES="INTENT_AC_MISMATCH"
+
 # planner_draft_revise_classify <semantic-json|-> [<dor-result-json>]
 # Each argument may be JSON text or a file path; `-`/empty semantic = none.
 planner_draft_revise_classify() {
@@ -690,20 +702,28 @@ planner_draft_revise_classify() {
   [ "$sem" = "-" ] || [ -z "$sem" ] && sem='null'
   [ -n "$det" ] && [ -f "$det" ] && det=$(cat "$det")
   [ -n "$det" ] || det='null'
-  local structural demotable
+  local structural demotable ac_codes
   structural=$(_dor_semantic_structural_codes | jq -R . | jq -sc 'map(select(. != ""))')
   demotable=$(_dor_audit_demotable_codes | jq -R . | jq -sc 'map(select(. != ""))')
-  jq -nc --argjson s "$sem" --argjson d "$det" --argjson st "$structural" --argjson dm "$demotable" '
+  # shellcheck disable=SC2086 # word-split the space-separated constant
+  ac_codes=$(printf '%s\n' $PLANNER_DRAFT_REVISABLE_AC_CODES | jq -R . | jq -sc 'map(select(. != ""))')
+  jq -nc --argjson s "$sem" --argjson d "$det" --argjson st0 "$structural" --argjson dm "$demotable" \
+    --argjson ac "$ac_codes" '
     ([($s // {}).findings // [] | .[] | select(.severity == "blocking")]) as $b
-    | {
+    # Per finding: structural unless it is an AC-scoped code on one criterion.
+    | def pdr_structural($st0; $ac):
+        (.code as $c | $st0 | index($c)) != null
+        and (((.code as $c | $ac | index($c)) != null
+              and ((.unit // "") | test("^Acceptance Criteria/ac:[0-9a-f]+$"))) | not);
+    {
         revisable:
-          ([$b[] | select(.verified != false and ((.code as $c | $st | index($c)) == null))
+          ([$b[] | select(.verified != false and (pdr_structural($st0; $ac) | not))
             | {kind: "semantic", id, code}]
            + [(($d // {}).missing // [])[] | select(startswith("SEMANTIC_") | not)
               | select(. as $c | $dm | index($c)) | {kind: "deterministic", id: ., code: .}]),
         non_revisable:
           ([$b[] | select(.verified == false) | {kind: "semantic", id, code, why: "unverified"}]
-           + [$b[] | select(.verified != false and ((.code as $c | $st | index($c)) != null))
+           + [$b[] | select(.verified != false and pdr_structural($st0; $ac))
               | {kind: "semantic", id, code, why: "structural"}]
            + (if ((($s // {}).unverified_gaps // []) | length) > 0
               then [{kind: "semantic", id: "SEMANTIC_UNVERIFIED", code: "SEMANTIC_UNVERIFIED", why: "unverified-gap"}] else [] end)
@@ -789,6 +809,23 @@ planner_prompt_spec_revise() {
       + (if .detail then "\n  reason: \(.detail)" else "" end)
       + (if .audit then "\n  audit: \(.audit | tostring)" else "" end)' "$ff") || return 1
 
+  # Only when this round carries an AC-scoped structural code (rehearsal F62):
+  # a rebuttal leaves it blocking, so the agent is told to narrow or add a
+  # criterion. Every other revise prompt stays byte-identical.
+  local ac_rule="" ac_ids
+  # shellcheck disable=SC2086 # word-split the space-separated constant
+  ac_ids=$(jq -r --argjson ac "$(printf '%s\n' $PLANNER_DRAFT_REVISABLE_AC_CODES | jq -R . | jq -sc 'map(select(. != ""))')" \
+    '[.[] | select((.code as $c | $ac | index($c)) != null) | (.id // .code)] | join(", ")' "$ff") || return 1
+  if [ -n "$ac_ids" ]; then
+    ac_rule="
+- ${ac_ids}: an \`INTENT_AC_MISMATCH\` says one criterion does not test what the
+  intent needs. A rebuttal does not clear it: the ticket stays blocked. Fix it by
+  appending a qualifier that scopes the quoted criterion to what the intent and
+  behaviour section describe (for example to the element or record the ticket
+  creates), or by adding a criterion that tests the intended outcome directly.
+  Rebut it only when the criterion already serves the intent as written."
+  fi
+
   if _planner_intent_has_brief "$sd"; then
     local brief idea
     brief=$(awk '/^## Intent Seal$/ { exit } /^## Original Brief$/ { on = 1; next } on && /^## / { on = 0 } on' "${sd}/artifacts/intent.md")
@@ -865,7 +902,7 @@ Behaviour\`, \`## Expected Behaviour\`), \`## Technical Context\`, \`## Test Use
   raise a new structural finding (such as contradictory requirements) is
   reverted.
 - When a finding is wrong (already covered, or out of scope by the intent), write
-  a rebuttal instead of an edit.
+  a rebuttal instead of an edit.${ac_rule}
 - When a finding is right but needs a product decision that no source (intent,
   brief, consensus, spec) states, do not rebut it. Choose the most conservative
   sensible default, add one Scope row \`- Assumption: <the default, in plain words>\`
