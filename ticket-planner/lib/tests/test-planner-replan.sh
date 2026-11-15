@@ -8,6 +8,7 @@
 #   3. Systematic overconfidence lowers regenerated confidence
 #   4. Absent vs unreadable feedback distinction
 #   5. Flag detection across state log, proposal, and ticket specs
+#   7. Post-replan dependency graph reads Specify's blocked-by:<ref> grammar
 #
 # Run: bash ticket-planner/lib/tests/test-planner-replan.sh
 
@@ -501,6 +502,72 @@ if [ "$(planner_readiness_gaps_summarize "")" = "none" ]; then
   pass "readiness_gaps_summarize('') → none"
 else
   fail "readiness_gaps_summarize('') → none" "got $(planner_readiness_gaps_summarize "")"
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 7. planner_replan_validate_deps reads the Specify grammar (blocked-by:<ref>)
+# ═══════════════════════════════════════════════════════════════════════════════
+# Specify writes `blocked-by:<slug>` on the `## Labels` line — no braces,
+# optionally backticked, space- or comma-separated. The old parser expected
+# `blocked-by:{X}`, matched nothing, and the cycle check could never fire.
+
+# Load the cycle checker up front so these cases test the parser, not the
+# lib's own sourcing.
+source "${LIB_DIR}/planner-deps-check.sh"
+
+# _rv_spec <init> <slug> <labels line>
+_rv_spec() {
+  local d="${TMPDIR}/.ticket-auto/initiatives/$1/artifacts/specs"
+  mkdir -p "$d"
+  printf '# %s\n\n## Labels\n%s\n\n## Acceptance Criteria\n- [ ] it works\n' "$2" "$3" >"${d}/$2.md"
+}
+
+echo "--- 7a: Labels cycle (backticked + comma forms) → validate_deps returns 1 ---"
+planner_state_init "INIT-RVCYC" "replan deps cycle"
+_rv_spec INIT-RVCYC alpha-schema '`feature` `blocked-by:beta-api`'
+_rv_spec INIT-RVCYC beta-api 'planned, feature, blocked-by:alpha-schema'
+if planner_replan_validate_deps "INIT-RVCYC" 2>/dev/null; then
+  fail "Labels cycle detected" "validate_deps returned 0 on alpha-schema <-> beta-api"
+else
+  pass "Labels cycle (blocked-by:<slug>, no braces) → validate_deps returns 1"
+fi
+
+echo "--- 7b: prefix ref cycle → validate_deps returns 1 ---"
+planner_state_init "INIT-RVPFX" "replan deps prefix"
+_rv_spec INIT-RVPFX exc-1-ingest 'feature blocked-by:exc-2'
+_rv_spec INIT-RVPFX exc-2-report 'feature blocked-by:exc-1'
+if planner_replan_validate_deps "INIT-RVPFX" 2>/dev/null; then
+  fail "prefix-ref cycle detected" "validate_deps returned 0"
+else
+  pass "prefix refs resolve to sibling slugs → cycle detected"
+fi
+
+echo "--- 7c: acyclic chain + external ref → validate_deps returns 0 ---"
+planner_state_init "INIT-RVOK" "replan deps ok"
+_rv_spec INIT-RVOK a-model 'feature blocked-by:WIL-83'
+_rv_spec INIT-RVOK b-service '`feature` `blocked-by:a-model`'
+_rv_spec INIT-RVOK c-ui 'planned, feature, blocked-by:b-service, blocked-by:a-model'
+if planner_replan_validate_deps "INIT-RVOK" 2>/dev/null; then
+  pass "acyclic chain with external ref → validate_deps returns 0"
+else
+  fail "acyclic chain with external ref" "validate_deps returned non-zero"
+fi
+
+echo "--- 7c2: edge set equals the TicketGen reader's (sibling + external) ---"
+got=$(planner_replan_deps_json "INIT-RVOK" 2>/dev/null || echo "ERR")
+want='{"a-model":["WIL-83"],"b-service":["a-model"],"c-ui":["b-service","a-model"]}'
+if [ "$(jq -cS . <<<"$got" 2>/dev/null)" = "$(jq -cS . <<<"$want")" ]; then
+  pass "replan deps graph = $want"
+else
+  fail "replan deps graph" "got $got"
+fi
+
+echo "--- 7d: no specs dir → validate_deps returns 0 ---"
+planner_state_init "INIT-RVNONE" "replan deps none"
+if planner_replan_validate_deps "INIT-RVNONE" 2>/dev/null; then
+  pass "no specs → validate_deps returns 0"
+else
+  fail "no specs → validate_deps returns 0" "returned non-zero"
 fi
 
 echo ""
