@@ -19,7 +19,7 @@ ticket-planner/
   agents/draft-revise-agent.md    # Tool-limited (Read, Write) spec revise agent — draft readiness gate
   agents/goldfish-review-agent.md # Tool-limited (Read, Grep, Glob, Write) context-withheld reviewer — goldfish lens
   lib/                            # Shared bash libraries (54 files)
-  lib/tests/                      # Test suites (87 files; corpus/ holds scrubbed real planner output, seam-bash-derives — scrubbed by scripts/corpus-scrub.sh, checked by test-corpus-privacy.sh)
+  lib/tests/                      # Test suites (87 files; corpus/ holds scrubbed real planner output, seam-bash-derives — scrubbed by scripts/corpus-scrub.sh, checked by test-corpus-privacy.sh; private names come from the local, uncommitted ~/.config/claude-plugins/corpus-private-names)
   docs/                           # Architecture and reference docs
   README.md                       # Marketplace entry point
   plugin-overview.md              # Maintainer-facing design doc
