@@ -707,6 +707,11 @@ if need "$name" planner_params_prompt_rules planner_ownership_prompt_rules plann
   # The sibling rules (rehearsal F38/F43, test-planner-sibling-rules.sh) came
   # after every capture below: strip them first so the earlier pins hold.
   sp=$(_strip_inserted_blocks "$sp" "inline:"$'\n\n'"$(planner_sibling_blocker_rule)" "$(planner_sibling_citation_rule)")
+  # The code-span self-lint (rehearsal F53) came after the sibling rules:
+  # strip its two command lines and its note the same way.
+  sp=$(_strip_inserted_blocks "$sp" \
+    "inline:"$'source "${CLAUDE_PLUGIN_ROOT}/lib/planner-crosscheck-codespan.sh"\nplanner_crosscheck_codespan "INIT-TEST"\n' \
+    "inline:"$'\nA `CODE_SPAN_EDGE_SPACE` line means an inline code value starts and ends\nwith a space, which markdown drops: quote the value inside the span\n(`"  a b "`) so the spaces a test depends on survive.\n')
   own_specify_blocks
   acpre_specify_blocks
   st=$(_strip_inserted_blocks "$sp" "$(planner_params_prompt_rules)" "$SPECIFY_BULLET" "${ACPRE_BLOCKS[@]}" "${OWN_BLOCKS[@]}")
