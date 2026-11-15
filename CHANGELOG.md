@@ -47,6 +47,20 @@ marketplace. Where a release also moved `ticket-planner`, `fleet-controller`, or
   through the real readers, with a privacy grep. Openspec change `seam-bash-derives`
   plans the next slices.
 
+## ticket-planner 0.43.7 (2026-11-15) — replan reads real dependency edges
+
+- **`planner_replan_validate_deps` now sees the dependencies specs actually write.**
+  It parsed `blocked-by:{X}` (braces), but Specify writes `blocked-by:<slug>` on the
+  `## Labels` line — no braces, optionally backticked, space- or comma-separated. The
+  sed matched nothing, so the whole Labels line became one "target", the graph was
+  nonsense and the post-replan cycle check could never fire. It also sourced its cycle
+  checker relative to the caller's working directory. The new
+  `planner_replan_deps_json <id>` reads the graph through `planner_ticketgen_deps_json`,
+  the reader TicketGen orders by and Crosscheck's `DEPENDENCY_CYCLE` uses, so replan
+  now gets sibling-prefix resolution, external tracker ids and both sidecars'
+  (test-data synthesis, ownership) edges too. Libraries resolve from the lib's own
+  directory. `planner_replan_validate_deps` has no caller yet, so nothing else changes.
+
 ## ticket-planner 0.43.6 (2026-11-15) — dispatch-rehearsal iteration 09 finding
 
 - **Draft gate: an `INTENT_AC_MISMATCH` on one criterion gets a revise round (F62).**

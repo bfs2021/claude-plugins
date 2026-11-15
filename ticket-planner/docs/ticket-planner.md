@@ -446,8 +446,8 @@ cycle through a sidecar edge (consumer → TD spec, or reader → writer from
 `## Labels` blocked-by, the test-data synthesis edges in `artifacts/testdata-synth.json` and
 the ownership edges in `artifacts/ownership-edges.json`.
 
-`planner_replan_validate_deps` (re-planning) still sees `## Labels` refs only, not either
-sidecar. That gap predates the ownership edges.
+`planner_replan_validate_deps` (re-planning) reads the same graph through
+`planner_replan_deps_json`, so it sees `## Labels` refs and both sidecars' edges.
 
 ### Cross-initiative prerequisites
 
