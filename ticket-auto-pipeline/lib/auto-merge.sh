@@ -22,8 +22,9 @@
 #      an unset AUTONOMY never auto-merges from the router.
 #   2. COMPLEXITY must be `simple`.
 #   3. The latest META|outcome-label|info| must read `Smooth`.
-#   3b. The latest PR-REVIEW|pr-review terminal must be done|OK
-#      (PR_REVIEW_NOT_OK) — the verdict bash routed from PHASE_RESULT.
+#   3b. The latest PR-REVIEW|pr-review terminal must be done|OK, AND
+#      phase-route.sh, re-run here on the log, must route OK from a parsed
+#      PHASE_RESULT (not no-diff, not missing) — PR_REVIEW_NOT_OK.
 #   4. A PR number must be recorded (PR-REVIEW|checkout-pr|done|<n>), and the
 #      whole message must be that number (`#<n>` tolerated) — PR_NUMBER_INVALID.
 #      The ticket branch must be recorded (META|branch-context ticket=, else
@@ -181,6 +182,17 @@ main() {
     return 3
     ;;
   esac
+  # …and the route itself is re-derived here rather than trusted from that
+  # line: OK from a parsed PHASE_RESULT only. A no-diff route has no PR to
+  # merge, and any other source is not a review verdict.
+  local route=""
+  # shellcheck source=phase-route.sh
+  source "$_AM_DIR/phase-route.sh" 2>/dev/null && route=$(phase_route PR-REVIEW "$_AM_LOG" 2>/dev/null) || route=""
+  if ! grep -qx 'ROUTE_VERDICT=OK' <<<"$route" || ! grep -qx 'ROUTE_SOURCE=phase-result' <<<"$route"; then
+    _am_log skip "PR_REVIEW_NOT_OK: PR review route is not OK from a parsed PHASE_RESULT ($(sed -n 's/^ROUTE_SOURCE=//p' <<<"$route")), not auto-merging"
+    _am_out skipped "PR review route is not OK"
+    return 3
+  fi
 
   # 4. PR number — resolved BEFORE the integration guard. The checkout-pr
   # line is agent-written, so its whole message must be the number (an

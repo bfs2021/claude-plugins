@@ -1259,9 +1259,11 @@ spawn_agent_post() {
   # reading of the agent's prose. The router's own claim may only be the more
   # conservative one: bash downgrades it (logging META|route-override), never
   # upgrades it. A missing or invalid PHASE_RESULT routes VERIFY to FAIL and
-  # PR-REVIEW to BLOCK. Manual-router path only — fleetd calls
-  # phase_terminal_write directly with its own classify_phase outcome.
-  if [ "$LOOP_BEARING" = "true" ] && [ -n "${LOG_FILE:-}" ]; then
+  # PR-REVIEW to BLOCK. Keyed on PHASE/STEP alone — never on a flag the
+  # router passes, so the router cannot opt out. Manual-router path only —
+  # fleetd calls phase_terminal_write directly with its own classify_phase
+  # outcome.
+  if [ -n "${LOG_FILE:-}" ]; then
     _spawn_route_enforce
   fi
 

@@ -168,8 +168,16 @@ _rs_post_spawn() {
   local _capture="./logs/${_rs_tid}-${_rs_phase_lower}-agent.log"
   case "$_rs_phase" in
   IMPLEMENT | VERIFY | PR-REVIEW)
-    # Advisory, observe-only: exit 1 (absent/malformed block →
-    # claimed_verdict=UNKNOWN) is normal and nothing routes on it.
+    # VERIFY / PR-REVIEW route on the parser's record (phase-route.sh). The
+    # agent has returned and can no longer write the log, so this anchor
+    # marks where bash's own lines begin: phase-route.sh reads only the
+    # first record after the last anchor, never a line the agent wrote.
+    case "$_rs_phase" in
+    VERIFY | PR-REVIEW) _rs_plog META phase-route-anchor info "$_rs_phase attempt=${_rs_attempt:-1}" ;;
+    esac
+    # Exit 1 (absent/malformed block → claimed_verdict=UNKNOWN) is normal.
+    # IMPLEMENT: advisory. VERIFY / PR-REVIEW: routed by phase-route.sh; an
+    # exit 2 (nothing logged) leaves no record after the anchor → no verdict.
     bash "$_RS_DIR/phase-result-parse.sh" --phase "$_rs_phase" \
       --return-file "$_capture" \
       --log-file "$_rs_log_file" >/dev/null 2>&1 || true
@@ -177,7 +185,7 @@ _rs_post_spawn() {
   esac
 
   if [ "$_rs_phase" = VERIFY ]; then
-    # Advisory, observe-only: never gates, never halts on a mismatch.
+    # Never halts; an optimistic delta on fresh evidence fails the route.
     bash "$_RS_DIR/verdict-recompute.sh" --phase VERIFY \
       --return-file "$_capture" \
       --ticket-dir "$_rs_ticket_dir" \

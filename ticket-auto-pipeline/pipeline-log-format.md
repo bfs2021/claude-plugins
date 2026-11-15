@@ -102,11 +102,16 @@ mapping — it is the one place their vocabularies diverge.
 bracket's `META|phase-result` record (and, for VERIFY, a contradicting `META|claim-delta` on
 fresh evidence) with the table above, and `router-step.sh post-spawn` prints it as
 `ROUTE_RESULT`/`ROUTE_VERDICT`/`ROUTE_SOURCE`. A missing or invalid block is VERIFY `fail`/`FAIL`
-and PR-REVIEW `done`/`BLOCK`. `spawn_agent_post` (with `LOOP_BEARING=true`) enforces it: when
-the router's claim is less conservative than the route it writes
+and PR-REVIEW `done`/`BLOCK`. Because the agent writes this log during its own bracket, post-spawn
+first writes `META|phase-route-anchor|info|<PHASE> attempt=<n>` (after the agent returned), and
+only the first `META|phase-result` (and `META|claim-delta`) after the last anchor counts — a
+record the agent wrote itself never does. `spawn_agent_post` enforces the route for every
+VERIFY `verify` / PR-REVIEW `pr-review` terminal, whatever flags the router passes: when the
+router's claim is less conservative it writes
 `META|route-override|warn|<PHASE>: router claimed <R>/<V>, PHASE_RESULT routes <R>/<V> (<source>)`
 and the routed values instead. It never upgrades a router FAIL/WARN/BLOCK. `auto-merge.sh`
-merges only after a `PR-REVIEW|pr-review|done|OK` terminal.
+merges only after a `PR-REVIEW|pr-review|done|OK` terminal AND its own re-run of `phase-route.sh`
+routes OK from a parsed PHASE_RESULT (a `no-diff` route has no PR and never merges).
 
 Example:
 

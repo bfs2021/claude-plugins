@@ -41,7 +41,10 @@ _setup() {
   cat >"$_ws/log" <<'EOF'
 2026-10-01T00:00:00Z|META|branch-context|info|base=develop;integration=;source=default;ticket=feat/cre-2;uat-policy=per-ticket;merge-policy=
 2026-10-01T00:00:00Z|META|outcome-label|info|Smooth
+2026-10-01T00:00:01Z|PR-REVIEW|pr-review|waiting|Agent launched — Review the PR
 2026-10-01T00:00:01Z|PR-REVIEW|checkout-pr|done|12
+2026-10-01T00:00:02Z|META|phase-route-anchor|info|PR-REVIEW attempt=1
+2026-10-01T00:00:02Z|META|phase-result|info|{"phase":"PR-REVIEW","claimed_verdict":"PASS","parse_status":"ok"}
 2026-10-01T00:00:02Z|PR-REVIEW|pr-review|done|OK — Verdict: all requirements addressed
 EOF
   : >"$_ws/env.sh"
@@ -323,6 +326,39 @@ test_pr_review_warn_refuses() {
   [ "$ok" = 1 ]
 }
 
+# Must-fail: a done|OK terminal written by anyone (router skipping
+# enforcement, an agent) does not merge when the parser's record says BLOCK.
+test_ok_terminal_with_block_record_refuses() {
+  _setup
+  sed -i 's/"claimed_verdict":"PASS"/"claimed_verdict":"BLOCK"/' "$_ws/log"
+  _am
+  local ok=1
+  [ "$_rc" = 3 ] && ! _merged && grep -q 'PR_REVIEW_NOT_OK' "$_ws/log" || ok=0
+  _teardown
+  [ "$ok" = 1 ]
+}
+
+# Must-fail: a no-diff route never merges (there is no PR of its own).
+test_no_diff_route_refuses() {
+  _setup
+  cat >"$_ws/log" <<'EOF'
+2026-10-01T00:00:00Z|META|branch-context|info|base=develop;integration=;source=default;ticket=feat/cre-2;uat-policy=per-ticket;merge-policy=
+2026-10-01T00:00:00Z|META|outcome-label|info|Smooth
+2026-10-01T00:00:00Z|IMPLEMENT|implement|waiting|Agent launched
+2026-10-01T00:00:00Z|IMPLEMENT|commit-push|skip|no diff
+2026-10-01T00:00:01Z|PR-REVIEW|pr-review|waiting|Agent launched — Review the PR
+2026-10-01T00:00:01Z|PR-REVIEW|pr-review|done|N/A — no PR
+2026-10-01T00:00:02Z|META|phase-route-anchor|info|PR-REVIEW attempt=1
+2026-10-01T00:00:02Z|META|phase-result|info|{"phase":"PR-REVIEW","claimed_verdict":"UNKNOWN","parse_status":"absent"}
+2026-10-01T00:00:02Z|PR-REVIEW|pr-review|done|OK — no diff
+EOF
+  _am
+  local ok=1
+  [ "$_rc" = 3 ] && ! grep -q '^pr ' "$_ws/gh.calls" && grep -q 'PR_REVIEW_NOT_OK' "$_ws/log" || ok=0
+  _teardown
+  [ "$ok" = 1 ]
+}
+
 test_no_pr_review_terminal_refuses() {
   _setup
   grep -v '|PR-REVIEW|pr-review|' "$_ws/log" >"$_ws/log.new" && mv "$_ws/log.new" "$_ws/log"
@@ -371,6 +407,8 @@ _run "unreadable head ref without integration branch refuses" test_gh_view_failu
 _run "PR-REVIEW BLOCK terminal refuses" test_pr_review_block_refuses
 _run "PR-REVIEW WARN terminal refuses" test_pr_review_warn_refuses
 _run "no PR-REVIEW terminal refuses" test_no_pr_review_terminal_refuses
+_run "done|OK terminal with a BLOCK record refuses" test_ok_terminal_with_block_record_refuses
+_run "no-diff route refuses" test_no_diff_route_refuses
 _run "usage error rc 2" test_usage_rc2
 _run "router delegates to auto-merge.sh" test_router_delegates_to_script
 

@@ -1020,6 +1020,13 @@ STEP=verify
 TICKET_ID=TEST-VERDICT1
 LOG_FILE=$log_file
 META
+  # A VERIFY PASS terminal needs bash's own parsed PASS record (seam audit
+  # Track 0.2): the bracket, post-spawn's anchor, the parser's record.
+  cat >"$log_file" <<'LOGEOF'
+2026-11-15T10:00:00Z|VERIFY|verify|waiting|Agent launched
+2026-11-15T10:00:01Z|META|phase-route-anchor|info|VERIFY attempt=1
+2026-11-15T10:00:01Z|META|phase-result|info|{"phase":"VERIFY","claimed_verdict":"PASS","parse_status":"ok"}
+LOGEOF
   source "$LIB_DIR/spawn-helper.sh"
   spawn_agent_post TICKET_ID=TEST-VERDICT1 RESULT=done VERDICT=PASS MSG="3/3 criteria met" >/dev/null 2>&1
   local rc=$?
