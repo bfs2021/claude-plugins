@@ -411,6 +411,7 @@ test-grill:
 	bash grill-me/lib/tests/test-grill-render.sh
 	bash grill-me/lib/tests/test-grill-hold.sh
 	bash grill-me/lib/tests/test-grill-telemetry.sh
+	bash grill-me/lib/tests/test-grill-skill-sources.sh
 
 test-flow:
 	@echo "=== ticket-flow tests ==="

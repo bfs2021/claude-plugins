@@ -89,7 +89,7 @@ eq "round 2: message counted once, answer wait measured" "$(echo "$r2" | jq -c '
 
 DOC="$SCRATCH/intent.md"
 grill_render "$WD/result.json" "$WD/assessment.json" "$DOC" >/dev/null 2>&1
-grill_seal_generate "$DOC" product-idea "$(jq -r .readiness "$WD/result.json")" "$(jq -r .recommendation "$WD/result.json")" 2 2026-11-01T10:04:40Z >/dev/null 2>&1
+grill_seal_generate "$DOC" "$WD" >/dev/null 2>&1
 eq "seal noted on the open session" "$(jq -r '.sealed' "$WD/telemetry/open.json")" "$DOC"
 
 echo '{"session_id":"g-sess","hook_event_name":"Stop"}' | GRILL_TELEMETRY_NOW=2026-11-01T10:05:00Z bash "$HOOK"

@@ -1,6 +1,6 @@
 # grill-me — Architecture
 
-Pre-work readiness gate. Assesses an input against a profile-driven dimension model, scores it deterministically in bash, and produces a cryptographically sealed Validated Business Intent document.
+Pre-work readiness gate. Assesses an input against a profile-driven dimension model, scores it deterministically in bash, and produces a tamper-evident sealed Validated Business Intent document.
 
 ## Profile model
 

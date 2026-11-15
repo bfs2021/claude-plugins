@@ -215,6 +215,7 @@ python3 -m pytest fleet-controller/fleetd/tests/test_worker_telemetry_env.py -v	
 python3 -m pytest ticket-auto-pipeline/skills/ticket-auto/tests/test_dashboard_fleet.py -v	0.5
 bash grill-me/lib/tests/test-grill-profile.sh	0.4
 bash grill-me/lib/tests/test-grill-seal.sh	0.4
+bash grill-me/lib/tests/test-grill-skill-sources.sh	0.3
 bash ticket-auto-pipeline/lib/tests/test-implement-diff-check.sh	0.4
 bash ticket-auto-pipeline/lib/tests/test-inspect-verifiers.sh	0.4
 bash ticket-auto-pipeline/lib/tests/test-linear-api-audit.sh	0.4

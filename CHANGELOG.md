@@ -17,6 +17,27 @@ marketplace. Where a release also moved `ticket-planner`, `fleet-controller`, or
 > - **0.19.0 never existed.** `plugin.json` went 0.18.0 → 0.20.0. The Phase 2
 >   commit message claims `0.19.0→0.20.0`, but no 0.19.0 was ever committed.
 
+## grill-me 0.7.0 (2026-11-15) — seam-bash-derives slice 4: the seal reads result.json
+
+- **The agent passes no seal value (seam audit, grill row G4).** `grill_seal_generate` took
+  readiness, recommendation, round and profile as arguments the agent copied from
+  `grill_score`'s stdout, so a stale round's numbers, a typo, or `ready` after a
+  `seal-with-gaps` downgrade sealed as VALID. It is now `grill_seal_generate <doc> <work_dir>`
+  and reads all four from `<work_dir>/result.json`; Generated is stamped in bash. A missing,
+  unparseable or out-of-contract `result.json` (profile id, integer readiness 0–100, known
+  recommendation, round ≥ 1), or an `assessment.json` at a different round (re-assessed, not
+  re-scored), refuses with the document untouched. The old six-argument call is refused too.
+- **One entry lib (rehearsal F68).** SKILL.md told the agent to source only
+  `lib/grill-hold.sh`, which defines none of the profile, input, score, render or seal
+  functions: a headless agent hit `grill_profile_load: command not found` and sourced every
+  lib itself. New `lib/grill.sh` sources the six libs from its own directory; SKILL.md
+  sources it in Step W. `test-grill-skill-sources.sh` sources exactly SKILL.md's documented
+  line in a clean shell and checks every `grill_*` name SKILL.md mentions is defined.
+- **Wording.** The seal is called tamper-evident, not "cryptographically sealed", in the
+  skill, manifests, READMEs and CLAUDE.md files: the hash is unkeyed SHA-256.
+- The verifier is unchanged: a seal written by 0.6.0 (`lib/tests/fixtures/sealed-intent-v0.6.0.md`)
+  verifies VALID. ticket-planner's intent-gate test seals through the new call.
+
 ## 0.119.0 / ticket-planner 0.46.0 (2026-11-15) — seam-bash-derives slice 3: TICKET and BODY_HASH stamped by bash
 
 - **The DoR semantic evaluator copies no identity field (seam audit, draft gate row 7).**
