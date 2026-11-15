@@ -17,6 +17,36 @@ marketplace. Where a release also moved `ticket-planner`, `fleet-controller`, or
 > - **0.19.0 never existed.** `plugin.json` went 0.18.0 → 0.20.0. The Phase 2
 >   commit message claims `0.19.0→0.20.0`, but no 0.19.0 was ever committed.
 
+## 0.118.0 (2026-11-15) — seam audit Track 0: ticket-auto fails closed on unreadable model text
+
+- **Auto-merge identity (0.1).** `auto-merge.sh` merges only when the `checkout-pr`
+  message is exactly a PR number (`#12` tolerated), the ticket branch is recorded
+  (`META|branch-context` `ticket=`), and the PR's head ref is readable, not the
+  integration branch and equal to that ticket branch. New skip codes
+  `PR_NUMBER_INVALID`, `TICKET_BRANCH_UNRECORDED`, `PR_HEAD_MISMATCH`; the head ref is
+  now read on every merge, not only with an integration branch.
+- **Outcome prose only withholds (0.1).** Without the dedicated
+  `IMPLEMENT|implement-outcome` line, `outcome-label-check.sh` recovers the worst of
+  Hard/Rough from the implement agent's prose and never Smooth, so a self-grade cannot
+  unlock auto-merge.
+- **VERIFY / PR-REVIEW route on the parsed PHASE_RESULT (0.2).** New
+  `lib/phase-route.sh`. `router-step.sh post-spawn` writes a `META|phase-route-anchor`
+  after the agent returns and prints `ROUTE_RESULT`/`ROUTE_VERDICT`/`ROUTE_SOURCE` from
+  the parser's first record after it; an agent-written record never counts. Missing or
+  invalid → VERIFY FAIL, PR-REVIEW BLOCK; an optimistic claim-delta on fresh evidence →
+  FAIL. `spawn_agent_post` enforces the route on every VERIFY/PR-REVIEW verdict terminal
+  (downgrade only, `META|route-override|warn|`), and `auto-merge.sh` re-runs it and needs
+  OK from a parsed record (`PR_REVIEW_NOT_OK`). The PR-REVIEW no-diff exemption needs an
+  absent block, a commit-push skip in the current implement attempt and no recorded PR.
+- **Entry gate (0.3).** ticket-critique now has `critique-status.sh` write
+  `critique-result.txt`; the gate combines it strictly with notes.md (stricter status,
+  lower score, higher BLOCKER count; TICKET must match), reads notes.md
+  case-insensitively, and gate-stops `CRITIQUE_STATUS_MISSING` on an unreadable status.
+  A missing complexity or artifact type gate-stops `COMPLEXITY_MISSING` /
+  `ARTIFACT_TYPE_MISSING` instead of defaulting to `simple`. The Verification Plan
+  table vouches for a prerequisite only when every verifiable row fills that column.
+  A policy auto-approve holds on any open `[needs-human]` question.
+
 ## ticket-planner 0.43.6 (2026-11-15) — dispatch-rehearsal iteration 09 finding
 
 - **Draft gate: an `INTENT_AC_MISMATCH` on one criterion gets a revise round (F62).**
