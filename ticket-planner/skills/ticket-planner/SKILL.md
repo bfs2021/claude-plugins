@@ -678,12 +678,12 @@ For each phase to run:
 
 4. **Wait for the agent** to complete. The agent writes state log entries itself.
 
-4a. **ADR gate halt bridge (adr-governance-gate).** Before step 5's retry check: a
-    blocking ADR verdict needs a human to accept or resolve the ADR out of band, so it
-    halts instead of consuming the retry budget (it is a no-op for any other phase):
+4a. **Post-agent gate.** Before step 5's retry check: after Specify bash records its
+    spec list; a blocking ADR verdict needs a human to accept the ADR out of band,
+    so it halts instead of consuming the retry budget (a no-op for other phases):
 
     ```bash
-    planner_dispatch_gate adr "$INITIATIVE_ID" "$PHASE" "$STATE_DIR" || exit $(($? == 3 ? 0 : 1))
+    planner_dispatch_gate post "$INITIATIVE_ID" "$PHASE" "$STATE_DIR" || exit $(($? == 3 ? 0 : 1))
     ```
 
 5. **Check the result.** The retry budget is derived from `fail` entries in the state

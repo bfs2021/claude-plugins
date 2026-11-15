@@ -7,6 +7,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LIB_DIR="${SCRIPT_DIR}/.."
 
 source "${LIB_DIR}/planner-crosscheck-propagation.sh"
+source "${LIB_DIR}/planner-phase-results.sh"
 
 TMPDIR=$(mktemp -d)
 trap 'rm -rf "$TMPDIR"' EXIT
@@ -317,7 +318,10 @@ fi
 # planner_crosscheck_carve_scope
 # ═══════════════════════════════════════════════════════════════════════════
 
-echo "--- ticket count mismatch is CARVE_SCOPE_LOST ---"
+# carve_scope compares the slugs bash recorded at Specify end
+# (phase-results/specify.json) with the specs on disk — never a count from a
+# status line (seam-bash-derives, rehearsal F67). Corpus replays of the real
+# iter-10 shape are in test-planner-corpus.sh.
 SPECS8="${TMPDIR}/specs8"
 mkdir -p "$SPECS8"
 cat >"${SPECS8}/a.md" <<'EOF'
@@ -328,40 +332,33 @@ cat >"${SPECS8}/b.md" <<'EOF'
 ## Title
 B
 EOF
-LOG8="${TMPDIR}/state8.log"
-cat >"$LOG8" <<'EOF'
-1
-2026-08-31T10:00:00Z|Specify|synthesize|start|Synthesizing proposal and writing specs for 4 tickets
-2026-08-31T10:05:00Z|Specify|synthesize|done|Proposal written, 4 ticket specs in artifacts/specs/
-EOF
+RESULT8="${TMPDIR}/specify8.json"
 
-OUT=$(planner_crosscheck_carve_scope "$LOG8" "$SPECS8" 2>&1)
+echo "--- recorded slugs equal to the specs on disk pass ---"
+echo '{"version":1,"phase":"Specify","derived_by":"bash","specify_done":"t","specs":["a","b"],"count":2}' >"$RESULT8"
+if planner_crosscheck_carve_scope "$RESULT8" "$SPECS8" >/tmp/pp-out-9.txt 2>&1; then
+  pass "matching slugs pass"
+else
+  fail "matching slugs pass" "$(cat /tmp/pp-out-9.txt)"
+fi
+
+echo "--- a recorded slug missing on disk is CARVE_SCOPE_LOST ---"
+echo '{"version":1,"phase":"Specify","derived_by":"bash","specify_done":"t","specs":["a","b","c"],"count":3}' >"$RESULT8"
+OUT=$(planner_crosscheck_carve_scope "$RESULT8" "$SPECS8" 2>&1)
 RC=$?
-if [ "$RC" -ne 0 ] && grep -q "CARVE_SCOPE_LOST" <<<"$OUT"; then
-  pass "ticket count mismatch reports CARVE_SCOPE_LOST"
+if [ "$RC" -ne 0 ] && grep -q "CARVE_SCOPE_LOST .*missing: c" <<<"$OUT"; then
+  pass "lost spec reports CARVE_SCOPE_LOST naming it"
 else
-  fail "ticket count mismatch reports CARVE_SCOPE_LOST" "$OUT"
+  fail "lost spec reports CARVE_SCOPE_LOST naming it" "$OUT"
 fi
 
-echo "--- matching ticket count passes ---"
-LOG9="${TMPDIR}/state9.log"
-cat >"$LOG9" <<'EOF'
-1
-2026-08-31T10:00:00Z|Specify|synthesize|start|Synthesizing proposal and writing specs for 2 tickets
-2026-08-31T10:05:00Z|Specify|synthesize|done|Proposal written, 2 ticket specs in artifacts/specs/
-EOF
-
-if planner_crosscheck_carve_scope "$LOG9" "$SPECS8" >/tmp/pp-out-9.txt 2>&1; then
-  pass "matching ticket count passes"
+echo "--- a missing record is CHECK_ERRORED, never a pass ---"
+OUT=$(planner_crosscheck_carve_scope "${TMPDIR}/does-not-exist.json" "$SPECS8" 2>&1)
+RC=$?
+if [ "$RC" -ne 0 ] && grep -q "CHECK_ERRORED carve_scope" <<<"$OUT"; then
+  pass "missing record fails closed"
 else
-  fail "matching ticket count passes" "$(cat /tmp/pp-out-9.txt)"
-fi
-
-echo "--- missing state log is a clean no-op (nothing to compare) ---"
-if planner_crosscheck_carve_scope "${TMPDIR}/does-not-exist.log" "$SPECS8" >/tmp/pp-out-10.txt 2>&1; then
-  pass "missing state log is a clean no-op"
-else
-  fail "missing state log is a clean no-op" "$(cat /tmp/pp-out-10.txt)"
+  fail "missing record fails closed" "$OUT"
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -379,9 +376,10 @@ cp "${SPECS1}/vs-2.md" "${ARTIFACTS_DIR}/specs/vs-2.md"
 cp "$CONSENSUS1" "${ARTIFACTS_DIR}/consensus.md"
 cat >"${REPOS_ROOT}/.ticket-auto/initiatives/${INIT_ID}/state.log" <<'EOF'
 1
-2026-08-31T10:00:00Z|Specify|synthesize|start|Synthesizing proposal and writing specs for 2 tickets
-2026-08-31T10:05:00Z|Specify|synthesize|done|Proposal written, 2 ticket specs in artifacts/specs/
+2026-08-31T10:00:00Z|Specify|synthesize|start|Synthesizing proposal and writing ticket specs
+2026-08-31T10:05:00Z|Specify|synthesize|done|Proposal and ticket specs written
 EOF
+planner_specify_result_ensure "$INIT_ID"
 
 if planner_crosscheck_propagation "$INIT_ID" >/tmp/pp-out-11.txt 2>&1; then
   pass "clean initiative sweep passes all three checks"

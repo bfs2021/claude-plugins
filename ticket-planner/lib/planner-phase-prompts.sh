@@ -672,7 +672,7 @@ $(_planner_prompt_repos_root_export)
 source "\${CLAUDE_PLUGIN_ROOT}/lib/planner-state.sh"
 planner_state_write "${initiative_id}" "Discovery" "explore" "start" "Exploring affected repositories"
 # ... do your work, including the repo-ref writes above ...
-planner_state_write "${initiative_id}" "Discovery" "explore" "done" "Discovery report: N services, M symbols resolved"
+planner_state_write "${initiative_id}" "Discovery" "explore" "done" "Discovery report written to artifacts/discovery.md"
 \`\`\`
 
 On failure, write \`fail\` instead of \`done\`.
@@ -1254,9 +1254,9 @@ fi
 export CLAUDE_PLUGIN_ROOT
 $(_planner_prompt_repos_root_export)
 source "\${CLAUDE_PLUGIN_ROOT}/lib/planner-state.sh"
-planner_state_write "${initiative_id}" "Specify" "synthesize" "start" "Synthesizing proposal and writing specs for N tickets"
+planner_state_write "${initiative_id}" "Specify" "synthesize" "start" "Synthesizing proposal and writing ticket specs"
 # ... do your work, then self-lint per Part 4 ...
-planner_state_write "${initiative_id}" "Specify" "synthesize" "done" "Proposal written, N ticket specs in artifacts/specs/, self-lint clean"
+planner_state_write "${initiative_id}" "Specify" "synthesize" "done" "Proposal and ticket specs written to artifacts/specs/, self-lint clean"
 \`\`\`
 
 On failure, write \`fail\` instead of \`done\`.
@@ -1347,8 +1347,7 @@ $(_planner_prompt_repos_root_export)
 source "\${CLAUDE_PLUGIN_ROOT}/lib/planner-state.sh"
 planner_state_write "${initiative_id}" "Review" "critique" "start" "Critiquing proposal for gaps and risks"
 # ... do your work ...
-severity_counts="\$(grep -c 'blocker' artifacts/review.md || true) blockers, ..."
-planner_state_write "${initiative_id}" "Review" "critique" "done" "Review complete: \${severity_counts}"
+planner_state_write "${initiative_id}" "Review" "critique" "done" "Review written to artifacts/review.md"
 \`\`\`
 
 On failure, write \`fail\` instead of \`done\`.
@@ -1477,9 +1476,9 @@ fi
 export CLAUDE_PLUGIN_ROOT
 $(_planner_prompt_repos_root_export)
 source "\${CLAUDE_PLUGIN_ROOT}/lib/planner-state.sh"
-planner_state_write "${initiative_id}" "Consensus" "resolve" "start" "Resolving N review findings"
+planner_state_write "${initiative_id}" "Consensus" "resolve" "start" "Resolving review findings"
 # ... do your work ...
-planner_state_write "${initiative_id}" "Consensus" "resolve" "done" "Consensus: X accepted, Y rejected, Z deferred"
+planner_state_write "${initiative_id}" "Consensus" "resolve" "done" "Consensus written to artifacts/consensus.md"
 \`\`\`
 
 On failure, write \`fail\` instead of \`done\`.

@@ -337,6 +337,7 @@ test-planner:
 	bash ticket-planner/lib/tests/test-planner-crosscheck-repo-ref.sh
 	bash ticket-planner/lib/tests/test-planner-base-branch.sh
 	bash ticket-planner/lib/tests/test-planner-crosscheck-propagation.sh
+	bash ticket-planner/lib/tests/test-planner-corpus.sh
 	bash ticket-planner/lib/tests/test-planner-crosscheck-bypass.sh
 	bash ticket-planner/lib/tests/test-planner-crosscheck-contracts.sh
 	bash ticket-planner/lib/tests/test-planner-crosscheck-signals.sh
