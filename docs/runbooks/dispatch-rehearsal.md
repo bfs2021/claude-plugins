@@ -33,6 +33,7 @@ Without these rules, the loop converges by making the input easier or the gates 
   - add a fixture for the false positive;
   - keep `ticket-auto-pipeline/lib/tests/fixtures/dor/20-28` failing with the same codes;
   - be reviewed by a separate reviewer agent before commit.
+  These rules also cover the seam plan's gate-policy work (next.md Step 19, G4–G6): demotions, Refinement parity and the DoR-evaluator retry.
 - **Negative control, every iteration.** Copy a passing child body and remove one `Source:` line or the Test User credentials. Then confirm `check_ticket_ready` or `check_planned_body` fails on the copy.
 - **The clean counter resets to 0** on any code or gate commit.
 - **Never** hand-edit a generated ticket, `body.md` or manifest. Never waive a code to get a pass.
@@ -102,9 +103,18 @@ The idea passes after **two fresh full runs in a row**, after the last code chan
   - `blocked-edges` is clean;
 - the negative control failed as expected.
 
+Warnings count too (added 2026-11-15, seam plan G7):
+
+- Every warning a gate raised is listed in `run-record.md` with a label: `true` (a real plan gap), `false` (the check was wrong) or `debatable`.
+- An independent reviewer agent, which did not run the iteration, checks the labels.
+- A run is not clean if it has a `debatable` label, an unlabelled warning, or a warning labelled `true` on a code of a blocking class. The last two are leaks: a gate let a real problem through.
+- A ticket the semantic evaluator did not evaluate never counts toward a clean run.
+- Report the run's total warnings and unevaluated tickets in `run-record.md`.
+- Any change to a gate's policy (block, warn, demote) resets the clean-run counter, the same as a code change.
+
 Then run the holdout idea once. A class B or C failure there means the fixes overfit to the main idea. Report it; don't loop on it.
 
-**Cap:** 10 full runs per idea (raised from 6 on 2026-11-07, because a late failure at 6 would have left no room for the two consecutive clean runs above). Preflight-only and `replan` reruns don't count toward the cap. At the cap, stop and report what remains.
+**Cap:** 15 full runs per idea (raised from 6 on 2026-11-07 and from 10 on 2026-11-15, because a late failure would have left no room for the two consecutive clean runs above). Preflight-only and `replan` reruns don't count toward the cap. At the cap, stop and report what remains.
 
 ## 6. Cleanup
 
