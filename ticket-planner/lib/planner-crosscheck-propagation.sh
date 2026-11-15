@@ -38,16 +38,24 @@
 #   spec. Code: FORWARD_REF_UNFULFILLED.
 #
 #   planner_crosscheck_carve_scope — detection only (see header note above): if
-#   the ticket count Specify declared in state.log ("...for N tickets") doesn't
-#   match the actual spec file count, a carve or drop happened after Specify
-#   and needs a human scope audit — this script cannot reconstruct the
-#   pre-carve proposal to diff automatically. Code: CARVE_SCOPE_LOST.
+#   the spec slugs bash recorded when Specify finished
+#   (artifacts/phase-results/specify.json) differ from the specs on disk, a
+#   carve, drop or split happened after Specify and needs a human scope audit —
+#   this script cannot reconstruct the pre-carve proposal to diff
+#   automatically. Code: CARVE_SCOPE_LOST; no readable record fails closed
+#   with CHECK_ERRORED (seam-bash-derives).
 #
 # Usage:
 #   planner_crosscheck_propagation <initiative_id>
 #     Runs all three checks. Returns 0 if clean, 1 if any finding was reported.
 #
 # Sourceable library — no set -euo pipefail.
+
+# carve_scope reads the Specify record bash writes (planner-phase-results.sh).
+if ! declare -f planner_specify_result_slugs >/dev/null 2>&1; then
+  # shellcheck source=/dev/null
+  source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/planner-phase-results.sh"
+fi
 
 # ── Config ──────────────────────────────────────────────────────────────────
 
@@ -418,40 +426,40 @@ planner_crosscheck_forward_references() {
 
 # ── Check 4: carve scope (detection only) ────────────────────────────────────
 
-# Detect a post-Specify ticket-count change. Cannot diff pre/post-carve scope
-# — see header note — this only flags that a manual scope audit is needed.
-# Usage: planner_crosscheck_carve_scope <state_log> <specs_dir>
-# Returns: 0 if clean/undetectable, 1 if a mismatch was reported.
+# Detect a spec carved, dropped or split off after Specify. Compares the slugs
+# bash recorded from disk when Specify finished (artifacts/phase-results/
+# specify.json, planner-phase-results.sh) with the specs on disk now — never a
+# count an agent typed into a status line (rehearsal F67: Specify's start line
+# guessed "7 tickets" before any spec existed, and a clean 8-spec plan was
+# blocked). It cannot diff pre/post-carve scope — see header note — so it only
+# flags that a manual scope audit is needed. TD specs Crosscheck's test-data
+# synthesis writes are not Specify's and are left out on both sides.
+#
+# A missing or unreadable record fails closed with CHECK_ERRORED: carve scope
+# was not checked, and that is never a pass.
+#
+# Usage: planner_crosscheck_carve_scope <specify_result_json> <specs_dir>
+# Returns: 0 if clean, 1 if a finding was reported.
 planner_crosscheck_carve_scope() {
-  local state_log="$1" specs_dir="$2"
-
-  [ -f "$state_log" ] || return 0
-
-  local declared_n
-  declared_n=$(grep '|Specify|synthesize|start|' "$state_log" 2>/dev/null |
-    tail -1 | grep -oE 'for [0-9]+ tickets' | grep -oE '[0-9]+')
-  [ -n "$declared_n" ] || return 0
-
-  local actual_n=0
-  if [ -d "$specs_dir" ]; then
-    local f base
-    for f in "$specs_dir"/*.md; do
-      [ -f "$f" ] || continue
-      base="$(basename "$f" .md)"
-      [ "$base" = "INDEX" ] && continue
-      # A TD spec Crosscheck's test-data synthesis wrote is not one Specify
-      # declared (planner-test-data-derivation).
-      grep -qF -- "${PLANNER_TESTDATA_SYNTH_MARKER:-<!-- planner:testdata-synth v1 -->}" "$f" 2>/dev/null && continue
-      actual_n=$((actual_n + 1))
-    done
-  fi
-
-  if [ "$declared_n" -ne "$actual_n" ]; then
-    echo "planner-crosscheck-propagation: CARVE_SCOPE_LOST Specify declared ${declared_n} tickets, ${actual_n} spec files exist — a ticket was carved or dropped after Specify; manual scope audit needed (no pre-carve proposal snapshot is retained to diff automatically)"
+  local result="$1" specs_dir="$2" recorded err
+  if ! recorded=$(planner_specify_result_slugs "$result" 2>&1); then
+    err=$(printf '%s' "$recorded" | head -1 | tr '|\r\n' '   ')
+    echo "planner-crosscheck-propagation: CHECK_ERRORED carve_scope: no readable Specify record (${err}) — bash writes it when Specify finishes; re-run Specify, or after a manual scope audit accept with --accept CHECK_ERRORED:\"<reason>\""
     return 1
   fi
 
-  return 0
+  local now lost added n_rec n_now
+  now=$(_planner_specify_slugs_on_disk "$specs_dir")
+  lost=$(LC_ALL=C comm -23 <(printf '%s\n' "$recorded" | sed '/^$/d' | LC_ALL=C sort -u) \
+    <(printf '%s\n' "$now" | sed '/^$/d' | LC_ALL=C sort -u) | paste -sd, - | sed 's/,/, /g')
+  added=$(LC_ALL=C comm -13 <(printf '%s\n' "$recorded" | sed '/^$/d' | LC_ALL=C sort -u) \
+    <(printf '%s\n' "$now" | sed '/^$/d' | LC_ALL=C sort -u) | paste -sd, - | sed 's/,/, /g')
+  [ -z "$lost" ] && [ -z "$added" ] && return 0
+
+  n_rec=$(printf '%s\n' "$recorded" | sed '/^$/d' | wc -l | tr -d ' ')
+  n_now=$(printf '%s\n' "$now" | sed '/^$/d' | wc -l | tr -d ' ')
+  echo "planner-crosscheck-propagation: CARVE_SCOPE_LOST Specify wrote ${n_rec} spec(s), ${n_now} exist now${lost:+ — missing: ${lost}}${added:+ — added: ${added}} — a ticket was carved, dropped or split after Specify; manual scope audit needed (no pre-carve proposal snapshot is retained to diff automatically)"
+  return 1
 }
 
 # ── Public entry point ────────────────────────────────────────────────────────
@@ -467,7 +475,6 @@ planner_crosscheck_propagation() {
     return 1
   }
   local artifacts_dir="${repos_root}/.ticket-auto/initiatives/${initiative_id}/artifacts"
-  local state_log="${repos_root}/.ticket-auto/initiatives/${initiative_id}/state.log"
   local specs_dir="${artifacts_dir}/specs"
   local consensus_file="${artifacts_dir}/consensus.md"
 
@@ -480,7 +487,7 @@ planner_crosscheck_propagation() {
 
   planner_crosscheck_consensus_propagation "$consensus_file" "$specs_dir" || failures=$((failures + 1))
   planner_crosscheck_forward_references "$specs_dir" || failures=$((failures + 1))
-  planner_crosscheck_carve_scope "$state_log" "$specs_dir" || failures=$((failures + 1))
+  planner_crosscheck_carve_scope "${artifacts_dir}/phase-results/specify.json" "$specs_dir" || failures=$((failures + 1))
 
   return $((failures > 0 ? 1 : 0))
 }

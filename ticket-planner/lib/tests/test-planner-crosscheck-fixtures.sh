@@ -161,6 +161,8 @@ for fixture_dir in "$FIXTURES_DIR"/*/; do
     planner_state_write "$init_id" "$ll_phase" "$ll_step" "$ll_status" "$ll_msg" >/dev/null 2>&1
   done < <(jq -r '.log_lines // [] | .[]' "$expected_file")
 
+  # Specify end: bash records the spec list carve scope compares (seam-bash-derives).
+  planner_specify_result_write "$init_id" >/dev/null
   planner_crosscheck_run "$init_id" >/dev/null 2>&1
   rc=$?
 

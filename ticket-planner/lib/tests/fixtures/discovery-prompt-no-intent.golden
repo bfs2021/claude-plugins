@@ -172,7 +172,7 @@ export REPOS_ROOT=/__REPOS_ROOT__
 source "${CLAUDE_PLUGIN_ROOT}/lib/planner-state.sh"
 planner_state_write "INIT-T" "Discovery" "explore" "start" "Exploring affected repositories"
 # ... do your work, including the repo-ref writes above ...
-planner_state_write "INIT-T" "Discovery" "explore" "done" "Discovery report: N services, M symbols resolved"
+planner_state_write "INIT-T" "Discovery" "explore" "done" "Discovery report written to artifacts/discovery.md"
 ```
 
 On failure, write `fail` instead of `done`.

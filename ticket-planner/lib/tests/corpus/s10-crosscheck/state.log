@@ -1,0 +1,24 @@
+2026-11-15T12:16:26Z|META|schema|start|1
+2026-11-15T12:16:26Z|META|initiative-id|start|INIT-corpus-s10
+2026-11-15T12:16:26Z|META|idea|start|Build the first slice of a blogging app modelled on the RealWorld Conduit spec in the empty app repo: Express API (port 3000) + Vite vanilla JS frontend (port 5173) covering register, login, current user, create/read/list articles and five frontend pages. Replaces the calculator placeholder named in the repo's CLAUDE.md. 
+2026-11-15T12:16:26Z|META|contract|start|test-data-source-v1
+2026-11-15T12:16:26Z|META|no-tests-rule|done|false
+2026-11-15T12:16:26Z|META|intent|done|84,ready,0000000000000000000000000000000000000000000000000000000000000000
+2026-11-15T12:16:42Z|Appraisal|scope|start|Interpreting idea: Build the first slice of a blogging app modelled on the RealWorld Conduit spec in the empty app repo: Express API (port 3000) + Vite vanilla JS frontend (port 5173) covering register, login, current user, create/read/list articles and five frontend pages. Replaces the calculator placeholder named in the repo's CLAUDE.md.
+2026-11-15T12:17:24Z|Appraisal|scope|done|Scope summary written to artifacts/appraisal.md
+2026-11-15T12:17:48Z|Discovery|explore|start|Exploring affected repositories
+2026-11-15T12:18:15Z|META|discovery|repo-ref|app@main@0000000000000000000000000000000000000000
+2026-11-15T12:19:05Z|Discovery|explore|done|Discovery report: 1 services, 10 symbols resolved
+2026-11-15T12:19:23Z|Architecture|design|start|Evaluating technical approaches
+2026-11-15T12:20:21Z|Architecture|design|done|Architecture decision: CommonJS Express app exported for in-process Jest+supertest tests, Vite vanilla SPA on 5173 reaching API via /api dev proxy (no CORS)
+2026-11-15T12:20:31Z|META|contract|start|specify-parameters-v1
+2026-11-15T12:20:31Z|META|contract|start|spec-ownership-v1
+2026-11-15T12:20:31Z|META|contract|start|ac-precondition-v1
+2026-11-15T12:21:03Z|Specify|synthesize|start|Synthesizing proposal and writing specs for 7 tickets
+2026-11-15T12:31:48Z|Specify|synthesize|done|Proposal written, 8 ticket specs in artifacts/specs/, self-lint clean
+2026-11-15T12:32:01Z|META|goldfish|skip|788196fd91f3 DISABLED
+2026-11-15T12:32:12Z|Review|critique|start|Critiquing proposal for gaps and risks
+2026-11-15T12:34:20Z|Review|critique|done|Review complete: 0 blockers, 3 major, 7 minor, 3 nit; verdict needs-revision
+2026-11-15T12:34:41Z|Consensus|resolve|start|Resolving review findings
+2026-11-15T12:38:31Z|META|ac-precondition|done|0 checked, 0 unchecked, 11 planned, 8 input
+2026-11-15T12:38:44Z|Consensus|resolve|done|Consensus: 11 accepted, 0 rejected, 2 deferred

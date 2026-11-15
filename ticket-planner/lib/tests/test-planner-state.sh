@@ -298,12 +298,16 @@ fi
 _seed_through_consensus "INIT-RERUN-3"
 planner_state_write "INIT-RERUN-3" "Crosscheck" "check" "start" "running"
 planner_state_write "INIT-RERUN-3" "Crosscheck" "check" "done" "clean"
-err=$(planner_state_write "INIT-RERUN-3" "Crosscheck" "check" "done" "dup" 2>&1 >/dev/null)
+# A suppressed duplicate returns 3, not 0, so the writer knows the log kept the
+# earlier line (seam-bash-derives, rehearsal F70). This suite runs under
+# set -e, so the rc is captured, not left to abort the script.
+dup_rc=0
+err=$(planner_state_write "INIT-RERUN-3" "Crosscheck" "check" "done" "dup" 2>&1 >/dev/null) || dup_rc=$?
 n=$(_count_status "INIT-RERUN-3" Crosscheck check done)
-if [ "$n" = "1" ] && [[ "$err" == *"duplicate done entry for Crosscheck/check suppressed"* ]]; then
-  pass "done → done without an intervening start is still suppressed"
+if [ "$n" = "1" ] && [ "$dup_rc" = "3" ] && [[ "$err" == *"duplicate done for Crosscheck/check not written (rc 3)"* ]]; then
+  pass "done → done without an intervening start is still suppressed, rc 3"
 else
-  fail "done → done without an intervening start is still suppressed" "got $n done entries, stderr '$err'"
+  fail "done → done without an intervening start is still suppressed, rc 3" "got $n done entries, rc ${dup_rc}, stderr '$err'"
 fi
 
 # ── Test 12: planner_phase_count / planner_phase_position ──────────────────────

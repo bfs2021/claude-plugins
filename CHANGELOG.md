@@ -17,6 +17,36 @@ marketplace. Where a release also moved `ticket-planner`, `fleet-controller`, or
 > - **0.19.0 never existed.** `plugin.json` went 0.18.0 → 0.20.0. The Phase 2
 >   commit message claims `0.19.0→0.20.0`, but no 0.19.0 was ever committed.
 
+## ticket-planner 0.44.0 (2026-11-15) — seam-bash-derives slice 1: bash derives, the model judges
+
+- **Carve scope compares the specs bash recorded, not a count the agent typed (F67).**
+  Iteration 10 halted at Crosscheck with `CARVE_SCOPE_LOST` "Specify declared 7
+  tickets, 8 spec files exist" on a clean plan: the check read the number from
+  Specify's `synthesize|start` line, which the prompt had the agent write before any
+  spec existed. When that message held no number, the check passed without checking.
+  Now, when Specify finishes, bash lists `artifacts/specs/*.md` (minus `INDEX.md` and
+  synth TD specs) into the new `artifacts/phase-results/specify.json`
+  (`lib/planner-phase-results.sh`). `planner_crosscheck_carve_scope` diffs those slugs
+  against the specs on disk and names any that were lost or added.
+- **Fail closed: `CHECK_ERRORED`.** A missing or unreadable `specify.json` is a new
+  blocking finding, `CHECK_ERRORED carve_scope: …`, never a pass. **An initiative whose
+  Specify ran under an older release halts once at Crosscheck** with it: audit the
+  scope, then `resume <ID> --accept CHECK_ERRORED:"<reason>"`, or re-run Specify.
+- **Post-agent gate.** SKILL.md step 4a now calls `planner_dispatch_gate post`, which
+  records Specify's spec list and then runs the ADR gate as before; `pre` repeats the
+  record before Review, so a router that died in between still writes it.
+- **A dropped duplicate `done` is visible (F70).** Consensus's corrected second `done`
+  line was dropped as a duplicate with rc 0, so the log kept the wrong counts.
+  `planner_state_write` now returns 3 and says on stderr that the line was not written
+  and how to record a new run. Every caller was audited; `META|ownership-edges|done`,
+  which a resumed Crosscheck used to lose, is now a repeatable record.
+- **Status lines carry no counts.** The Discovery, Specify, Review and Consensus prompts'
+  state-log lines are fixed text; no script reads a value out of an agent's message.
+- **Corpus.** `ticket-planner/lib/tests/corpus/` starts with a scrubbed iteration 10
+  snapshot (`MANIFEST.tsv`, `labels.tsv`) and `test-planner-corpus.sh` replays it
+  through the real readers, with a privacy grep. Openspec change `seam-bash-derives`
+  plans the next slices.
+
 ## ticket-planner 0.43.6 (2026-11-15) — dispatch-rehearsal iteration 09 finding
 
 - **Draft gate: an `INTENT_AC_MISMATCH` on one criterion gets a revise round (F62).**

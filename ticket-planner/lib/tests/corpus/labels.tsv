@@ -1,0 +1,3 @@
+snap_id	check	unit	observed	expected	label	source
+s10-crosscheck	carve_scope	initiative	CARVE_SCOPE_LOST	pass	checker-bug	F67
+s10-crosscheck	state_write_dedupe	Consensus/resolve	silent-drop-rc0	visible-drop-rc3	checker-bug	F70

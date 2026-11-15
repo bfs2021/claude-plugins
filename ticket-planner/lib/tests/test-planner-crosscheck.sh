@@ -99,6 +99,8 @@ EOF
 
 echo "--- clean run ---"
 
+# Specify end: bash records the spec list carve scope compares (seam-bash-derives).
+planner_specify_result_write "$INIT_ID" >/dev/null
 if planner_crosscheck_run "$INIT_ID"; then
   pass "clean artifacts: planner_crosscheck_run returns 0"
 else
@@ -163,6 +165,8 @@ cat >"${STATE_DIR2}/artifacts/specs/vs-b.md" <<'EOF'
 Cites a file that does not exist under REPOS_ROOT: lib/nonexistent-helper.ts:42.
 EOF
 
+# Specify end: bash records the spec list carve scope compares (seam-bash-derives).
+planner_specify_result_write "$INIT_ID2" >/dev/null
 if planner_crosscheck_run "$INIT_ID2"; then
   fail "dirty artifacts: planner_crosscheck_run returns 1" "returned 0"
 else
@@ -265,6 +269,8 @@ EOF
 log_file3=$(planner_state_log "$INIT_ID3")
 
 # Unaccepted: the finding blocks, same as the dirty run above.
+# Specify end: bash records the spec list carve scope compares (seam-bash-derives).
+planner_specify_result_write "$INIT_ID3" >/dev/null
 if planner_crosscheck_run "$INIT_ID3"; then
   fail "accept: unaccepted CITATION_UNRESOLVED still blocks" "returned 0"
 else
