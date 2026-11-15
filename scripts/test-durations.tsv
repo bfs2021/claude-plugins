@@ -141,6 +141,7 @@ bash fleet-controller/lib/tests/test-fleet-dashboard.sh	2.0
 bash ticket-auto-pipeline/lib/tests/test-flow-run.sh	2.0
 bash ticket-auto-pipeline/lib/tests/test-manifest-read.sh	2.0
 bash ticket-planner/lib/tests/test-branch-directive-gen.sh	2.0
+bash ticket-auto-pipeline/lib/tests/test-dor-semantic-request.sh	2.0
 bash ticket-auto-pipeline/lib/tests/test-board-pusher-integration.sh	1.9
 bash ticket-planner/lib/tests/test-planner-crosscheck-citations.sh	1.9
 bash ticket-auto-pipeline/lib/tests/test-persona-injection.sh	1.8

@@ -24,10 +24,14 @@
 #   _dor_semantic_dim_code <dimension>
 #     Prints SEMANTIC_<DIMENSION_UPPER> for a dimension key.
 #
-#   dor_semantic_prompt scan|audit <TID> <body-file> <result-file> [<det-result-file>]
-#     Prints the agent prompt (design.md Decision 5). See task 6.1.
+#   dor_semantic_prompt scan|audit [--attempt N] <TID> <body-file> <result-file> [<det-result-file>]
+#     Prints the agent prompt (design.md Decision 5) and writes the spawn
+#     request next to <result-file> (seam-bash-derives slice 3).
 #
-#   dor_semantic_apply <TID> <body-file> <scan-json> <audit-json>
+#   dor_semantic_request_path <result-file>
+#     The spawn request's path: <result-file> minus .txt, plus .request.json.
+#
+#   dor_semantic_apply <TID> <body-file> <scan-json> <audit-json> [<scan-request> <audit-request>]
 #     Validates and stores a result via set_ticket_semantic (design.md
 #     Decision 6/10/11), then the finding lineage via set_ticket_lineage
 #     (planner-refinement-convergence D1/D3). Built from the three pure
@@ -35,9 +39,10 @@
 #     (manifest-write.sh), which a draft on disk calls too
 #     (planner-draft-readiness D3/D16).
 #
-#   dor_semantic_findings <TID> <body> <scan-json> <audit-json>
+#   dor_semantic_findings <TID> <body> <scan-json> <audit-json> [<scan-request> <audit-request>]
 #     Prints {findings, unverified_gaps} (verified quotes, base severity).
-#     Exit 2 on a ticket or body-hash mismatch (apply maps it to 1).
+#     TICKET/BODY_HASH come from the spawn requests. Exit 2 on a ticket
+#     mismatch or a body changed since the spawn (apply maps it to 1).
 #
 #   dor_semantic_lineage_from <prior-lineage-json|null> <body> <hash> <findings> <audit> [<migrated-from>]
 #     Pure lineage/round/demotion. DOR_SEMANTIC_PRIOR_PASSED=true applies the
@@ -601,15 +606,15 @@ dor_semantic_lineage_from() {
           + (if $migrated_from != "" then {migrated_from: $migrated_from} else {} end))}'
 }
 
-# dor_semantic_apply <TID> <body-file> <scan-json> <audit-json>
+# dor_semantic_apply <TID> <body-file> <scan-json> <audit-json> [<scan-request> <audit-request>]
 # Validates and stores a canned or agent-produced result pair (design.md
 # Decisions 6, 10, 11). <scan-json>/<audit-json> are the canonical JSON
 # objects dor-semantic-parse.sh's parse_dor_semantic prints (parse_status
-# "ok" is the caller's responsibility to check before calling this — an
-# invalid parse has no TICKET/BODY_HASH worth trusting).
+# "ok" is the caller's responsibility to check before calling this). The
+# requests are each result file's dor_semantic_request_path.
 #
-# Rejects (exit 1, nothing written) when either result's `ticket` differs
-# from <TID> or `body_hash` differs from _dor_body_hash of <body-file>.
+# Rejects (exit 1, nothing written) on dor_semantic_findings' rc 2: a
+# request for another ticket, or a body changed since the spawn.
 # Every finding's quote (and quote_b, when present) is tested against the
 # normalised body; a mismatch marks that finding verified:false. A scan gap
 # marked "finding" with no finding in its own dimension is recorded in
@@ -618,7 +623,7 @@ dor_semantic_lineage_from() {
 # result is stored via set_ticket_semantic, whose exit code (3 no ready
 # object, 1 no manifest) is propagated unchanged.
 dor_semantic_apply() {
-  local tid="$1" body_file="$2" scan_json="$3" audit_json="$4"
+  local tid="$1" body_file="$2" scan_json="$3" audit_json="$4" scan_req="${5:-}" audit_req="${6:-}"
 
   if [ ! -f "$body_file" ]; then
     echo "dor-semantic: body file not found: $body_file" >&2
@@ -632,7 +637,7 @@ dor_semantic_apply() {
   # Quote verification, severity, unverified gaps. A ticket or body-hash
   # mismatch is rc 2 there and rc 1 here, as it always was (D16).
   local judged rc=0
-  judged=$(dor_semantic_findings "$tid" "$body" "$scan_json" "$audit_json") || rc=$?
+  judged=$(dor_semantic_findings "$tid" "$body" "$scan_json" "$audit_json" "$scan_req" "$audit_req") || rc=$?
   [ "$rc" -eq 0 ] || return 1
 
   local findings_json unverified_gaps
@@ -660,35 +665,112 @@ dor_semantic_apply() {
   set_ticket_lineage "$tid" "$lineage_json"
 }
 
-# dor_semantic_findings <TID> <body> <scan-json> <audit-json>
-# The findings builder dor_semantic_apply uses (planner-draft-readiness D3),
-# pure: <body> is the body text, nothing is read or written. Prints
-# {"findings": [...], "unverified_gaps": [...]} — each finding
-# {code, dimension, severity (base, before any demotion), quote, quote_b,
-# detail, verified}; a quote (or quote_b) not found in the normalised body
-# is verified:false; a scan gap marked "finding" with no finding in its own
-# dimension is listed in unverified_gaps. Exit 2 when either result's
-# `ticket` differs from <TID> or `body_hash` from _dor_body_hash <body>.
+# dor_semantic_request_path <result-file> — the spawn request beside it:
+# `.txt` dropped, `.request.json` added.
+dor_semantic_request_path() {
+  printf '%s.request.json\n' "${1%.txt}"
+}
+
+# _dor_semantic_request_write <kind> <tid> <body-file> <result-file> <attempt>
+# The spawn request (seam-bash-derives slice 3): {version, kind, ticket,
+# body_hash, attempt, result_file}, written atomically beside the result
+# file. Bash knows TICKET and BODY_HASH at spawn time, so the evaluator
+# never copies them. A missing body writes no request and drops an older
+# one. rc 1 when the request cannot be written.
+_dor_semantic_request_write() {
+  local kind="$1" tid="$2" body_file="$3" result_file="$4" attempt="$5" req hash=""
+  req=$(dor_semantic_request_path "$result_file")
+  rm -f "$req"
+  [ -f "$body_file" ] || return 0
+  hash=$(_dor_body_hash "$(cat "$body_file")" 2>/dev/null) || hash=""
+  [ -n "$hash" ] || return 0
+  [[ "$attempt" =~ ^[1-9][0-9]*$ ]] || attempt=1
+  if ! jq -nc --arg k "$kind" --arg t "$tid" --arg h "$hash" --argjson n "$attempt" --arg r "$result_file" \
+    '{version: 1, kind: $k, ticket: $t, body_hash: $h, attempt: $n, result_file: $r}' >"${req}.tmp" ||
+    ! mv -f "${req}.tmp" "$req"; then
+    rm -f "${req}.tmp"
+    echo "dor-semantic: cannot write the spawn request $req" >&2
+    return 1
+  fi
+}
+
+# _dor_semantic_req_field <request-file> <field> — a string field of a JSON
+# object, else empty.
+_dor_semantic_req_field() {
+  jq -r --arg f "$2" 'if type == "object" then (.[$f] // "") | tostring else "" end' "$1" 2>/dev/null || true
+}
+
+# _dor_semantic_identity <kind> <TID> <real-hash> <result-json> [<request-file>]
+# Binds one parsed result to <TID> and to the body it was spawned on. With a
+# readable request of <kind>, its ticket and body_hash are the facts: a
+# request for another ticket, or a body no longer hashing to the request's
+# body_hash (edited since the spawn), is rc 2. An echoed TICKET/BODY_HASH
+# that disagrees with the request only warns: the echo measures the model's
+# copying, not which body it read. With no usable request the echo is
+# checked as before, with a warning; no request and no echo is rc 2.
+_dor_semantic_identity() {
+  local kind="$1" tid="$2" real_hash="$3" result="$4" req="${5:-}"
+  local e_tid e_hash r_kind="" r_tid="" r_hash="" why
+  e_tid=$(jq -r '.ticket // ""' <<<"$result" 2>/dev/null) || e_tid=""
+  e_hash=$(jq -r '.body_hash // ""' <<<"$result" 2>/dev/null) || e_hash=""
+  if [ -n "$req" ] && [ -f "$req" ]; then
+    r_kind=$(_dor_semantic_req_field "$req" kind)
+    r_tid=$(_dor_semantic_req_field "$req" ticket)
+    r_hash=$(_dor_semantic_req_field "$req" body_hash)
+  fi
+  if [ -n "$r_tid" ] && [[ "$r_hash" =~ ^sha256:[0-9a-f]{64}$ ]] && [ "$r_kind" = "$kind" ]; then
+    if [ -n "$e_tid" ] && [ "$e_tid" != "$r_tid" ]; then
+      echo "dor-semantic: WARNING ${kind} result echoes TICKET=${e_tid}, spawn request says ${r_tid} — echo ignored" >&2
+    fi
+    if [ -n "$e_hash" ] && [ "$e_hash" != "$r_hash" ]; then
+      echo "dor-semantic: WARNING ${kind} result echoes BODY_HASH=${e_hash}, spawn request says ${r_hash} — echo ignored" >&2
+    fi
+    if [ "$r_tid" != "$tid" ]; then
+      echo "dor-semantic: ${kind} spawn request is for ticket ${r_tid}, want ${tid} (${req})" >&2
+      return 2
+    fi
+    if [ "$r_hash" != "$real_hash" ]; then
+      echo "dor-semantic: body changed since the ${kind} was spawned (request body_hash=${r_hash}, body now ${real_hash})" >&2
+      return 2
+    fi
+    return 0
+  fi
+  if [ -z "$req" ]; then
+    why="no spawn request given"
+  elif [ -f "$req" ]; then
+    why="spawn request unreadable: ${req}"
+  else
+    why="spawn request missing: ${req}"
+  fi
+  if [ -z "$e_tid" ] && [ -z "$e_hash" ]; then
+    echo "dor-semantic: ${kind} result rejected — ${why}, and the result echoes no TICKET/BODY_HASH" >&2
+    return 2
+  fi
+  echo "dor-semantic: WARNING ${kind}: ${why} — checking the echoed TICKET/BODY_HASH instead" >&2
+  if [ "$e_tid" != "$tid" ] || [ "$e_hash" != "$real_hash" ]; then
+    echo "dor-semantic: ${kind} result TICKET/BODY_HASH mismatch (ticket=${e_tid} want=${tid}, hash=${e_hash} want=${real_hash})" >&2
+    return 2
+  fi
+  return 0
+}
+
+# dor_semantic_findings <TID> <body> <scan-json> <audit-json> [<scan-request> <audit-request>]
+# The findings builder dor_semantic_apply uses (planner-draft-readiness D3):
+# <body> is the body text, nothing is written, only the two spawn requests
+# are read. Prints {"findings": [...], "unverified_gaps": [...]} — each
+# finding {code, dimension, severity (base, before any demotion), quote,
+# quote_b, detail, verified}; a quote (or quote_b) not found in the
+# normalised body is verified:false; a scan gap marked "finding" with no
+# finding in its own dimension is listed in unverified_gaps. Exit 2 when
+# _dor_semantic_identity rejects either result.
 dor_semantic_findings() {
-  local tid="$1" body="$2" scan_json="$3" audit_json="$4"
+  local tid="$1" body="$2" scan_json="$3" audit_json="$4" scan_req="${5:-}" audit_req="${6:-}"
 
   local real_hash
   real_hash=$(_dor_body_hash "$body")
 
-  local scan_tid scan_hash audit_tid audit_hash
-  scan_tid=$(echo "$scan_json" | jq -r '.ticket // ""' 2>/dev/null) || scan_tid=""
-  scan_hash=$(echo "$scan_json" | jq -r '.body_hash // ""' 2>/dev/null) || scan_hash=""
-  audit_tid=$(echo "$audit_json" | jq -r '.ticket // ""' 2>/dev/null) || audit_tid=""
-  audit_hash=$(echo "$audit_json" | jq -r '.body_hash // ""' 2>/dev/null) || audit_hash=""
-
-  if [ "$scan_tid" != "$tid" ] || [ "$scan_hash" != "$real_hash" ]; then
-    echo "dor-semantic: scan result TICKET/BODY_HASH mismatch (ticket=${scan_tid} want=${tid}, hash=${scan_hash} want=${real_hash})" >&2
-    return 2
-  fi
-  if [ "$audit_tid" != "$tid" ] || [ "$audit_hash" != "$real_hash" ]; then
-    echo "dor-semantic: audit result TICKET/BODY_HASH mismatch (ticket=${audit_tid} want=${tid}, hash=${audit_hash} want=${real_hash})" >&2
-    return 2
-  fi
+  _dor_semantic_identity scan "$tid" "$real_hash" "$scan_json" "$scan_req" || return 2
+  _dor_semantic_identity audit "$tid" "$real_hash" "$audit_json" "$audit_req" || return 2
 
   local norm_body
   norm_body=$(_dor_semantic_normalise "$body")
@@ -1108,20 +1190,27 @@ dor_audit_demote() {
   printf '%s\n' "${codes[@]}"
 }
 
-# dor_semantic_prompt scan|audit <TID> <body-file> <result-file> [<det-result-file>]
+# dor_semantic_prompt scan|audit [--attempt N] <TID> <body-file> <result-file> [<det-result-file>]
 # Builds the agent prompt (design.md Decision 5) — printf %s for the data
 # section, single-quoted heredocs for the instructions (the phase-inspector.
 # sh pattern), so ticket text and file paths are never shell-expanded. The
 # scan branch never references <det-result-file> or any deterministic code —
-# the scan is blind by construction (design.md Decision 4).
+# the scan is blind by construction (design.md Decision 4). Also writes the
+# spawn request beside <result-file> (_dor_semantic_request_write; rc 1 when
+# it cannot be written).
 dor_semantic_prompt() {
-  # --changed-sections <h1|h2…> (planner-refinement-convergence D4) may
+  # --changed-sections <h1|h2…> (planner-refinement-convergence D4) and
+  # --attempt <n> (the request's attempt, default 1) may
   # appear anywhere after the kind; the rest are positional.
-  local changed_sections="" _pos=()
+  local changed_sections="" attempt=1 _pos=()
   while [ "$#" -gt 0 ]; do
     case "$1" in
     --changed-sections)
       changed_sections="${2:-}"
+      shift 2 || shift
+      ;;
+    --attempt)
+      attempt="${2:-1}"
       shift 2 || shift
       ;;
     *)
@@ -1132,30 +1221,25 @@ dor_semantic_prompt() {
   done
   local kind="${_pos[0]:-}" tid="${_pos[1]:-}" body_file="${_pos[2]:-}" result_file="${_pos[3]:-}" det_result_file="${_pos[4]:-}"
 
-  # The evaluator agent is Read/Write only (no shell, by design), so it
-  # cannot compute a SHA-256 itself. Compute the body hash here, with the
-  # exact function dor_semantic_apply uses, and hand it over as a literal for
-  # the agent to echo. The binding still holds: apply re-hashes the body file
-  # as it is at apply time, so a body edited after this prompt was built
-  # still fails the BODY_HASH check.
-  local body_hash=""
-  if [ -f "$body_file" ]; then
-    body_hash=$(_dor_body_hash "$(cat "$body_file")" 2>/dev/null) || body_hash=""
+  # The ticket and the body hash go into the spawn request, never into the
+  # agent's block: findings binds the result to them, and checks the body
+  # still hashes as it did here (seam-bash-derives slice 3).
+  if [ -n "$result_file" ]; then
+    _dor_semantic_request_write "$kind" "$tid" "$body_file" "$result_file" "$attempt" || return 1
   fi
-  [ -n "$body_hash" ] || body_hash="sha256:UNAVAILABLE"
 
   local data_block
   if [ "$kind" = "scan" ]; then
-    data_block=$(printf '## DoR Semantic Scan\n\n**Ticket**: %s\n**Body file**: %s\n**Body hash**: %s\n**Write your result to**: %s\n' \
-      "$tid" "$body_file" "$body_hash" "$result_file")
+    data_block=$(printf '## DoR Semantic Scan\n\n**Ticket**: %s\n**Body file**: %s\n**Write your result to**: %s\n' \
+      "$tid" "$body_file" "$result_file")
     if [ -n "$changed_sections" ]; then
       local _cs_lines
       _cs_lines=$(printf '%s\n' "$changed_sections" | tr '|' '\n' | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//' | grep . | sed 's/^/- /')
       data_block=$(printf '%s\n**Changed sections** (this is a rescan after an edit):\n%s\n' "$data_block" "$_cs_lines")
     fi
   else
-    data_block=$(printf '## DoR Semantic Audit\n\n**Ticket**: %s\n**Body file**: %s\n**Body hash**: %s\n**Deterministic result file**: %s\n**Write your result to**: %s\n' \
-      "$tid" "$body_file" "$body_hash" "$det_result_file" "$result_file")
+    data_block=$(printf '## DoR Semantic Audit\n\n**Ticket**: %s\n**Body file**: %s\n**Deterministic result file**: %s\n**Write your result to**: %s\n' \
+      "$tid" "$body_file" "$det_result_file" "$result_file")
   fi
 
   local common_rules
@@ -1228,8 +1312,6 @@ Write exactly one block to the result file:
 
 === DOR_SEMANTIC_SCAN ===
 SCHEMA_VERSION: 1
-TICKET: <ticket id, copied exactly>
-BODY_HASH: <the **Body hash** value above, copied exactly — do not compute or alter it>
 PARAPHRASE: <required — the one change this ticket makes, in your own words, one line, at most 400 characters>
 FINDING_1_CODE: <code>
 FINDING_1_QUOTE: <verbatim quote>
@@ -1269,8 +1351,6 @@ Write exactly one block to the result file:
 
 === DOR_SEMANTIC_AUDIT ===
 SCHEMA_VERSION: 1
-TICKET: <ticket id, copied exactly>
-BODY_HASH: <the **Body hash** value above, copied exactly — do not compute or alter it>
 AUDIT_1_CODE: <a code from the deterministic result>
 AUDIT_1_VERDICT: agree|disputed|uncertain
 AUDIT_1_REASON: <required when VERDICT is disputed — must cite ticket text>

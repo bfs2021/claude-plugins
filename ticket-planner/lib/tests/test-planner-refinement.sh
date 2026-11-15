@@ -1064,55 +1064,67 @@ else
   fail "audit prompt DOES reference dor-result.json" "reference missing"
 fi
 
-# ── #497: a Read/Write-only agent can satisfy the BODY_HASH binding ──────
-# The evaluator has no shell, so it cannot compute a SHA-256. The prompt must
-# hand it the hash as a literal; an agent that copies that literal verbatim
-# must be accepted, and a body edited after the prompt was built must still
-# be rejected.
+# ── #497 → seam-bash-derives slice 3: the binding is the spawn request ───
+# The evaluator has no shell and copies nothing: the prompt writes a spawn
+# request (ticket, body hash, attempt) beside each result file, and apply
+# takes TICKET/BODY_HASH from it. A result with a slipped echo, or none, is
+# accepted; a body edited after the prompt was built is still rejected.
 
-echo "--- #497: body hash handed to the agent in the prompt ---"
+echo "--- spawn request: TICKET/BODY_HASH stamped by bash ---"
 
 _add_child "PRO-190" "22-sourced-contract"
 planner_refinement_scan "$INIT_ID" >/dev/null
 
-_hash_from_prompt() {
-  echo "$1" | sed -n 's/^\*\*Body hash\*\*: //p' | head -1
-}
-
 p497_scan=$(planner_refinement_prompt "$INIT_ID" "PRO-190" scan)
 p497_audit=$(planner_refinement_prompt "$INIT_ID" "PRO-190" audit)
-h497_scan=$(_hash_from_prompt "$p497_scan")
-h497_audit=$(_hash_from_prompt "$p497_audit")
 h497_real=$(_body_hash "PRO-190")
+r497_scan="$(_planner_dir "PRO-190")/semantic-scan-result.request.json"
+r497_audit="$(_planner_dir "PRO-190")/semantic-audit-result.request.json"
 
-if [ -n "$h497_real" ] && [ "$h497_scan" = "$h497_real" ] && [ "$h497_audit" = "$h497_real" ]; then
-  pass "scan and audit prompts carry the body hash as a literal"
+if [ -n "$h497_real" ] && [ "$(jq -r '"\(.ticket) \(.body_hash) \(.attempt)"' "$r497_scan" 2>/dev/null)" = "PRO-190 ${h497_real} 1" ] &&
+  [ "$(jq -r '"\(.kind) \(.body_hash)"' "$r497_audit" 2>/dev/null)" = "audit ${h497_real}" ]; then
+  pass "scan and audit prompts write spawn requests with the ticket, body hash and attempt"
 else
-  fail "scan and audit prompts carry the body hash as a literal" "scan=$h497_scan audit=$h497_audit want=$h497_real"
+  fail "scan and audit prompts write spawn requests" "scan=$(cat "$r497_scan" 2>&1) audit=$(cat "$r497_audit" 2>&1)"
 fi
-if ! grep -qi "compute this yourself" <<<"$p497_scan$p497_audit"; then
-  pass "prompts no longer ask the agent to compute the hash"
+if ! grep -qi "compute this yourself\|Body hash\|^TICKET:\|^BODY_HASH:" <<<"$p497_scan$p497_audit"; then
+  pass "prompts ask for no TICKET or BODY_HASH"
 else
-  fail "prompts no longer ask the agent to compute the hash" "found the old instruction"
+  fail "prompts ask for no TICKET or BODY_HASH" "found an echo instruction"
 fi
 
-# Simulated Read/Write-only agent: copies the hash from the prompt verbatim.
-_write_clean_scan "PRO-190" "$h497_scan"
-_write_clean_audit "PRO-190" "$h497_audit"
+# A one-character slip in the echoed hash (the copy error the echo invited).
+h497_slip="${h497_real%?}$([ "${h497_real: -1}" = "0" ] && echo 1 || echo 0)"
+_write_clean_scan "PRO-190" "$h497_slip"
+_write_clean_audit "PRO-190" "$h497_slip"
 if planner_refinement_apply "$INIT_ID" "PRO-190" 2>/dev/null; then
-  pass "result echoing the prompt's body hash is accepted by planner_refinement_apply"
+  pass "a slipped BODY_HASH echo is accepted on the spawn request"
 else
-  fail "result echoing the prompt's body hash is accepted by planner_refinement_apply" "returned nonzero"
+  fail "a slipped BODY_HASH echo is accepted on the spawn request" "returned nonzero"
 fi
 
-# Body edited after the prompt was built: the same results are now stale.
+# The retry's request records the attempt apply_pending counted.
+echo 1 >"$(_planner_dir "PRO-190")/semantic-attempts"
+planner_refinement_prompt "$INIT_ID" "PRO-190" scan >/dev/null
+if [ "$(jq -r .attempt "$r497_scan" 2>/dev/null)" = "2" ]; then
+  pass "the retry's spawn request records attempt 2"
+else
+  fail "the retry's spawn request records attempt 2" "$(cat "$r497_scan" 2>&1)"
+fi
+rm -f "$(_planner_dir "PRO-190")/semantic-attempts"
+planner_refinement_prompt "$INIT_ID" "PRO-190" scan >/dev/null
+
+# Body edited after the prompt was built: the request no longer matches.
 echo "- a criterion added after the scan" >>"$(_planner_dir "PRO-190")/body.md"
+h497_new=$(_body_hash "PRO-190")
+_write_clean_scan "PRO-190" "$h497_new"
+_write_clean_audit "PRO-190" "$h497_new"
 stale_rc=0
 stale_err=$(planner_refinement_apply "$INIT_ID" "PRO-190" 2>&1 >/dev/null) || stale_rc=$?
-if [ "$stale_rc" -ne 0 ] && grep -q "BODY_HASH mismatch" <<<"$stale_err"; then
-  pass "body edited after the scan still fails the binding check"
+if [ "$stale_rc" -ne 0 ] && grep -q "body changed since the scan was spawned" <<<"$stale_err"; then
+  pass "body edited after the spawn fails the binding check, even with a fresh echo"
 else
-  fail "body edited after the scan still fails the binding check" "rc=$stale_rc err=$stale_err"
+  fail "body edited after the spawn fails the binding check" "rc=$stale_rc err=$stale_err"
 fi
 
 # ── planner-draft-readiness S2b task 4.1: step 1b's spawn-list driver ────

@@ -17,6 +17,41 @@ marketplace. Where a release also moved `ticket-planner`, `fleet-controller`, or
 > - **0.19.0 never existed.** `plugin.json` went 0.18.0 → 0.20.0. The Phase 2
 >   commit message claims `0.19.0→0.20.0`, but no 0.19.0 was ever committed.
 
+## 0.119.0 / ticket-planner 0.46.0 (2026-11-15) — seam-bash-derives slice 3: TICKET and BODY_HASH stamped by bash
+
+- **The DoR semantic evaluator copies no identity field (seam audit, draft gate row 7).**
+  The scan and audit prompts asked the agent to copy `TICKET` and a 64-hex `BODY_HASH`
+  into its block, and a one-character slip threw away a whole valid evaluation (a
+  failed attempt; two make the draft or ticket `SEMANTIC_UNAVAILABLE`).
+  `dor_semantic_prompt` now writes a spawn request beside each result file
+  (`dor_semantic_request_path`: `scan-result.txt` → `scan-result.request.json`,
+  `{version, kind, ticket, body_hash, attempt, result_file}`), takes `--attempt N`, and
+  no longer shows the hash or asks for either line.
+- **The request is the binding.** `dor_semantic_findings` / `dor_semantic_apply` take
+  the two request paths as optional trailing arguments. A request for another ticket,
+  or a body that no longer hashes to the request's `body_hash` (edited since the spawn),
+  is rejected as before. An echoed `TICKET`/`BODY_HASH` that disagrees with the request
+  is a stderr warning and ignored: the agent only copied it, so a mismatch says nothing
+  about which body it read. A missing or unreadable request warns and falls back to the
+  echoed values (checked strictly, as before); no request and no echo is rejected.
+- **Parser.** `TICKET` and `BODY_HASH` are optional (an echo still parses for one
+  release). No other contract change: codes, severities and quote verification are
+  untouched, and the evaluator string stays `dor-semantic-v4`.
+- **Callers (ticket-planner 0.46.0).** The draft readiness gate passes `--attempt` from
+  its `attempts` file and `_pdl_evaluate` passes both requests; the request files are in
+  `PLANNER_DRAFT_RESULT_FILES`, so a body change clears them and a revert restores them
+  with their results. Refinement passes `--attempt` (`semantic-attempts` + 1) and both
+  requests to apply, and clears them with the result files in `prepare`.
+  **For operators:** ticket-planner 0.46.0 needs ticket-auto-pipeline 0.119.0 or later;
+  with an older `dor-semantic.sh` Refinement and the draft gate stop with
+  `dor-semantic.sh is too old`. A result already on disk from an older prompt (no
+  request) is judged on its echo with a warning.
+- **Tests.** `test-dor-semantic-request.sh` (new, 38 cases) over real-shaped fixtures
+  `fixtures/dor/semantic/30-slip-*` (one-character hash slip) and `30-noticket-*` (no
+  `TICKET`); the draft gate harness stubs now write no echo (`DOR_ECHO=slip` scenario
+  7b in `test-planner-draft-readiness-gate-recover.sh`); Refinement's #497 block covers
+  the request, the slip, the attempt and a body edited after the spawn.
+
 ## 0.118.0 (2026-11-15) — seam audit Track 0: ticket-auto fails closed on unreadable model text
 
 - **Auto-merge identity (0.1).** `auto-merge.sh` merges only when the `checkout-pr`

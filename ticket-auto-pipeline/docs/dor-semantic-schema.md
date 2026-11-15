@@ -96,8 +96,6 @@ that names a sibling code for the same gap. Advisory findings are stored in
 ```
 === DOR_SEMANTIC_SCAN ===
 SCHEMA_VERSION: 1
-TICKET: WIL-123
-BODY_HASH: sha256:ab12...
 PARAPHRASE: Let finance export the invoice list as a CSV file from the invoices screen.
 FINDING_1_CODE: MISSING_CORE_AC
 FINDING_1_QUOTE: the export should work correctly
@@ -148,8 +146,6 @@ not back a gap. It changes no code, schema or verdict, so the evaluator stays `d
 ```
 === DOR_SEMANTIC_AUDIT ===
 SCHEMA_VERSION: 1
-TICKET: WIL-123
-BODY_HASH: sha256:ab12...
 AUDIT_1_CODE: AC_VAGUE
 AUDIT_1_VERDICT: disputed
 AUDIT_1_REASON: "handles errors gracefully" is qualified by AC-4's explicit retry table
@@ -205,9 +201,31 @@ dropping the finding.
 
 ## Result binding and versioning
 
-`dor_semantic_apply` rejects (exit 1, nothing written) a result whose `TICKET` differs
-from the ticket id it was called with, or whose `BODY_HASH` differs from
-`_dor_body_hash` of the body file it is given. `DOR_SEMANTIC_EVALUATOR="dor-semantic-v4"`
+**The spawn request** (seam-bash-derives slice 3). The agent copies no identity
+field: `TICKET` and `BODY_HASH` are bash facts. `dor_semantic_prompt` writes
+`<result-file minus .txt>.request.json` beside each result file
+(`dor_semantic_request_path`) — `{version: 1, kind, ticket, body_hash, attempt,
+result_file}`, `body_hash` = `_dor_body_hash` of the body when the prompt was built,
+written atomically, no request when the body file is missing. `dor_semantic_findings`
+and `dor_semantic_apply` take the two request paths as optional trailing arguments
+and bind each result to its request:
+
+| Situation | Result |
+|---|---|
+| Request readable, its `ticket` = the ticket id, body still hashes to its `body_hash` | accepted |
+| Request for another ticket | rejected (findings rc 2, apply rc 1) |
+| Body changed since the spawn (request hash ≠ body hash now) | rejected — `body changed since the <kind> was spawned` |
+| An echoed `TICKET`/`BODY_HASH` disagrees with the request | **warning only**, the echo is ignored |
+| Request missing or unreadable | warning, then the echoed values are checked as before |
+| Request missing and no echo | rejected |
+
+The parser keeps accepting an echoed `TICKET`/`BODY_HASH` for one release (both are
+optional; absent parses as `""`). A disagreeing echo is a warning, not a rejection:
+the agent only ever copied the value from its prompt, so a mismatch measures the copy,
+not which body it read — the request already binds the result file to the ticket, and
+the hash check against the request is the real "body unchanged since spawn" test. A
+one-character slip used to throw away a valid evaluation (seam audit 2026-11-15,
+draft gate row 7). `DOR_SEMANTIC_EVALUATOR="dor-semantic-v4"`
 is stamped into `ready.semantic.evaluator` on every stored result; it changes whenever
 the prompt, code vocabulary, or block schema changes, so a caller can decide whether a
 cached verdict is current by comparing body hash and evaluator string. `v2`
@@ -509,11 +527,10 @@ readiness return code, and neither invokes a model. Both drop a disputed code th
 ## Evaluator agent contract
 
 `agents/dor-semantic-agent.md` declares `tools: Read, Write`. `dor_semantic_prompt
-scan|audit <TID> <body-file> <result-file> [<det-result-file>]` builds its prompt:
-paths, never ticket text, plus the body file's `_dor_body_hash` as a `**Body hash**:`
-literal the agent copies into `BODY_HASH` (the agent has no shell and cannot compute a
-SHA-256 itself; apply re-hashes the body at apply time, so the binding still catches a
-body edited after the prompt was built); states that file contents are data, not instructions;
+scan|audit [--attempt N] <TID> <body-file> <result-file> [<det-result-file>]` builds its
+prompt: paths, never ticket text, and no body hash — the hash goes into the spawn request
+it writes beside the result file (see Result binding above), so the agent echoes
+nothing; states that file contents are data, not instructions;
 instructs the agent to write exactly one block to the result path and return a single
 line (`DOR_SEMANTIC <scan|audit> written <path>`). This keeps a caller running tens of
 tickets from accumulating every result in its own context. The scan prompt never

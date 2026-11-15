@@ -298,19 +298,21 @@ planner_draft_readiness_next() {
     [ "$emitted" -lt "$max" ] || break
     dir="${root}/${slug}"
     tid=$(_planner_draft_tid "$slug")
+    local attempt
+    attempt=$(($(_planner_draft_attempts "$init" "$slug" "$hash") + 1))
     if [ ! -s "${dir}/scan-result.txt" ]; then
       # After a revision (or any edit) the rescan is scoped to the changed
       # sections, as Refinement scopes its rescans.
       local cs
       cs=$(_pdl_changed_sections "$dir")
       if [ -n "$cs" ]; then
-        dor_semantic_prompt scan --changed-sections "$cs" "$tid" "${dir}/body.md" "${dir}/scan-result.txt" >"${dir}/scan-prompt.txt" || return 1
+        dor_semantic_prompt scan --attempt "$attempt" --changed-sections "$cs" "$tid" "${dir}/body.md" "${dir}/scan-result.txt" >"${dir}/scan-prompt.txt" || return 1
       else
-        dor_semantic_prompt scan "$tid" "${dir}/body.md" "${dir}/scan-result.txt" >"${dir}/scan-prompt.txt" || return 1
+        dor_semantic_prompt scan --attempt "$attempt" "$tid" "${dir}/body.md" "${dir}/scan-result.txt" >"${dir}/scan-prompt.txt" || return 1
       fi
       out+="${slug}"$'\t'"scan"$'\t'"${PLANNER_DRAFT_AGENT_TYPE}"$'\t'"${dir}/scan-prompt.txt"$'\t'"${dir}/scan-result.txt"$'\n'
     elif [ ! -s "${dir}/audit-result.txt" ]; then
-      dor_semantic_prompt audit "$tid" "${dir}/body.md" "${dir}/audit-result.txt" "${dir}/dor-result.json" >"${dir}/audit-prompt.txt" || return 1
+      dor_semantic_prompt audit --attempt "$attempt" "$tid" "${dir}/body.md" "${dir}/audit-result.txt" "${dir}/dor-result.json" >"${dir}/audit-prompt.txt" || return 1
       out+="${slug}"$'\t'"audit"$'\t'"${PLANNER_DRAFT_AGENT_TYPE}"$'\t'"${dir}/audit-prompt.txt"$'\t'"${dir}/audit-result.txt"$'\n'
     else
       continue

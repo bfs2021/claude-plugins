@@ -287,7 +287,11 @@ parse_dor_semantic() {
 
   # ── validate top-level fields ─────────────────────────────────────────
   if [ "$status" = "ok" ]; then
-    local f _required="SCHEMA_VERSION TICKET BODY_HASH"
+    # TICKET and BODY_HASH are optional (seam-bash-derives slice 3): bash
+    # stamps both from the spawn request. An echoed value is still parsed
+    # (empty when absent) for one release; dor_semantic_findings ignores it
+    # with a warning when a request exists.
+    local f _required="SCHEMA_VERSION"
     if [ "$kind" = "audit" ]; then
       _required="$_required SCORE_PLAUSIBLE SCORE_REASON"
     else
