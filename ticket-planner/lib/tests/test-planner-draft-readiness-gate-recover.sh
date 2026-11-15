@@ -9,6 +9,8 @@
 #      Crosscheck halts with Crosscheck's report.
 #   7. Two failed agent attempts make the verdict `unavailable` (blocks);
 #      the next run retries it.
+#   7b. A slipped TICKET/BODY_HASH echo is judged on the spawn request
+#      (seam-bash-derives slice 3), not counted as a failed attempt.
 #   8. A removed spec loses its directory; --until Crosscheck skips the gate.
 #
 # Usage: bash ticket-planner/lib/tests/test-planner-draft-readiness-gate-recover.sh
@@ -98,6 +100,21 @@ if [ "$GATE_RC" -eq 0 ] && [ "$SPAWNS" -eq 2 ] && [ "$(cut -d' ' -f3 "${DR}/b-ap
   pass "the next run retries an unavailable draft (no edit needed)"
 else
   fail "unavailable retry" "rc=$GATE_RC spawns=$SPAWNS"
+fi
+
+# ── 7b. echo slip (seam-bash-derives slice 3) ────────────────────────────
+echo "--- 7b. a slipped TICKET/BODY_HASH echo is judged on the spawn request ---"
+sed -i 's/Export responds with status code 200/Export responds with status code 200 and a CSV body/' "${SPECS}/b-api.md"
+DOR_ECHO=slip _gate
+req="${DR}/b-api/scan-result.request.json"
+if [ "$GATE_RC" -eq 0 ] && [ "$(cut -d' ' -f3 "${DR}/b-api/verdict")" = "ready" ] &&
+  grep -q '^TICKET: b-api$' "${DR}/b-api/scan-result.txt" &&
+  [ "$(jq -r '"\(.ticket) \(.attempt)"' "$req")" = "DRAFT-b-api 1" ] &&
+  [ "$(jq -r .body_hash "$req")" = "$(_hash_of b-api)" ] &&
+  [ "$(_planner_draft_attempts "$INIT" b-api "$(_hash_of b-api)")" = "0" ]; then
+  pass "slipped echo: judged ready with no failed attempt; the request holds DRAFT-<slug> and the real hash"
+else
+  fail "slipped echo" "rc=$GATE_RC verdict=$(cat "${DR}/b-api/verdict") $(cat "$req" 2>&1)"
 fi
 
 # ── 8. removed spec, --until Crosscheck ──────────────────────────────────

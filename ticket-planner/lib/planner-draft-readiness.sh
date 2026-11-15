@@ -65,8 +65,10 @@ PLANNER_DRAFT_GENERATED_TOKEN="DRAFT-GENERATED"
 # changes, before any spawn. `lineage.json` (the prior for the next round,
 # D11) and the revision history (spec.r*, findings.r*, revise.r*, D14) are
 # never in this list — they survive a body change and go only with the
-# spec's directory.
-PLANNER_DRAFT_RESULT_FILES="verdict dor-result.json scan-result.txt audit-result.txt semantic.json"
+# spec's directory. The spawn requests (scan-result.request.json,
+# audit-result.request.json — dor_semantic_prompt writes them) go with their
+# result files, so a revert restores a matching pair.
+PLANNER_DRAFT_RESULT_FILES="verdict dor-result.json scan-result.txt audit-result.txt semantic.json scan-result.request.json audit-result.request.json"
 
 # ── Layout ────────────────────────────────────────────────────────────────
 

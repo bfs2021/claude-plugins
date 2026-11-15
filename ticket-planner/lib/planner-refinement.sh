@@ -188,6 +188,7 @@ _planner_refinement_resolve() {
 _planner_refinement_source_deps() {
   if declare -f check_ticket_ready >/dev/null 2>&1 &&
     declare -f dor_semantic_prompt >/dev/null 2>&1 &&
+    declare -f dor_semantic_request_path >/dev/null 2>&1 &&
     declare -f set_ticket_readiness >/dev/null 2>&1; then
     return 0
   fi
@@ -231,6 +232,12 @@ _planner_refinement_source_deps() {
   fi
   if ! declare -f dor_semantic_prompt >/dev/null 2>&1; then
     echo "planner-refinement: ${dor_semantic} sourced but did not define dor_semantic_prompt" >&2
+    return 1
+  fi
+  # The spawn request (seam-bash-derives slice 3): an older dor-semantic.sh
+  # would read `--attempt` as the ticket id.
+  if ! declare -f dor_semantic_request_path >/dev/null 2>&1; then
+    echo "planner-refinement: ${dor_semantic} is too old (no dor_semantic_request_path) — update ticket-auto-pipeline to 0.119.0 or later" >&2
     return 1
   fi
   return 0
@@ -599,7 +606,11 @@ planner_refinement_prompt() {
   _planner_refinement_source_deps || return 1
 
   local pdir="${REPOS_ROOT:-}/.ticket-auto/initiatives/${initiative_id}/tickets/${tid}/planner"
-  local body_file="${pdir}/body.md"
+  local body_file="${pdir}/body.md" attempt
+  # The spawn request records which attempt this is (apply_pending's count).
+  attempt=$(cat "${pdir}/semantic-attempts" 2>/dev/null) || attempt=0
+  [[ "$attempt" =~ ^[0-9]+$ ]] || attempt=0
+  attempt=$((attempt + 1))
 
   if [ "$kind" = "scan" ]; then
     # A stale verdict that recorded which sections changed gets a scoped
@@ -608,12 +619,12 @@ planner_refinement_prompt() {
     changed=$(get_ticket_manifest_field "$tid" ready 2>/dev/null |
       jq -r '(.semantic.changed_sections // []) | join("|")' 2>/dev/null) || changed=""
     if [ -n "$changed" ]; then
-      dor_semantic_prompt scan --changed-sections "$changed" "$tid" "$body_file" "${pdir}/semantic-scan-result.txt"
+      dor_semantic_prompt scan --attempt "$attempt" --changed-sections "$changed" "$tid" "$body_file" "${pdir}/semantic-scan-result.txt"
     else
-      dor_semantic_prompt scan "$tid" "$body_file" "${pdir}/semantic-scan-result.txt"
+      dor_semantic_prompt scan --attempt "$attempt" "$tid" "$body_file" "${pdir}/semantic-scan-result.txt"
     fi
   else
-    dor_semantic_prompt audit "$tid" "$body_file" "${pdir}/semantic-audit-result.txt" "${pdir}/dor-result.json"
+    dor_semantic_prompt audit --attempt "$attempt" "$tid" "$body_file" "${pdir}/semantic-audit-result.txt" "${pdir}/dor-result.json"
   fi
 }
 
@@ -662,7 +673,8 @@ planner_refinement_apply() {
     DOR_SEMANTIC_DRIFT_DEMOTE=true \
     DOR_SEMANTIC_ROUND_RESET_SHARE="${DOR_SEMANTIC_ROUND_RESET_SHARE:-0.5}" \
     DOR_SEMANTIC_PRIOR_PASSED="$prior_passed" \
-    dor_semantic_apply "$tid" "$body_file" "$scan_json" "$audit_json" || apply_rc=$?
+    dor_semantic_apply "$tid" "$body_file" "$scan_json" "$audit_json" \
+    "$(dor_semantic_request_path "$scan_file")" "$(dor_semantic_request_path "$audit_file")" || apply_rc=$?
   if [ "$apply_rc" -eq 0 ]; then
     rm -f "${pdir}/draft-passed" 2>/dev/null
     if [ "${PLANNER_REFINEMENT_AUDIT_DEMOTE:-false}" = "true" ]; then
@@ -1605,7 +1617,8 @@ planner_refinement_prepare() {
   for tid in "${needs[@]}"; do
     [ -n "$tid" ] || continue
     local pdir="${REPOS_ROOT:-}/.ticket-auto/initiatives/${init}/tickets/${tid}/planner"
-    rm -f "${pdir}/semantic-scan-result.txt" "${pdir}/semantic-audit-result.txt" "${pdir}/semantic-attempts"
+    rm -f "${pdir}/semantic-scan-result.txt" "${pdir}/semantic-audit-result.txt" "${pdir}/semantic-attempts" \
+      "${pdir}/semantic-scan-result.request.json" "${pdir}/semantic-audit-result.request.json"
     echo "$tid" >>"$pass"
   done
   return 0

@@ -175,9 +175,19 @@ _spec "b-api" "Finance can export invoices" "planned, feature, blocked-by:a" \
 # ── stub agents ───────────────────────────────────────────────────────────
 # FINDINGS_<slug> (code|quote) makes that draft's scan raise one finding.
 # BROKEN_<slug>=1 writes an unparseable result; MISSING_<slug>=1 writes none.
+# The stub writes no TICKET/BODY_HASH, as the prompt asks (bash stamps both
+# from the spawn request, seam-bash-derives slice 3). DOR_ECHO=slip echoes
+# the old way with a copy slip: the bare slug and a one-character-off hash.
 _hash_of() { planner_draft_readiness_body_hash "${DR}/$1/body.md"; }
+_echo_lines() { # _echo_lines <slug>
+  [ "${DOR_ECHO:-none}" = "slip" ] || return 0
+  local h
+  h=$(_hash_of "$1")
+  echo "TICKET: $1"
+  echo "BODY_HASH: ${h%?}$([ "${h: -1}" = "0" ] && echo 1 || echo 0)"
+}
 _spawn_list() {
-  local list="$1" slug kind type pf rf tid h var code quote
+  local list="$1" slug kind type pf rf var code quote
   while IFS=$'\t' read -r slug kind type pf rf; do
     [ -n "$slug" ] || continue
     [ "$type" = "ticket-auto-pipeline:dor-semantic-agent" ] || echo "bad agent type $type" >&2
@@ -189,15 +199,12 @@ _spawn_list() {
       echo "garbage" >"$rf"
       continue
     fi
-    tid="DRAFT-${slug}"
-    h=$(_hash_of "$slug")
     if [ "$kind" = "scan" ]; then
       var="FINDINGS_${slug//-/_}"
       {
         echo "=== DOR_SEMANTIC_SCAN ==="
         echo "SCHEMA_VERSION: 1"
-        echo "TICKET: ${tid}"
-        echo "BODY_HASH: ${h}"
+        _echo_lines "$slug"
         echo "PARAPHRASE: The ticket makes one change, described consistently."
         if [ -n "${!var:-}" ]; then
           code="${!var%%|*}"
@@ -221,8 +228,7 @@ _spawn_list() {
       {
         echo "=== DOR_SEMANTIC_AUDIT ==="
         echo "SCHEMA_VERSION: 1"
-        echo "TICKET: ${tid}"
-        echo "BODY_HASH: ${h}"
+        _echo_lines "$slug"
         echo "SCORE_PLAUSIBLE: yes"
         echo "SCORE_REASON: fixture"
         echo "=== END DOR_SEMANTIC_AUDIT ==="
