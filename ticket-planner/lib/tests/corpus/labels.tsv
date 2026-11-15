@@ -1,3 +1,5 @@
 snap_id	check	unit	observed	expected	label	source
 s10-crosscheck	carve_scope	initiative	CARVE_SCOPE_LOST	pass	checker-bug	F67
 s10-crosscheck	state_write_dedupe	Consensus/resolve	silent-drop-rc0	visible-drop-rc3	checker-bug	F70
+s10-crosscheck	consensus_dispositions	consensus.md	log-says-11/0/2	headings-12/0/1	checker-bug	F70
+s02-cited	cited_artifact_questions	consensus.md	UNRAISED-when-paraphrased	canonical-line-restored	format	audit-1-row-19

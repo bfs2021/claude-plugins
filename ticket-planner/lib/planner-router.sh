@@ -323,6 +323,27 @@ planner_until_validate() {
 
 # ── Dispatch-loop halts ────────────────────────────────────────────────────────
 
+# _planner_dispatch_consensus_facts <initiative_id> <loud|quiet> — what bash
+# derives once Consensus's latest attempt ended `done` (seam-bash-derives
+# slice 2): the canonical CITED_ARTIFACT questions in consensus.md (rc 1 when
+# consensus.md cannot be written), then phase-results/consensus.json. Nothing
+# blocks on the dispositions yet: when the headings cannot be read there is no
+# file, and `loud` (post) prints one WARNING; `quiet` (pre, every resume) does
+# not repeat it. Idempotent; a no-op before Consensus has finished.
+_planner_dispatch_consensus_facts() {
+  local initiative_id="$1" mode="$2" err
+  _planner_phase_done_ts "$(planner_state_log "$initiative_id")" Consensus >/dev/null || return 0
+  _source_if_missing planner_cited_questions_sync "${_PLANNER_ROUTER_LIB_DIR}/planner-crosscheck-testdata.sh"
+  planner_cited_questions_sync "$initiative_id" || {
+    echo "ERROR: could not write the cited-artifact questions into consensus.md for '${initiative_id}'" >&2
+    return 1
+  }
+  if ! err=$(planner_consensus_result_ensure "$initiative_id" 2>&1) && [ "$mode" = "loud" ]; then
+    echo "WARNING: ${err:-could not record the Consensus dispositions} (nothing blocks on it yet)" >&2
+  fi
+  return 0
+}
+
 # The dispatch loop's halt blocks (SKILL.md step 7), one call each. Every gate
 # prints the operator report its inline SKILL.md block printed before
 # skill-deterministic-extraction moved it here; fixtures/halt-goldens pins the
@@ -344,8 +365,12 @@ planner_until_validate() {
 #   post       step 4a, after every agent phase: for Specify, bash records the
 #              specs on disk in artifacts/phase-results/specify.json
 #              (planner_specify_result_ensure, seam-bash-derives; rc 1 when it
-#              cannot), then the adr gate. `pre` repeats the record before
-#              Review, so a router that died in between still writes it
+#              cannot); for Consensus, bash writes the canonical
+#              CITED_ARTIFACT questions into consensus.md and records the
+#              finding dispositions in phase-results/consensus.json
+#              (_planner_dispatch_consensus_facts, slice 2); then the adr
+#              gate. `pre` repeats both before Review and Crosscheck
+#              respectively, so a router that died in between still writes them
 #   stop       step 6: --until or the create gate stops the run after <phase>
 # Returns: 0 proceed (nothing printed but a gate's own output), 3 halted (the
 #          report is on stdout; the caller exits 0), 1 error (stderr; exit 1).
@@ -367,6 +392,9 @@ planner_dispatch_gate() {
         echo "ERROR: could not record Specify's spec list for '${initiative_id}' (artifacts/phase-results/specify.json)" >&2
         return 1
       }
+    fi
+    if [ "$phase" = "Crosscheck" ]; then
+      _planner_dispatch_consensus_facts "$initiative_id" quiet || return 1
     fi
     for g in create consensus specify; do
       rc=0
@@ -451,6 +479,9 @@ planner_dispatch_gate() {
         echo "ERROR: could not record Specify's spec list for '${initiative_id}' (artifacts/phase-results/specify.json)" >&2
         return 1
       }
+    fi
+    if [ "$phase" = "Consensus" ]; then
+      _planner_dispatch_consensus_facts "$initiative_id" loud || return 1
     fi
     planner_dispatch_gate adr "$initiative_id" "$phase" "$state_dir"
     return

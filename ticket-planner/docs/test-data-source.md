@@ -236,8 +236,11 @@ an export, an attachment). It first tries the source's attachments, the initiati
 
 ### consensus.md — `## Open Questions`
 
-`planner_cited_artifacts_questions <id>` renders one line per NOT FOUND artifact. The
-Consensus agent copies it verbatim:
+`planner_cited_artifacts_questions <id>` renders one line per NOT FOUND artifact. Bash writes
+them into the section after Consensus (`planner_cited_questions_sync`, run by the router's `post`
+gate and again before Crosscheck): a line that names one of the artifacts is rewritten to the
+canonical text, keeping its answer, and a missing one is appended. The agent no longer copies
+them, so a paraphrase cannot turn into `CITED_ARTIFACT_UNRAISED`:
 
 ```
 - CITED_ARTIFACT: `<name>` — cited but not retrievable. Provide it, or confirm it should be synthesised. Answer: PENDING

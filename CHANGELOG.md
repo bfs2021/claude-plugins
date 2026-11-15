@@ -72,6 +72,39 @@ marketplace. Where a release also moved `ticket-planner`, `fleet-controller`, or
   and `FLEET_ROUTER_STEP_SHELL` off (`FLEETD_PHASE_DISPATCH_NEEDS_ROUTER_STEP`). Both flags
   default off, so nothing changes on a host that has not opted in.
 
+## ticket-planner 0.45.0 (2026-11-15) — seam-bash-derives slice 2: Consensus, cited artifacts and COMPLETED.md from bash
+
+- **Consensus dispositions are counted by bash (F70).** Iteration 10's Consensus logged
+  "11 accepted, 0 rejected, 2 deferred"; its own headings said 12/0/1. After Consensus,
+  the router's `post` gate (and `pre` before Crosscheck) reads the
+  `### <id> — <severity> — <title> — <disposition>` headings under
+  `## Findings Addressed` into `artifacts/phase-results/consensus.json` (counts plus each
+  finding's id and disposition). Fail closed: when the headings cannot be read (no
+  section, no id heading, a disposition outside accepted/rejected/deferred such as
+  "partly accepted") there is no file and one WARNING line. Nothing blocks on the file
+  yet. The Consensus prompt now names the heading shape.
+- **Bash writes the `CITED_ARTIFACT:` questions (audit row 19).** The Consensus agent was
+  asked to copy them verbatim; a paraphrase or a dropped line blocked Crosscheck with
+  `CITED_ARTIFACT_UNRAISED`. `planner_cited_questions_sync` now rewrites any line that
+  names a NOT FOUND artifact to the canonical text, keeping its `Answer:`, and appends a
+  missing one at the end of `## Open Questions`. It runs after Consensus and again before
+  each Crosscheck, writes only on a change, and keeps CRLF. The copy instruction is gone
+  from the prompt.
+- **COMPLETED.md reads the intent files.** The epic id comes from
+  `.intents/epic-<INIT>.json` and the ticket ids and count from every created
+  `.intents/ticket-*.json` plus the epic manifest, never from the `EPIC_ID=` or
+  `META|ticketgen` messages, which are now free text. The "Tickets Created" line is
+  `<n> tickets` (the created/skipped/failed split came from a message); a spec with no
+  created ticket is a Warnings line. **For operators:** an initiative with no created
+  epic intent file can no longer render COMPLETED.md (rc 1, as before for a missing
+  `EPIC_ID`).
+- **Status-line lint covers every prompt line.** `test-planner-corpus.sh` now checks all
+  `planner_state_write` lines in the prompts for count placeholders and keeps the list
+  of prompt-written lines a script still reads: `EpicGen|create|done` `EPIC_ID=`,
+  `META|adr-gate|fail` (change `seam-fail-closed`) and `META|discovery|repo-ref`.
+- **Corpus.** Iteration 10's consensus.md headings and a new iteration 02 snapshot
+  (`s02-cited`, two NOT FOUND cited artifacts) with replay cases.
+
 ## ticket-planner 0.44.0 (2026-11-15) — seam-bash-derives slice 1: bash derives, the model judges
 
 - **Carve scope compares the specs bash recorded, not a count the agent typed (F67).**
