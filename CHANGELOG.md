@@ -17,6 +17,32 @@ marketplace. Where a release also moved `ticket-planner`, `fleet-controller`, or
 > - **0.19.0 never existed.** `plugin.json` went 0.18.0 → 0.20.0. The Phase 2
 >   commit message claims `0.19.0→0.20.0`, but no 0.19.0 was ever committed.
 
+## ticket-planner 0.47.0 (2026-11-15) — seam-bash-derives slice 5: corpus scrub, privacy gate, doctor guard
+
+- **`scripts/corpus-scrub.sh <src> <dst>`** copies real planner output into a corpus tree
+  with one deterministic token map, applied to file contents and file names alike:
+  initiative ids, UUIDs and commit shas get a fake derived from a hash of the value (the
+  same value always gets the same fake), e-mails outside `conduit.test` and
+  `example.{com,org,net}` become `redacted@example.com`, token-shaped strings become
+  `REDACTED-TOKEN`, and tracker ids, `linear.app` URLs, home paths, the sandbox repository
+  and owner names and private names are rewritten. It refuses binary files, symlinks and
+  a non-empty destination. **`scripts/corpus-rehash.sh <dir>`** then recomputes what the
+  rewrite invalidated: `BODY_HASH` (and a spawn request's `body_hash`) with ticket-auto's
+  `_dor_body_hash` over the scrubbed `body.md`, and `revise.r<N>.sha` over the scrubbed
+  revise file. A result with no `body.md` beside it keeps its hash. Test:
+  `scripts/tests/test-corpus-scrub.sh`.
+- **`test-corpus-privacy.sh`** is its own CI test. It scans every `*/lib/tests/corpus/`
+  directory, contents and file names, for tracker ids and URLs, real initiative ids, home
+  paths, the sandbox, owner and private names, token-shaped strings and e-mails outside
+  the allowlist, then plants one leak of each kind in a copy and checks each is reported.
+- **`/ticket-planner doctor` refuses a `REPOS_ROOT` that holds a corpus (F46 class).** A
+  `corpus/MANIFEST.tsv` (or the local unscrubbed `corpus-raw/MANIFEST.tsv`) within 10
+  levels of `REPOS_ROOT` is an `error` row and counts as an issue: phase agents would read
+  past findings and verdicts. **For operators:** a `REPOS_ROOT` that contains this
+  checkout now fails doctor; point it at the sandbox repositories only.
+- **Runbook:** every rehearsal halt becomes a scrubbed corpus case, committed red, before
+  its fix (`docs/runbooks/dispatch-rehearsal.md` § 3).
+
 ## grill-me 0.7.0 (2026-11-15) — seam-bash-derives slice 4: the seal reads result.json
 
 - **The agent passes no seal value (seam audit, grill row G4).** `grill_seal_generate` took

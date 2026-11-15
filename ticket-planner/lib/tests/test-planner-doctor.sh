@@ -70,6 +70,50 @@ else
   fail "real REPOS_ROOT resolves ok" "$ROW"
 fi
 
+# ── Test 1b: a test corpus under REPOS_ROOT is refused (F46 class) ──────
+
+echo "--- Test 1b: corpus under REPOS_ROOT ---"
+
+if [ -z "$(doctor_row "$OUT" "corpus-under-REPOS_ROOT")" ]; then
+  pass "no corpus row when REPOS_ROOT holds no corpus"
+else
+  fail "no corpus row when REPOS_ROOT holds no corpus" "$(doctor_row "$OUT" "corpus-under-REPOS_ROOT")"
+fi
+BASE_RC=0
+planner_doctor_run >/dev/null 2>&1 || BASE_RC=$?
+
+CORPUS_DIR="${REPOS_ROOT}/claude-plugins/ticket-planner/lib/tests/corpus"
+mkdir -p "$CORPUS_DIR"
+printf 'snap_id\titer\n' >"${CORPUS_DIR}/MANIFEST.tsv"
+RC=0
+OUT=$(planner_doctor_run 2>/dev/null) || RC=$?
+ROW=$(doctor_row "$OUT" "corpus-under-REPOS_ROOT")
+if grep -q "|error|${CORPUS_DIR}/MANIFEST.tsv|" <<<"$ROW" && [ "$RC" -eq $((BASE_RC + 1)) ]; then
+  pass "a checkout's corpus six levels down is an error and counts as an issue"
+else
+  fail "a checkout's corpus six levels down is an error and counts as an issue" "rc=${RC} base=${BASE_RC} ${ROW}"
+fi
+rm -rf "${REPOS_ROOT}/claude-plugins"
+
+mkdir -p "${REPOS_ROOT}/rehearsal/corpus-raw"
+printf 'snap_id\titer\n' >"${REPOS_ROOT}/rehearsal/corpus-raw/MANIFEST.tsv"
+if grep -q '|error|' <<<"$(doctor_row "$(planner_doctor_run 2>/dev/null)" "corpus-under-REPOS_ROOT")"; then
+  pass "the local unscrubbed replay (corpus-raw) is refused too"
+else
+  fail "the local unscrubbed replay (corpus-raw) is refused too" "not reported"
+fi
+rm -rf "${REPOS_ROOT}/rehearsal"
+
+mkdir -p "${REPOS_ROOT}/app/node_modules/x/corpus" "${REPOS_ROOT}/app/docs/corpus"
+printf 'x\n' >"${REPOS_ROOT}/app/node_modules/x/corpus/MANIFEST.tsv"
+printf 'x\n' >"${REPOS_ROOT}/app/docs/corpus/OTHER.tsv"
+if [ -z "$(doctor_row "$(planner_doctor_run 2>/dev/null)" "corpus-under-REPOS_ROOT")" ]; then
+  pass "node_modules is pruned and another file name is not a corpus"
+else
+  fail "node_modules is pruned and another file name is not a corpus" "reported"
+fi
+rm -rf "${REPOS_ROOT}/app"
+
 # ── Test 2: Linear team + label resolution (mocked) ─────────────────────
 
 echo "--- Test 2: team + board-projected labels ---"

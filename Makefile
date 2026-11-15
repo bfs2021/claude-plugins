@@ -220,6 +220,7 @@ test-lib:
 	bash scripts/tests/test-ci-nightly-issue.sh
 	bash scripts/tests/test-check-grep-q-pipe.sh
 	bash scripts/tests/test-drift-report.sh
+	bash scripts/tests/test-corpus-scrub.sh
 	CLAUDE_SKILLS_LIB="$(CURDIR)/ticket-auto-pipeline/lib" \
 	bash ticket-auto-pipeline/lib/tests/test-gate-check.sh
 	CLAUDE_SKILLS_LIB="$(CURDIR)/ticket-auto-pipeline/lib" \
@@ -341,6 +342,7 @@ test-planner:
 	bash ticket-planner/lib/tests/test-planner-base-branch.sh
 	bash ticket-planner/lib/tests/test-planner-crosscheck-propagation.sh
 	bash ticket-planner/lib/tests/test-planner-corpus.sh
+	bash ticket-planner/lib/tests/test-corpus-privacy.sh
 	bash ticket-planner/lib/tests/test-planner-crosscheck-bypass.sh
 	bash ticket-planner/lib/tests/test-planner-crosscheck-contracts.sh
 	bash ticket-planner/lib/tests/test-planner-crosscheck-signals.sh

@@ -165,6 +165,7 @@ bash ticket-auto-pipeline/lib/tests/test-ticket-audit-exec-dedup.sh	1.3
 bash ticket-auto-pipeline/lib/tests/test-worker-hooks.sh	1.3
 bash ticket-planner/lib/tests/test-branch-decision.sh	1.3
 bash ticket-planner/lib/tests/test-planner-intent-testdata.sh	1.3
+bash scripts/tests/test-corpus-scrub.sh	1.2
 bash ticket-auto-pipeline/lib/tests/test-ac-drift.sh	1.2
 bash ticket-auto-pipeline/lib/tests/test-board-cursor-fastforward.sh	1.2
 bash ticket-auto-pipeline/lib/tests/test-dispatch-table.sh	1.2
@@ -222,6 +223,7 @@ bash ticket-auto-pipeline/lib/tests/test-linear-api-audit.sh	0.4
 bash ticket-auto-pipeline/lib/tests/test-retro-crosscheck.sh	0.4
 bash ticket-auto-pipeline/lib/tests/test-retro-lib-layout.sh	0.4
 bash ticket-auto-pipeline/lib/tests/test-ticket-tmp.sh	0.4
+bash ticket-planner/lib/tests/test-corpus-privacy.sh	0.4
 bash ticket-planner/lib/tests/test-planner-body-template-humanizer.sh	0.4
 bash ticket-planner/lib/tests/test-planner-crosscheck-bypass.sh	0.4
 python3 -m pytest fleet-controller/fleetd/tests/test_main.py -v	0.4
