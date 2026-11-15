@@ -12,7 +12,7 @@ specs/export-csv.md
 
 (cross-file)
   CARVE_SCOPE_LOST — 1 blocking
-    fix: the spec-file count no longer matches the ticket count Specify declared — record the rescope in consensus.md, or restore the missing spec
+    fix: the specs on disk differ from the ones Specify wrote (artifacts/phase-results/specify.json) — record the rescope in consensus.md and accept it, or restore the missing spec
     ticket count changed 4 -> 3 after Specify; audit scope by hand
 
 TOTAL: 2 blocking, 1 warn, 0 accepted across 2 artifact group(s), 3 code(s)

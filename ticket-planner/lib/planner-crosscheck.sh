@@ -684,7 +684,7 @@ planner_crosscheck_findings_summary() {
 # Codes whose findings are inherently about a set of artifacts rather than one
 # — grouping them under whichever filename happens to appear first in the
 # message would point the operator at an arbitrary member of the set.
-PLANNER_CROSSCHECK_CROSS_FILE_CODES="RESOLUTION_NOT_PROPAGATED CARVE_SCOPE_LOST SIGNALS_UNIFORM TEST_DATA_UNOWNED TEST_DATA_UNSOURCED_LEGACY OWN_MULTI_WRITER OWN_MULTI_FIRE"
+PLANNER_CROSSCHECK_CROSS_FILE_CODES="RESOLUTION_NOT_PROPAGATED CARVE_SCOPE_LOST CHECK_ERRORED SIGNALS_UNIFORM TEST_DATA_UNOWNED TEST_DATA_UNSOURCED_LEGACY OWN_MULTI_WRITER OWN_MULTI_FIRE"
 
 # One-line remediation hint per finding code. Deliberately canned and code-
 # scoped: it says what shape the fix takes, not what the specific fix is —
@@ -747,7 +747,10 @@ planner_crosscheck_fix_hint() {
     echo "Crosscheck could not write artifacts/ownership-edges.json — check the artifacts directory is writable, then resume"
     ;;
   CARVE_SCOPE_LOST)
-    echo "the spec-file count no longer matches the ticket count Specify declared — record the rescope in consensus.md, or restore the missing spec"
+    echo "the specs on disk differ from the ones Specify wrote (artifacts/phase-results/specify.json) — record the rescope in consensus.md and accept it, or restore the missing spec"
+    ;;
+  CHECK_ERRORED)
+    echo "a check could not read its input and did not run — fix or regenerate the input it names (for carve scope, re-run Specify so bash records specify.json), or audit by hand and accept"
     ;;
   BYPASS_PATH_UNADDRESSED)
     echo "a live code path matching this ticket's terms is covered by no spec — extend the spec's scope, or record the path as out of scope"

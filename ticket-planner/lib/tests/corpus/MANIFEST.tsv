@@ -1,0 +1,2 @@
+snap_id	iter	stage	repo_variant	contents	provenance
+s10-crosscheck	10	consensus-done	greenfield	state.log through Consensus done; specs reduced to slug and title; INDEX.md	dispatch rehearsal iteration 10 (RealWorld Conduit clone, a public spec); scrubbed: initiative id, sandbox repo name, commit and intent hashes; signed off with seam-bash-derives slice 1

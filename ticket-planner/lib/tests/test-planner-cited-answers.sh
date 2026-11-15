@@ -87,6 +87,8 @@ EOF
 Nothing.
 EOF
   write_spec generate generate
+  # Specify end: bash records the spec list carve scope compares (seam-bash-derives).
+  planner_specify_result_write "$INIT" >/dev/null
   planner_crosscheck_run "$INIT" >/dev/null 2>&1
 }
 
@@ -291,6 +293,8 @@ cat >"${ART}/specs/test-data-pack.md" <<'EOF'
 1. Role: operator. Test data: none. Source: none.
 EOF
 write_spec seeded-by:test-data-pack seeded-by:test-data-pack
+# The hand-written pack stands in for a spec Specify wrote: record it (seam-bash-derives).
+planner_specify_result_write "$INIT" >/dev/null
 planner_crosscheck_run "$INIT" >/dev/null 2>&1
 rc=$?
 f=$(findings)
