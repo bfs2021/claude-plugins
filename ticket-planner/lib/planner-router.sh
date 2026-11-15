@@ -25,6 +25,9 @@ _source_if_missing "planner_initiative_dir" "${_PLANNER_ROUTER_LIB_DIR}/planner-
 # The goldfish lens (planner-goldfish-review): sourced here too, so a shell
 # that sources only the router has the NEXT and APPLY its `pre` gate names.
 _source_if_missing "planner_goldfish_due" "${_PLANNER_ROUTER_LIB_DIR}/planner-goldfish.sh"
+# Phase results bash derives from artifacts (seam-bash-derives): the `post`
+# gate records Specify's spec list, `pre` re-checks it before Review.
+_source_if_missing "planner_specify_result_ensure" "${_PLANNER_ROUTER_LIB_DIR}/planner-phase-results.sh"
 
 # ── Phase dispatch ─────────────────────────────────────────────────────────────
 
@@ -337,7 +340,12 @@ planner_until_validate() {
 #              `SPAWN NEXT=<fn> APPLY=<fn> TIMEOUT=<ms>` for SKILL.md step 1e
 #   create | consensus | specify   one of those alone
 #   crosscheck step 1a: runs Crosscheck; halts on a blocking finding
-#   adr        step 4a: Architecture parked on the ADR gate (Architecture only)
+#   adr        Architecture parked on the ADR gate (Architecture only)
+#   post       step 4a, after every agent phase: for Specify, bash records the
+#              specs on disk in artifacts/phase-results/specify.json
+#              (planner_specify_result_ensure, seam-bash-derives; rc 1 when it
+#              cannot), then the adr gate. `pre` repeats the record before
+#              Review, so a router that died in between still writes it
 #   stop       step 6: --until or the create gate stops the run after <phase>
 # Returns: 0 proceed (nothing printed but a gate's own output), 3 halted (the
 #          report is on stdout; the caller exits 0), 1 error (stderr; exit 1).
@@ -354,6 +362,12 @@ planner_dispatch_gate() {
       echo "ERROR: could not record the parameter, ownership and AC precondition contracts for '${initiative_id}'" >&2
       return 1
     }
+    if [ "$phase" = "Review" ]; then
+      planner_specify_result_ensure "$initiative_id" || {
+        echo "ERROR: could not record Specify's spec list for '${initiative_id}' (artifacts/phase-results/specify.json)" >&2
+        return 1
+      }
+    fi
     for g in create consensus specify; do
       rc=0
       planner_dispatch_gate "$g" "$initiative_id" "$phase" "$state_dir" || rc=$?
@@ -431,6 +445,16 @@ planner_dispatch_gate() {
       return 3
     fi
     ;;
+  post)
+    if [ "$phase" = "Specify" ]; then
+      planner_specify_result_ensure "$initiative_id" || {
+        echo "ERROR: could not record Specify's spec list for '${initiative_id}' (artifacts/phase-results/specify.json)" >&2
+        return 1
+      }
+    fi
+    planner_dispatch_gate adr "$initiative_id" "$phase" "$state_dir"
+    return
+    ;;
   adr)
     [ "$phase" = "Architecture" ] || return 0
     _source_if_missing planner_adr_gate_blocked "${_PLANNER_ROUTER_LIB_DIR}/planner-adr-gate.sh"
@@ -465,7 +489,7 @@ planner_dispatch_gate() {
     fi
     ;;
   *)
-    echo "planner-router: planner_dispatch_gate: unknown gate '${gate}' (pre|create|consensus|specify|crosscheck|adr|stop)" >&2
+    echo "planner-router: planner_dispatch_gate: unknown gate '${gate}' (pre|create|consensus|specify|crosscheck|adr|post|stop)" >&2
     return 1
     ;;
   esac

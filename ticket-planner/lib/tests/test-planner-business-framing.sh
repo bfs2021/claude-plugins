@@ -402,7 +402,8 @@ _prompt_has "EpicGen" "$EPICGEN_PROMPT" \
 # Pinned as the sha256 of the prompt captured with that change, with the
 # scratch REPOS_ROOT normalised. If a later change edits the Specify prompt on
 # purpose, re-capture: printf '%s' "${SPECIFY_PROMPT//$TMP_ROOT/<REPOS_ROOT>}" | sha256sum
-SPECIFY_PROMPT_SHA="70f5af9ceb674df514b61d3d9077fb09e246b38e93051bef57670e99bab54332"
+# Re-captured for seam-bash-derives (status lines carry no counts).
+SPECIFY_PROMPT_SHA="a598e48f9223f6cfd3c31cb2518b160cc3edc07a521dd83af330e6ea5a8e2be7"
 got_sha=$(printf '%s' "${SPECIFY_PROMPT//$TMP_ROOT/<REPOS_ROOT>}" | sha256sum | cut -d' ' -f1)
 if [ "$got_sha" = "$SPECIFY_PROMPT_SHA" ]; then
   pass "Specify prompt is byte-identical to the pre-change capture"

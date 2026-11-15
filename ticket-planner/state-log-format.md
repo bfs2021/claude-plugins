@@ -23,6 +23,12 @@ planner_state_write "${initiative_id}" "Appraisal" "scope" "done" "Scope summary
 
 Direct writes (without `planner_state_write`) bypass duplicate detection, atomic flock, and pipe sanitization — avoid them.
 
+A `done` for a phase and step whose last line is already `done` is a duplicate: it is not written, and `planner_state_write` returns **3** with a
+`duplicate done for <Phase>/<step> not written (rc 3)` message on stderr (seam-bash-derives, rehearsal F70). Write a `start` line first to record a new run.
+
+**Messages are for people.** No script reads a count or list out of the message of a line an agent writes; a value a check needs is derived by bash
+from the artifacts into `artifacts/phase-results/<phase>.json` (for Specify, `specify.json`: the spec slugs on disk when Specify finished).
+
 ## Statuses
 
 | Status | Meaning |

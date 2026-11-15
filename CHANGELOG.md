@@ -47,6 +47,75 @@ marketplace. Where a release also moved `ticket-planner`, `fleet-controller`, or
   table vouches for a prerequisite only when every verifiable row fills that column.
   A policy auto-approve holds on any open `[needs-human]` question.
 
+## fleet-controller 0.54.0 (2026-11-15) — fail closed where fleet code read model-written text (seam audit Track 0)
+
+- **Auto-merge checks the PR before merging (Track 0.1).** `orchestration.run_auto_merge`
+  took the PR number from the agent-written `PR-REVIEW|checkout-pr|done|` line and merged
+  it. It now refuses unless the number is a bare number and the PR's live `headRefName`
+  equals the ticket's recorded branch (`ticket=` in the last `META|branch-context`). Each
+  refusal skips the merge and logs `META|pr-auto-merge|skip|<CODE>`: `PR_NUMBER_INVALID`,
+  `PR_BRANCH_UNRECORDED`, `PR_HEAD_UNREADABLE`, `PR_HEAD_MISMATCH`. The head is now read for
+  every PR, not only under an epic integration branch. fleetd does not run STEP_4_6's
+  `post_dispatch` yet, so this hardens a path before it goes live.
+- **`detect_planner_feedback` finds collected feedback (Track 0.4).** It grepped for
+  `"source_tid":"<tid>"`, but `fleet-feedback.sh` writes its files through `jq .`
+  (`"source_tid": "<tid>"`), so the grep never matched and every planned ticket with
+  feedback showed `planner-feedback(S1)` until it finished. It now reads `.tickets[].source_tid`
+  with jq; an unparseable file still counts as not collected.
+- **Phase dispatch fails closed on a missing verdict (Track 0.5).** `classify_phase` returned
+  `done` for a loop-bearing phase (IMPLEMENT, VERIFY, PR-REVIEW) that exited 0 with no
+  usable `META|phase-result`, so a VERIFY agent that forgot its block passed. It now
+  returns `fail`. Rung 5 is reachable: `classify_phase` applies its `overrides`, and the
+  supervisor passes `phase_dispatch.verifier_overrides` (VERIFY `META|claim-delta`
+  `direction: optimistic`, IMPLEMENT `RETURN_INCOMPLETE`). Only `router-step.sh post-spawn`
+  writes these records, so fleetd refuses to start with `FLEET_PHASE_DISPATCH_ENABLE=true`
+  and `FLEET_ROUTER_STEP_SHELL` off (`FLEETD_PHASE_DISPATCH_NEEDS_ROUTER_STEP`). Both flags
+  default off, so nothing changes on a host that has not opted in.
+
+## ticket-planner 0.44.0 (2026-11-15) — seam-bash-derives slice 1: bash derives, the model judges
+
+- **Carve scope compares the specs bash recorded, not a count the agent typed (F67).**
+  Iteration 10 halted at Crosscheck with `CARVE_SCOPE_LOST` "Specify declared 7
+  tickets, 8 spec files exist" on a clean plan: the check read the number from
+  Specify's `synthesize|start` line, which the prompt had the agent write before any
+  spec existed. When that message held no number, the check passed without checking.
+  Now, when Specify finishes, bash lists `artifacts/specs/*.md` (minus `INDEX.md` and
+  synth TD specs) into the new `artifacts/phase-results/specify.json`
+  (`lib/planner-phase-results.sh`). `planner_crosscheck_carve_scope` diffs those slugs
+  against the specs on disk and names any that were lost or added.
+- **Fail closed: `CHECK_ERRORED`.** A missing or unreadable `specify.json` is a new
+  blocking finding, `CHECK_ERRORED carve_scope: …`, never a pass. **An initiative whose
+  Specify ran under an older release halts once at Crosscheck** with it: audit the
+  scope, then `resume <ID> --accept CHECK_ERRORED:"<reason>"`, or re-run Specify.
+- **Post-agent gate.** SKILL.md step 4a now calls `planner_dispatch_gate post`, which
+  records Specify's spec list and then runs the ADR gate as before; `pre` repeats the
+  record before Review, so a router that died in between still writes it.
+- **A dropped duplicate `done` is visible (F70).** Consensus's corrected second `done`
+  line was dropped as a duplicate with rc 0, so the log kept the wrong counts.
+  `planner_state_write` now returns 3 and says on stderr that the line was not written
+  and how to record a new run. Every caller was audited; `META|ownership-edges|done`,
+  which a resumed Crosscheck used to lose, is now a repeatable record.
+- **Status lines carry no counts.** The Discovery, Specify, Review and Consensus prompts'
+  state-log lines are fixed text; no script reads a value out of an agent's message.
+- **Corpus.** `ticket-planner/lib/tests/corpus/` starts with a scrubbed iteration 10
+  snapshot (`MANIFEST.tsv`, `labels.tsv`) and `test-planner-corpus.sh` replays it
+  through the real readers, with a privacy grep. Openspec change `seam-bash-derives`
+  plans the next slices.
+
+## ticket-planner 0.43.7 (2026-11-15) — replan reads real dependency edges
+
+- **`planner_replan_validate_deps` now sees the dependencies specs actually write.**
+  It parsed `blocked-by:{X}` (braces), but Specify writes `blocked-by:<slug>` on the
+  `## Labels` line — no braces, optionally backticked, space- or comma-separated. The
+  sed matched nothing, so the whole Labels line became one "target", the graph was
+  nonsense and the post-replan cycle check could never fire. It also sourced its cycle
+  checker relative to the caller's working directory. The new
+  `planner_replan_deps_json <id>` reads the graph through `planner_ticketgen_deps_json`,
+  the reader TicketGen orders by and Crosscheck's `DEPENDENCY_CYCLE` uses, so replan
+  now gets sibling-prefix resolution, external tracker ids and both sidecars'
+  (test-data synthesis, ownership) edges too. Libraries resolve from the lib's own
+  directory. `planner_replan_validate_deps` has no caller yet, so nothing else changes.
+
 ## ticket-planner 0.43.6 (2026-11-15) — dispatch-rehearsal iteration 09 finding
 
 - **Draft gate: an `INTENT_AC_MISMATCH` on one criterion gets a revise round (F62).**

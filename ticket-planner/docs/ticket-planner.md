@@ -446,8 +446,8 @@ cycle through a sidecar edge (consumer → TD spec, or reader → writer from
 `## Labels` blocked-by, the test-data synthesis edges in `artifacts/testdata-synth.json` and
 the ownership edges in `artifacts/ownership-edges.json`.
 
-`planner_replan_validate_deps` (re-planning) still sees `## Labels` refs only, not either
-sidecar. That gap predates the ownership edges.
+`planner_replan_validate_deps` (re-planning) reads the same graph through
+`planner_replan_deps_json`, so it sees `## Labels` refs and both sidecars' edges.
 
 ### Cross-initiative prerequisites
 
@@ -1410,8 +1410,9 @@ both plans and creates would be the footgun this design exists to remove.
 ### Accepting a genuine Crosscheck finding (`--accept`)
 
 Some blocking findings are correct about the artifacts but not defects — most often
-`CARVE_SCOPE_LOST` when a ticket count was deliberately rescoped after Specify and the
-rescope is already documented in `consensus.md` or a post-Consensus coverage-audit doc.
+`CARVE_SCOPE_LOST` when a spec was deliberately carved, split or dropped after Specify (carve
+scope compares the slugs bash recorded in `artifacts/phase-results/specify.json` when
+Specify finished with the specs on disk) and the rescope is already documented in `consensus.md` or a post-Consensus coverage-audit doc.
 Before this flag existed the only way to unblock the create gate was hand-writing a
 `META|crosscheck|accepted|...`-shaped line directly into `state.log` — undocumented,
 easy to get wrong, and indistinguishable from an automated pass unless you already knew
@@ -1420,6 +1421,11 @@ to look for it (#222).
 ```
 /ticket-planner resume INIT-42 --accept CARVE_SCOPE_LOST:"documented rescope, see consensus.md#tickets-6"
 ```
+
+`CHECK_ERRORED` (blocking) means a check could not read its input and so did not run: for carve
+scope, `specify.json` is missing or unreadable — an initiative whose Specify ran before
+ticket-planner 0.44.0 has none. Audit the scope by hand, then accept it the same way, or
+re-run Specify.
 
 `--accept CODE:"reason"` is **`resume` only**, same restriction as `--create` — a
 finding can only be accepted after Crosscheck has reported it. It is parsed and

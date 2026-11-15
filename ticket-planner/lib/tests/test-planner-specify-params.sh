@@ -686,6 +686,18 @@ _strip_inserted_blocks() {
 
 _sha() { printf '%s' "$1" | sha256sum | cut -d' ' -f1; }
 
+# seam-bash-derives replaced the count placeholders in the agents' status
+# lines (rehearsal F67/F70) after every capture below. Put the old wording
+# back before hashing, so the earlier pins keep their values.
+_seam_revert() {
+  local p="$1"
+  p="${p//\"Synthesizing proposal and writing ticket specs\"/\"Synthesizing proposal and writing specs for N tickets\"}"
+  p="${p//\"Proposal and ticket specs written to artifacts\/specs\/, self-lint clean\"/\"Proposal written, N ticket specs in artifacts\/specs\/, self-lint clean\"}"
+  p="${p//\"Resolving review findings\"/\"Resolving N review findings\"}"
+  p="${p//\"Consensus written to artifacts\/consensus.md\"/\"Consensus: X accepted, Y rejected, Z deferred\"}"
+  printf '%s' "$p"
+}
+
 # The ownership blocks of each prompt, in strip order.
 own_specify_blocks() {
   OWN_BLOCKS=("$(planner_ownership_prompt_rules)" "$OWN_SPECIFY_BULLET" "inline:${OWN_SPECIFY_HEADINGS}")
@@ -704,6 +716,7 @@ if need "$name" planner_params_prompt_rules planner_ownership_prompt_rules plann
   source "${LIB_DIR}/planner-phase-prompts.sh"
   sp=$(planner_prompt_specify "INIT-TEST" "an idea" "/repos/.ticket-auto/initiatives/INIT-TEST")
   sp="${sp//$REPOS_ROOT/<REPOS_ROOT>}"
+  sp=$(_seam_revert "$sp")
   # The sibling rules (rehearsal F38/F43, test-planner-sibling-rules.sh) came
   # after every capture below: strip them first so the earlier pins hold.
   sp=$(_strip_inserted_blocks "$sp" "inline:"$'\n\n'"$(planner_sibling_blocker_rule)" "$(planner_sibling_citation_rule)")
@@ -755,6 +768,7 @@ name="Consensus prompt is the pre-change prompt plus the rule blocks"
 if need "$name" planner_params_consensus_rule planner_ownership_consensus_rule planner_acpre_consensus_rule planner_goldfish_consensus_rule planner_prompt_consensus; then
   cp=$(planner_prompt_consensus "INIT-TEST" "an idea" "/repos/.ticket-auto/initiatives/INIT-TEST")
   cp="${cp//$REPOS_ROOT/<REPOS_ROOT>}"
+  cp=$(_seam_revert "$cp")
   # Sibling rules: stripped first, as for Specify above.
   _sib_sec=$(planner_sibling_citation_consensus_section "INIT-TEST")
   cp=$(_strip_inserted_blocks "$cp" "$(planner_sibling_blocker_rule)" "inline:${_sib_sec//$REPOS_ROOT/<REPOS_ROOT>}"$'\n\n')

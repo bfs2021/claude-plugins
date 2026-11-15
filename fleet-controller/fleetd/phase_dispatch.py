@@ -276,9 +276,27 @@ def classify_phase(phase, log_lines, exit_code=0, terminal_state=None,
     `terminal_state` is the value `fleet_ticket_terminal_state` returns
     (`done` / `gate-held` / `gate-stopped` / `incomplete`); pass None when it
     has not been consulted. `overrides` carries the independent verifiers of
-    rung 5 — see `apply_verifier_overrides`.
+    rung 5 — see `apply_verifier_overrides` and `verifier_overrides`, which
+    reads them from the same bracket. They apply to every rung but the
+    gate-stop.
+
+    Track 0.5 (fail closed): a loop-bearing phase (IMPLEMENT, VERIFY,
+    PR-REVIEW) that leaves no usable verdict and exits 0 is `fail`, never
+    `done`. A missing or UNKNOWN PHASE_RESULT is no evidence of success, and a
+    clean exit is no evidence of anything. That record is written only by
+    `router-step.sh post-spawn`, so fleetd refuses to start phase dispatch
+    without `FLEET_ROUTER_STEP_SHELL=true` (`__main__.phase_dispatch_refusal`).
     """
     phase = (phase or '').upper()
+    outcome = _classify_phase_rungs(phase, log_lines, exit_code,
+                                    terminal_state)
+    if outcome.source == 'gate-stop':
+        return outcome
+    return apply_verifier_overrides(outcome, overrides)
+
+
+def _classify_phase_rungs(phase, log_lines, exit_code, terminal_state):
+    """Rungs 1-4 of `classify_phase`; `phase` is already upper-cased."""
 
     # 1. A gate-stop wins outright. No judgment involved.
     for line in reversed(log_lines):
@@ -319,6 +337,15 @@ def classify_phase(phase, log_lines, exit_code=0, terminal_state=None,
         return PhaseOutcome('fail', '', 'exit-code',
                             f'no authoritative result; exit {exit_code}')
 
+    if phase in LOOP_BEARING_PHASES:
+        # Track 0.5: the model judges, bash knows. A loop-bearing phase with
+        # no verdict has not been judged, so it has not passed. VERIFY then
+        # retries implement against its loop cap instead of reaching PR
+        # review on nothing.
+        return PhaseOutcome('fail', '', 'exit-code',
+                            'no authoritative result; clean exit with no '
+                            'verdict fails closed')
+
     return PhaseOutcome('done', '', 'exit-code',
                         'no authoritative result; clean exit')
 
@@ -347,6 +374,56 @@ def apply_verifier_overrides(outcome, overrides):
     )
 
 
+def verifier_overrides(phase, log_lines):
+    """Rung 5's inputs, read from the phase's own bracket.
+
+    Only bash-written records count, never agent prose. Both are written by
+    `router-step.sh post-spawn` (fleetd runs it under
+    `FLEET_ROUTER_STEP_SHELL=true`):
+
+    * VERIFY — the last `META|claim-delta` (`verdict-recompute.sh`).
+      `direction: optimistic` (claimed PASS, the session trace does not
+      show it) gives `verdict_recompute: False`; `aligned`/`pessimistic`
+      give True; `unknown` or an unparseable record gives nothing, and the
+      claim itself decides.
+    * IMPLEMENT — a `META|gate-warn|...|RETURN_INCOMPLETE` line
+      (`return-completeness-check.sh`) gives `return_completeness: False`.
+      `next_step` does not route IMPLEMENT on its result today (the manual
+      router treats the warning as advisory too), so this records the
+      failure without changing the transition.
+
+    Returns a dict for `classify_phase(..., overrides=...)`; empty when no
+    signal was found.
+    """
+    phase = (phase or '').upper()
+    overrides = {}
+    if phase == 'VERIFY':
+        for line in reversed(log_lines):
+            fields = line.split('|', 4)
+            if len(fields) == 5 and fields[1] == 'META' \
+                    and fields[2] == 'claim-delta':
+                try:
+                    payload = json.loads(fields[4])
+                except ValueError:
+                    break
+                direction = (payload.get('direction') or '') \
+                    if isinstance(payload, dict) else ''
+                if direction == 'optimistic':
+                    overrides['verdict_recompute'] = False
+                elif direction in ('aligned', 'pessimistic'):
+                    overrides['verdict_recompute'] = True
+                break
+    elif phase == 'IMPLEMENT':
+        for line in log_lines:
+            fields = line.split('|', 4)
+            if len(fields) == 5 and fields[1] == 'META' \
+                    and fields[2] == 'gate-warn' \
+                    and fields[4].lstrip().startswith('RETURN_INCOMPLETE'):
+                overrides['return_completeness'] = False
+                break
+    return overrides
+
+
 def _last_phase_result(log_lines):
     """The most recent `META|phase-result` payload in `log_lines`, or None.
 
@@ -370,12 +447,11 @@ def _last_phase_result(log_lines):
 def missing_phase_result(phase, log_lines):
     """True when a loop-bearing phase produced no usable phase-result.
 
-    The fallback for a missing block is deliberately quiet — emission depends
-    on an agent following a prompt instruction, and no deterministic check can
-    observe whether it did, so failing closed would halt real tickets over a
-    reporting defect (design.md D12). It is instrumented instead: the
-    `phase_results` table already carries `parse_status` and `claimed_verdict`,
-    so the miss rate is a query. This predicate is what a caller records.
+    Since Track 0.5 a miss with a clean exit classifies `fail`
+    (`classify_phase` rung 4): design.md D12's quiet fallback read a
+    forgotten block as success. The miss is also instrumented: the
+    `phase_results` table carries `parse_status` and `claimed_verdict`, so the
+    miss rate is a query. This predicate is what a caller records.
     """
     if (phase or '').upper() not in LOOP_BEARING_PHASES:
         return False

@@ -198,10 +198,11 @@
       "category": "feature",
       "summary": "fleetd spawns each phase as its own short-lived worker and sequences phases itself, instead of one long-lived /ticket-auto worker per ticket.",
       "requires": [
-        { "flag": "FLEETD_SPAWN_ENABLED" }
+        { "flag": "FLEETD_SPAWN_ENABLED" },
+        { "flag": "FLEET_ROUTER_STEP_SHELL", "note": "fleetd refuses to start phase dispatch without it: only router-step.sh post-spawn records the phase verdict, and a loop-bearing phase with no verdict fails closed" }
       ],
       "recommend": "situational",
-      "why": "Fully implemented but its rollout is not switched on: trial it on one fleetd instance and compare outcomes before relying on it.",
+      "why": "Fully implemented but its rollout is not switched on: trial it on one fleetd instance and compare outcomes before relying on it. Enable it together with FLEET_ROUTER_STEP_SHELL (see the checklist in fleet-controller/CLAUDE.md).",
       "docs": "fleet-controller/CLAUDE.md#phase-level-dispatch-two-invocation-modes"
     },
     {
@@ -215,7 +216,7 @@
         { "flag": "FLEET_PHASE_DISPATCH_ENABLE" }
       ],
       "recommend": "situational",
-      "why": "One implementation of each router step for both the manual router and fleetd. Off until one clean live run; on adds the inspector and prescan agent spawns (token cost) and makes the phase-result channel reach classify_phase. Unset it to roll back; it is read on every call.",
+      "why": "One implementation of each router step for both the manual router and fleetd. Off until one clean live run; on adds the inspector and prescan agent spawns (token cost) and makes the phase-result channel reach classify_phase. Required by FLEET_PHASE_DISPATCH_ENABLE: fleetd refuses to start phase dispatch without it, so rolling it back means turning phase dispatch off too.",
       "docs": "fleet-controller/CLAUDE.md#router-step-delegation"
     },
     {
