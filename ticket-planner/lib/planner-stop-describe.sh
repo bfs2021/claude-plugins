@@ -25,6 +25,9 @@
 #   CONSENSUS_BLOCKED       position Crosscheck with consensus.md Readiness:
 #                           blocked (one `note` question; the release is an
 #                           edit of consensus.md or a Consensus re-run)
+#   DRAFT_HARNESS_ERROR     as DRAFT_NOT_READY, but the run halted on its
+#                           unevaluated share ((run) HARNESS_ERROR, seam-gate-
+#                           safety D4): the evaluator, not the plan, failed
 #   DRAFT_NOT_READY         position EpicGen, the latest draft readiness run
 #                           blocked and every draft verdict is still current
 #                           (one `note` question per blocked spec, one
@@ -41,12 +44,18 @@
 #   REFINEMENT_HALT         Refinement halted with waivable not-ready codes,
 #                           or on BODY_DRIFT/BODY_UNVERIFIED (one
 #                           flag:refresh-bodies question, never a waive)
+#   REFINEMENT_HARNESS_ERROR Refinement halted on its unevaluated share
+#                           (HARNESS_ERROR) with nothing to waive: one `note`
+#                           question, a resume re-judges those tickets
 #   UNTIL_STOP              the run stopped after its --until phase
 #   FAILED_RETRY_EXHAUSTED  the current phase spent its retry budget
 #   RUNNING                 none of the above — a plain resume makes progress
 #
 # Output: one v2 block, or one terminal line REASON=COMPLETED, REASON=RUNNING
-# or REASON=FAILED_RETRY_EXHAUSTED. `--json` prints the underlying model
+# or REASON=FAILED_RETRY_EXHAUSTED. A COMPLETED initiative with tickets the
+# evaluator could not judge adds `UNEVALUATED=<n>` and
+# `UNEVALUATED_TICKETS=<TID,...>` (`unknown` when unreadable): a completion
+# that is not clean. `--json` prints the underlying model
 # instead (the form planner-answers.sh validates against).
 #
 # No agent, no network. Refinement questions read the local ticket manifests
@@ -74,7 +83,7 @@ declare -f planner_draft_readiness_state >/dev/null 2>&1 ||
   source "${_PLANNER_STOP_DESCRIBE_DIR}/planner-draft-readiness-gate.sh"
 
 # The reason values this script emits as a block (the rest are terminal lines).
-PLANNER_STOP_BLOCK_REASONS="CREATE_GATE DRAFT_NOT_READY CROSSCHECK_BLOCKED CONSENSUS_BLOCKED ADR_GATE SPECIFY_DECISION PROJECT_GATE REFINEMENT_HALT UNTIL_STOP"
+PLANNER_STOP_BLOCK_REASONS="CREATE_GATE DRAFT_NOT_READY DRAFT_HARNESS_ERROR CROSSCHECK_BLOCKED CONSENSUS_BLOCKED ADR_GATE SPECIFY_DECISION PROJECT_GATE REFINEMENT_HALT REFINEMENT_HARNESS_ERROR UNTIL_STOP"
 
 # Longest finding/message excerpt quoted inside a question.
 _PLANNER_STOP_EXCERPT_MAX=200
@@ -512,6 +521,29 @@ _planner_stop_refinement_body_tids() {
   done
 }
 
+# _planner_stop_unevaluated <INIT> — "<n>\t<TID,...>" for the epic's
+# children the evaluator could not judge (planner_refinement_unevaluated),
+# nothing when there are none or no epic, "unknown" when the manifests
+# cannot be read. Runs in a subshell: sourcing stays out of the caller.
+_planner_stop_unevaluated() {
+  (
+    local log tids
+    log=$(planner_state_log "$1") || exit 0
+    grep -q '^[^|]*|EpicGen|' "$log" 2>/dev/null || exit 0
+    declare -f planner_refinement_unevaluated >/dev/null 2>&1 ||
+      source "${_PLANNER_STOP_DESCRIBE_DIR}/planner-refinement.sh" 2>/dev/null || {
+      echo unknown
+      exit 0
+    }
+    _planner_refinement_source_deps >/dev/null 2>&1 || {
+      echo unknown
+      exit 0
+    }
+    tids=$(planner_refinement_unevaluated "$1" 2>/dev/null | cut -f1 | paste -sd, -)
+    [ -z "$tids" ] || printf '%s\t%s\n' "$(awk -F, '{print NF}' <<<"$tids")" "$tids"
+  )
+}
+
 # planner_stop_describe_json <INIT>
 # Prints the stop model as one JSON object.
 planner_stop_describe_json() {
@@ -530,7 +562,14 @@ planner_stop_describe_json() {
 
   pos=$(planner_position_derive "$init")
   if [ -z "$pos" ]; then
-    _planner_stop_terminal COMPLETED
+    local unev
+    unev=$(_planner_stop_unevaluated "$init")
+    if [ -z "$unev" ]; then
+      _planner_stop_terminal COMPLETED
+    else
+      _planner_stop_terminal COMPLETED | jq -c --arg u "$unev" \
+        '. + {unevaluated: ($u | split("\t") | {count: .[0], tickets: (.[1] // "")})}'
+    fi
     return 0
   fi
 
@@ -615,7 +654,7 @@ planner_stop_describe_json() {
   if [ "$pos" = "EpicGen" ]; then
     dr_state=$(planner_draft_readiness_state "$init" 2>/dev/null) || dr_state="none"
     if [ "$dr_state" = "blocked" ]; then
-      local d_slug d_code d_quote d_text d_hist
+      local d_slug d_code d_quote d_text d_hist d_harness=0
       local -A d_seen=()
       local -a d_order=()
       while IFS=$'\t' read -r d_slug d_code d_quote; do
@@ -625,7 +664,11 @@ planner_stop_describe_json() {
       done < <(planner_draft_readiness_blocked_findings "$init")
       for d_slug in "${d_order[@]}"; do
         d_text="${d_seen[$d_slug]%; }"
-        if [ "$d_slug" = "(run)" ]; then
+        if [ "$d_slug" = "(run)" ] && [ "${d_text%% *}" = "HARNESS_ERROR" ]; then
+          d_harness=1
+          q=$(_planner_stop_question "draft-run" "note" \
+            "The semantic evaluator could not judge $(_planner_stop_excerpt "${d_text#HARNESS_ERROR }") drafts — a harness error, not a plan defect. Answer 'resolved' to re-run draft readiness (unevaluated drafts are re-judged)." "resolved" "")
+        elif [ "$d_slug" = "(run)" ]; then
           q=$(_planner_stop_question "draft-run" "note" \
             "Draft readiness stopped the revise loop: $(_planner_stop_excerpt "$d_text"). Answer 'resolved' to re-run draft readiness." "resolved" "")
         else
@@ -643,7 +686,11 @@ planner_stop_describe_json() {
         "Answer 'resolved' once the specs are fixed; the resume re-runs Crosscheck when a spec changed, then draft readiness." \
         "resolved" "")
       questions=$(jq -nc --argjson a "$questions" --argjson q "$q" '$a + [$q]')
-      _planner_stop_model DRAFT_NOT_READY "artifacts/draft-readiness/" "$round" "$questions"
+      if [ "$d_harness" = 1 ]; then
+        _planner_stop_model DRAFT_HARNESS_ERROR "artifacts/draft-readiness/" "$round" "$questions"
+      else
+        _planner_stop_model DRAFT_NOT_READY "artifacts/draft-readiness/" "$round" "$questions"
+      fi
       return 0
     fi
   fi
@@ -768,6 +815,17 @@ planner_stop_describe_json() {
       _planner_stop_model REFINEMENT_HALT "epic $(planner_epic_id "$init")" "$round" "$questions"
       return 0
     fi
+    # Halted on the unevaluated share (seam-gate-safety D4): nothing to
+    # waive, a resume re-judges those tickets.
+    local r_fail
+    r_fail=$(grep '|META|refinement-gate|fail|' "$log" | tail -1 | cut -d'|' -f5-)
+    if [ "${r_fail%% *}" = "HARNESS_ERROR" ]; then
+      q=$(_planner_stop_question "refinement-harness-error" "note" \
+        "The semantic evaluator could not judge $(_planner_stop_excerpt "${r_fail#HARNESS_ERROR }") — a harness error, not a plan defect. Answer 'resolved' to resume; Refinement re-judges those tickets." "resolved" "")
+      questions=$(jq -nc --argjson a "$questions" --argjson q "$q" '$a + [$q]')
+      _planner_stop_model REFINEMENT_HARNESS_ERROR "epic $(planner_epic_id "$init")" "$round" "$questions"
+      return 0
+    fi
   fi
 
   # ── --until stop ───────────────────────────────────────────────────────
@@ -803,6 +861,7 @@ planner_stop_describe() {
 
   if [ "$(printf '%s' "$model" | jq -r '.terminal')" = "true" ]; then
     echo "REASON=$(printf '%s' "$model" | jq -r '.reason')"
+    printf '%s' "$model" | jq -r '.unevaluated // empty | "UNEVALUATED=\(.count)", "UNEVALUATED_TICKETS=\(.tickets)"'
     return 0
   fi
 

@@ -176,7 +176,10 @@ findings=$(jq -nc '[{code:"MISSING_CORE_AC", dimension:"requirement_completeness
   quote:"nothing that matches the body", detail:"d"}]')
 scan=$(_scan_result "APPLY-6" "$hash" "$findings" "$_ALL_CLEAR_GAPS")
 audit=$(_audit_result "APPLY-6" "$hash")
-DOR_SEMANTIC_ADVISORY_CODES="MISSING_CORE_AC SEMANTIC_UNVERIFIED" dor_semantic_apply "APPLY-6" "$ws/body.md" "$scan" "$audit" >/dev/null
+# Listing SEMANTIC_UNVERIFIED itself never demotes it. (A finding whose own
+# code is advisory raises no SEMANTIC_UNVERIFIED at all, seam-gate-safety D4 —
+# test-dor-semantic-harness.sh.)
+DOR_SEMANTIC_ADVISORY_CODES="SEMANTIC_UNVERIFIED" dor_semantic_apply "APPLY-6" "$ws/body.md" "$scan" "$audit" >/dev/null
 grep -q "SEMANTIC_UNVERIFIED" <<<"$(get_ticket_manifest_field APPLY-6 ready | jq -c '.missing')" &&
   _pass "dor_semantic_apply: SEMANTIC_UNVERIFIED ignores the demotion list" ||
   _fail "dor_semantic_apply: SEMANTIC_UNVERIFIED should stay blocking regardless of the demotion list"
@@ -427,9 +430,11 @@ r=$(get_ticket_manifest_field "$tid" ready)
 [ "$(jq -r '.semantic.findings[0].verified' <<<"$r")" = "false" ] &&
   _pass "INCOHERENT_CHANGE: fabricated quote recorded verified:false" ||
   _fail "INCOHERENT_CHANGE: fabricated quote should be verified:false (got $(jq -c '.semantic.findings' <<<"$r"))"
-grep -q SEMANTIC_UNVERIFIED <<<"$(jq -c '.missing' <<<"$r")" &&
-  _pass "INCOHERENT_CHANGE: unverified quote raises SEMANTIC_UNVERIFIED like any finding" ||
-  _fail "INCOHERENT_CHANGE: unverified quote should raise SEMANTIC_UNVERIFIED (got $(jq -c '.missing' <<<"$r"))"
+# An advisory-only code's bad quote is that finding's own problem
+# (seam-gate-safety D4): marked unverified-quote, no SEMANTIC_UNVERIFIED.
+[ "$(jq -c '.missing' <<<"$r")" = '[]' ] && [ "$(jq -r '.semantic.findings[0].quote_check' <<<"$r")" = "unverified-quote" ] &&
+  _pass "INCOHERENT_CHANGE: unverified quote is marked unverified-quote and raises no SEMANTIC_UNVERIFIED" ||
+  _fail "INCOHERENT_CHANGE: unverified advisory quote should not block (got $(jq -c '.missing' <<<"$r"))"
 
 # A scan result with no paraphrase (an older caller) stores none.
 tid="PARA-none"

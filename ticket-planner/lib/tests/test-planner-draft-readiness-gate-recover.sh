@@ -47,14 +47,24 @@ fi
 
 # ── 7. unavailable ───────────────────────────────────────────────────────
 echo "--- 7. two failed attempts → unavailable ---"
-# Default (block audit): a draft the evaluator could not judge warns and
-# passes; Refinement judges the ticket after create.
+# Default (block audit): a draft the evaluator could not judge warns;
+# with two drafts one unevaluated is 1/2, over the 0.25 share, so the run
+# halts with HARNESS_ERROR (seam-gate-safety D4). Share 1 never halts: the
+# warn-and-pass path.
 export BROKEN_b_api=1
 _gate
 unset BROKEN_b_api
+if [ "$GATE_RC" -eq 3 ] && tail -2 "$LOG" | grep -q '|META|draft-readiness|fail|(run) HARNESS_ERROR 1/2 unevaluated$' &&
+  tail -1 "$LOG" | grep -q '|META|draft-readiness|done|blocked 0/2 HARNESS_ERROR$'; then
+  pass "default share: 1 of 2 unevaluated halts with HARNESS_ERROR"
+else
+  fail "default share" "rc=$GATE_RC $(tail -3 "$LOG")"
+fi
+export PLANNER_DRAFT_UNEVALUATED_MAX_SHARE=1
+BROKEN_b_api=1 _gate
 report=$(planner_draft_readiness_report "$INIT")
 if [ "$GATE_RC" -eq 0 ] && [ "$(cut -d' ' -f3 "${DR}/b-api/verdict")" = "unavailable" ] &&
-  tail -3 "$LOG" | grep -q '|META|draft-readiness|warn|b-api SEMANTIC_UNAVAILABLE "scan ' &&
+  tail -4 "$LOG" | grep -q '|META|draft-readiness|warn|b-api SEMANTIC_UNAVAILABLE "scan ' &&
   ! tail -3 "$LOG" | grep -q '|META|draft-readiness|fail|' &&
   grep -q 'Not judged by the semantic evaluator' <<<"$report" &&
   grep -q 'b-api SEMANTIC_UNAVAILABLE' <<<"$report"; then
@@ -62,8 +72,9 @@ if [ "$GATE_RC" -eq 0 ] && [ "$(cut -d' ' -f3 "${DR}/b-api/verdict")" = "unavail
 else
   fail "default unavailable" "rc=$GATE_RC $(tail -3 "$LOG") | $report"
 fi
-# The rest of scenario 7 checks the blocking mode.
-export PLANNER_DRAFT_WARN_CODES=""
+# The rest of scenario 7 checks the blocking mode (`none`: an empty value
+# reads as the default since seam-gate-safety D4).
+export PLANNER_DRAFT_WARN_CODES=none
 export BROKEN_b_api=1
 _gate
 unset BROKEN_b_api
@@ -94,7 +105,7 @@ if [ "$GATE_RC" -eq 3 ] && [ "$(cut -d' ' -f3 "${DR}/b-api/verdict")" = "unavail
 else
   fail "missing result" "rc=$GATE_RC spawns=$SPAWNS"
 fi
-unset PLANNER_DRAFT_WARN_CODES
+unset PLANNER_DRAFT_WARN_CODES PLANNER_DRAFT_UNEVALUATED_MAX_SHARE
 _gate
 if [ "$GATE_RC" -eq 0 ] && [ "$SPAWNS" -eq 2 ] && [ "$(cut -d' ' -f3 "${DR}/b-api/verdict")" = "ready" ]; then
   pass "the next run retries an unavailable draft (no edit needed)"

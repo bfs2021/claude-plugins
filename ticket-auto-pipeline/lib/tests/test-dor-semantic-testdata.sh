@@ -136,18 +136,20 @@ sev=$(_dor_semantic_severity EDGE_CASE_GAP)
 [ "$sev" = "blocking" ] && _pass "(d) other codes keep their severity (EDGE_CASE_GAP blocking)" ||
   _fail "(d) EDGE_CASE_GAP should stay blocking (got $sev)"
 
-# ── (e) non-verbatim quote → SEMANTIC_UNVERIFIED, never SEMANTIC_TEST_UAT ───
+# ── (e) non-verbatim quote → unverified-quote, never a blocking code ───────
+# Before seam-gate-safety D4 this raised SEMANTIC_UNVERIFIED; an advisory
+# code's bad quote now marks only that finding.
 
 sed 's|creates a draft copy with the same line items|creates a draft copy with the identical line items|' \
   "$SEMANTIC_DIR/27-scan.txt" >"$TMP_ROOT/e-scan.txt"
 _apply "TD-E" 27 feature "$TMP_ROOT/e-scan.txt" || true
 r=$(_ready "TD-E")
 if [ "$(echo "$r" | jq -r '.semantic.findings[0].verified')" = "false" ] &&
-  [ "$(echo "$r" | jq -r '(.missing // []) | index("SEMANTIC_UNVERIFIED") != null')" = "true" ] &&
-  [ "$(echo "$r" | jq -r '(.missing // []) | index("SEMANTIC_TEST_UAT") == null')" = "true" ]; then
-  _pass "(e) non-verbatim quote: verified:false, SEMANTIC_UNVERIFIED, no SEMANTIC_TEST_UAT"
+  [ "$(echo "$r" | jq -r '.semantic.findings[0].quote_check')" = "unverified-quote" ] &&
+  [ "$(echo "$r" | jq -c '.missing // []')" = "[]" ]; then
+  _pass "(e) non-verbatim quote: verified:false, unverified-quote, nothing in missing"
 else
-  _fail "(e) non-verbatim quote should raise SEMANTIC_UNVERIFIED only (ready=$r)"
+  _fail "(e) non-verbatim quote should only mark the finding (ready=$r)"
 fi
 
 # ── (f) a co-present verified MISSING_CORE_AC still blocks ──────────────────

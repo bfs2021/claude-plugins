@@ -17,6 +17,83 @@ marketplace. Where a release also moved `ticket-planner`, `fleet-controller`, or
 > - **0.19.0 never existed.** `plugin.json` went 0.18.0 → 0.20.0. The Phase 2
 >   commit message claims `0.19.0→0.20.0`, but no 0.19.0 was ever committed.
 
+## 0.121.0 / ticket-planner 0.50.0 (2026-11-16) — seam-gate-safety G5: an evaluator that could not judge is a harness error
+
+- **Looser quote re-check (ticket-auto-pipeline).** `dor_semantic_findings` tries a
+  second, looser match before a finding's quote is unverified: the quote is split at
+  every ellipsis (`…`, `...`), each piece loses enclosing quotes, punctuation and
+  whitespace, every piece must occur in the normalised body in order, and the longest
+  must be at least 12 characters (`DOR_SEMANTIC_LOOSE_QUOTE_MIN`), every piece at least
+  4 (`DOR_SEMANTIC_LOOSE_PIECE_MIN`). Case is never folded and no word is dropped. A
+  loose-verified finding is never demoted by the lineage policy (drift, round-limit,
+  draft-passed): before the re-check it would have blocked as unverified, so it keeps
+  blocking. A match is stored as the quote (the agent's text as
+  `quote_raw`, `quote_check: "loose"`), so anchoring and a later import read text the
+  body holds. Still unmatched: `verified: false`, `quote_check: "unverified-quote"`.
+  A verbatim quote takes the strict path unchanged.
+- **An advisory finding's bad quote is its own problem.** Every finding now records
+  `code_class` — its code's class (`_dor_semantic_severity`) when it was judged, never
+  the severity after a demotion. `dor_semantic_blocking_codes` (and the draft gate's
+  finding lines) raise `SEMANTIC_UNVERIFIED` for an unverified finding unless its
+  `code_class` is `advisory` (a finding without `code_class` counts as blocking), and
+  for an unbacked gap. Affected codes: the advisory-only `TEST_DATA_GAP` and
+  `INCOHERENT_CHANGE`, plus any code a host lists in `DOR_SEMANTIC_ADVISORY_CODES`. A
+  blocking-code finding with an unverified quote keeps its own `SEMANTIC_<DIMENSION>`
+  code and still raises `SEMANTIC_UNVERIFIED`; drift and the round limit no longer
+  demote an unverified finding at all (before, a round-limit demotion removed its own
+  code). Only a verified finding backs a gap. `dor/20-28` give the same codes as on
+  0.120.0.
+- **`ready.harness_error` (ticket-auto-pipeline).** New writer
+  `set_ticket_harness_error <TID> <json|null>` (`manifest-write.sh`). It never touches
+  `missing` or `status`: the field explains the codes, it never replaces them.
+  `set_ticket_semantic` drops it; `set_ticket_readiness` carries it only while the
+  semantic verdict is carried unstaled.
+- **Refinement: harness errors do not halt the epic.** `planner_refinement_unavailable`
+  still records `SEMANTIC_UNAVAILABLE` and now also `ready.harness_error` (code, reason,
+  each failed attempt's reason, attempts). A verdict whose only unwaived problem is
+  `SEMANTIC_UNVERIFIED` records one too. A child whose unwaived missing codes are all
+  harness codes and who carries the record is *not evaluated*: it stays not ready (never
+  dispatched), the gate passes (`Refinement|gate|done|<r> of <n> tickets ready, <u> not
+  evaluated (harness error), …` after `META|refinement-gate|warn|…`), and the report and
+  pass output list it under `## Not evaluated (harness error)`. A harness error next to
+  any other missing code halts as before. More than
+  `PLANNER_REFINEMENT_UNEVALUATED_MAX_SHARE` (default `0.25`, checked first in prepare)
+  of the children unevaluated halts the run with
+  `META|refinement-gate|fail|HARNESS_ERROR <u>/<n> unevaluated: <TIDs>`, so a mostly
+  unjudged epic never ends as a clean-looking Completed. A resume re-judges every child
+  with a harness error, also after Completed (`planner_refinement_after_completed_pending`);
+  the `unavailable` verdict carries the body hash it failed on, so a re-scan of the same
+  body keeps the record. Rejected results are kept as
+  `semantic-{scan,audit}-result.rejected.txt`.
+- **`FORMAT_RETRY_EXHAUSTED` is routed (G6's open seam).** The exhausted field goes into
+  the failed attempt's reason: the draft's `unavailable` reason at the draft gate (the
+  draft is then counted unevaluated), `ready.harness_error.reasons` at Refinement.
+- **Draft gate: the unevaluated cap.** A judged draft with `SEMANTIC_UNAVAILABLE` or
+  `SEMANTIC_UNVERIFIED` is unevaluated. More than `PLANNER_DRAFT_UNEVALUATED_MAX_SHARE`
+  (default `0.25`, validated by `planner_draft_readiness_config_check`; an unreadable
+  value counts as exceeded) halts the run before any Linear write:
+  `META|draft-readiness|fail|(run) HARNESS_ERROR <n>/<m> unevaluated`, done
+  `blocked <b>/<m> HARNESS_ERROR`. Fewer write `META|draft-readiness|warn|(run)
+  UNEVALUATED <n>/<m> <slugs>`; the report shows the share. With two drafts one failure
+  already halts (1/2 > 0.25).
+- **`PLANNER_DRAFT_WARN_CODES` reads with `:-`.** Exported empty, it is the default (warn
+  on the two harness codes). `PLANNER_DRAFT_WARN_CODES=none` makes them block — the old
+  "set it empty" no longer does.
+- **Run report, run record, stop describer, COMPLETED.md.** `planner_run_unevaluated_json`
+  (`planner-run-telemetry.sh`) is written into every `planner_run` record as
+  `unevaluated`, and `planner-run-report.sh` ends with `Unevaluated: drafts <n>/<m>,
+  tickets <k> (<TIDs>), harness-error lines <h> — nothing unevaluated | not a clean
+  run`, printed even without telemetry or when the telemetry cannot be read. A draft
+  run passed by an operator accept reads `accepted (last measured n/m)` and is never
+  clean; a count it cannot read is `unknown` and not clean. The stop describer prints
+  `UNEVALUATED=<n>` / `UNEVALUATED_TICKETS=<TIDs>` after `REASON=COMPLETED` when tickets
+  were left unevaluated, and reports the two harness halts as `DRAFT_HARNESS_ERROR`
+  and `REFINEMENT_HARNESS_ERROR`. COMPLETED.md lists unevaluated tickets under
+  Warnings.
+- **Compatibility.** The planner refuses a `manifest-write.sh` without
+  `set_ticket_harness_error` (ticket-auto-pipeline < 0.121.0). Older code ignores
+  `ready.harness_error`.
+
 ## 0.120.0 / ticket-planner 0.49.0 (2026-11-16) — seam-gate-safety G6: DoR evaluator format retry (re-serialise only)
 
 - **A format slip is no longer a failed evaluation.** When a DoR semantic scan or audit

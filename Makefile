@@ -197,6 +197,7 @@ test-lib:
 	bash ticket-auto-pipeline/lib/tests/test-dor-semantic-request.sh
 	# seam-gate-safety G6
 	bash ticket-auto-pipeline/lib/tests/test-dor-semantic-format-retry.sh
+	bash ticket-auto-pipeline/lib/tests/test-dor-semantic-harness.sh
 	bash ticket-auto-pipeline/lib/tests/test-body-baseline.sh
 	bash ticket-auto-pipeline/lib/tests/test-refinement-carryover.sh
 	# tracker-approval-by-script
@@ -348,6 +349,7 @@ test-planner:
 	bash ticket-planner/lib/tests/test-planner-gate-ledger.sh
 	bash ticket-planner/lib/tests/test-planner-corpus-replay.sh
 	bash ticket-planner/lib/tests/test-planner-semantic-format-retry.sh
+	bash ticket-planner/lib/tests/test-planner-semantic-harness-errors.sh
 	bash ticket-planner/lib/tests/test-planner-crosscheck-bypass.sh
 	bash ticket-planner/lib/tests/test-planner-crosscheck-contracts.sh
 	bash ticket-planner/lib/tests/test-planner-crosscheck-signals.sh

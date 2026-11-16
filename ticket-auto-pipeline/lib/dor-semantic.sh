@@ -293,6 +293,58 @@ _dor_semantic_normalise() {
     sed -E 's/  +/ /g; s/^ +//; s/ +$//'
 }
 
+# Shortest quote text the looser re-check accepts (seam-gate-safety D4): a
+# shorter remainder ("Returns 400") occurs in too many bodies by chance.
+DOR_SEMANTIC_LOOSE_QUOTE_MIN=12
+# Shortest piece between two ellipses: a one-letter piece ("a … x") would
+# match almost any body and let an elision skip text the agent did not quote.
+DOR_SEMANTIC_LOOSE_PIECE_MIN=4
+
+# _dor_semantic_loose_trim <text> — strips leading and trailing whitespace,
+# quote marks and punctuation.
+_dor_semantic_loose_trim() {
+  local t="$1" p='[[:space:][:punct:]]'
+  while [[ "$t" =~ ^$p ]]; do t="${t:1}"; done
+  while [[ "$t" =~ $p$ ]]; do t="${t%?}"; done
+  printf '%s' "$t"
+}
+
+# _dor_semantic_loose_quote <normalised-body> <quote>
+# The looser quote re-check (seam-gate-safety D4), run only after the strict
+# substring test failed. The quote is normalised as usual, split at every
+# ellipsis (`…` or `...`), and each piece is trimmed of enclosing quotes,
+# punctuation and whitespace. Every non-empty piece must occur in the body,
+# in order, every piece must be at least DOR_SEMANTIC_LOOSE_PIECE_MIN and the
+# longest at least DOR_SEMANTIC_LOOSE_QUOTE_MIN characters. A loose-verified
+# finding is never demoted by the lineage policy (drift, round-limit,
+# draft-passed): before this re-check it would have blocked as unverified. Prints the longest piece (the text
+# the finding is anchored on) and returns 0; returns 1 otherwise. Case is
+# never folded and no word is dropped, so a quote the body does not contain
+# still fails.
+_dor_semantic_loose_quote() {
+  local body="$1" q piece best="" rest
+  q=$(_dor_semantic_normalise "$2")
+  q="${q//…/$'\n'}"
+  q="${q//.../$'\n'}"
+  rest="$body"
+  local -a pieces=()
+  while IFS= read -r piece; do
+    piece=$(_dor_semantic_loose_trim "$piece")
+    [ -n "$piece" ] && pieces+=("$piece")
+  done <<<"$q"
+  [ "${#pieces[@]}" -gt 0 ] || return 1
+  for piece in "${pieces[@]}"; do
+    [ "${#piece}" -ge "$DOR_SEMANTIC_LOOSE_PIECE_MIN" ] || return 1
+    case "$rest" in
+    *"$piece"*) rest="${rest#*"$piece"}" ;;
+    *) return 1 ;;
+    esac
+    if [ "${#piece}" -gt "${#best}" ]; then best="$piece"; fi
+  done
+  [ "${#best}" -ge "$DOR_SEMANTIC_LOOSE_QUOTE_MIN" ] || return 1
+  printf '%s' "$best"
+}
+
 # ── Finding identity and lineage (planner-refinement-convergence D1–D3) ────
 
 # _dor_semantic_match_norm <text> — the anchor/identity normalisation:
@@ -574,13 +626,14 @@ dor_semantic_lineage_from() {
           else . + {lineage: "new", first_round: $r.round} end
         | del(.persisted)
         | .code as $code
-        | if $prior_passed and .severity == "blocking" and .verified == true then
+        | if (.quote_check // "") == "loose" then .
+          elif $prior_passed and .severity == "blocking" and .verified == true then
             if (($structural | index($code)) == null) then . + {severity: "advisory", demoted: "draft-passed"}
             elif .lineage != "carried" and ($pl != null) and ((.units | length) > 0)
                  and (.units | all(unchanged(.))) then
               . + {severity: "advisory", demoted: "draft-passed-structural", demote_reason: "unchanged-unit"}
             else . end
-          elif .severity == "blocking" and (($structural | index($code)) == null) then
+          elif .severity == "blocking" and .verified == true and (($structural | index($code)) == null) then
             if .lineage == "drift" and $policy.drift_demote then . + {severity: "advisory", demoted: "drift"}
             elif $max > 0 and $r.round > $max then . + {severity: "advisory", demoted: "round-limit"}
             else . end
@@ -781,7 +834,7 @@ dor_semantic_findings() {
   local dims_with_findings=""
   local jq_args=() filter="[" first=1 i
   for ((i = 0; i < n_findings; i++)); do
-    local code quote quote_b detail dim severity verified nq nqb restored
+    local code quote quote_b detail dim severity verified nq nqb restored qcheck quote_raw quote_b_raw loose
     code=$(echo "$scan_json" | jq -r ".findings[$i].code")
     # A finding bash put back after a format retry dropped it (seam-gate-
     # safety G6) keeps the mark; its quote is checked like any other.
@@ -791,22 +844,54 @@ dor_semantic_findings() {
     detail=$(echo "$scan_json" | jq -r ".findings[$i].detail // empty")
     dim=$(echo "$scan_json" | jq -r ".findings[$i].dimension")
     severity=$(_dor_semantic_severity "$code")
-    dims_with_findings="$dims_with_findings $dim"
 
+    # Strict test first; a quote that fails it gets the looser re-check
+    # (seam-gate-safety D4), which stores the matched text as the quote and
+    # the agent's text as quote_raw, so anchoring and a later import read
+    # text the body holds. Still unmatched: verified:false with
+    # quote_check "unverified-quote".
     verified="true"
+    qcheck=""
+    quote_raw="$quote" quote_b_raw="$quote_b"
     nq=$(_dor_semantic_normalise "$quote")
-    case "$norm_body" in *"$nq"*) ;; *) verified="false" ;; esac
+    case "$norm_body" in
+    *"$nq"*) ;;
+    *)
+      if loose=$(_dor_semantic_loose_quote "$norm_body" "$quote"); then
+        quote="$loose" qcheck="loose"
+      else
+        verified="false"
+      fi
+      ;;
+    esac
     if [ "$verified" = "true" ] && [ -n "$quote_b" ]; then
       nqb=$(_dor_semantic_normalise "$quote_b")
-      case "$norm_body" in *"$nqb"*) ;; *) verified="false" ;; esac
+      case "$norm_body" in
+      *"$nqb"*) ;;
+      *)
+        if loose=$(_dor_semantic_loose_quote "$norm_body" "$quote_b"); then
+          quote_b="$loose" qcheck="loose"
+        else
+          verified="false"
+        fi
+        ;;
+      esac
+    fi
+    if [ "$verified" = "false" ]; then
+      qcheck="unverified-quote" quote="$quote_raw" quote_b="$quote_b_raw"
+    else
+      # Only a verified finding backs a gap: an unverified one (whatever its
+      # class) leaves the gap unbacked, so SEMANTIC_UNVERIFIED still fires.
+      dims_with_findings="$dims_with_findings $dim"
     fi
 
     jq_args+=(--arg "code${i}" "$code" --arg "dim${i}" "$dim" --arg "sev${i}" "$severity"
       --arg "quote${i}" "$quote" --arg "quoteb${i}" "$quote_b" --arg "detail${i}" "$detail"
-      --argjson "verified${i}" "$verified" --argjson "restored${i}" "$restored")
+      --argjson "verified${i}" "$verified" --argjson "restored${i}" "$restored"
+      --arg "qcheck${i}" "$qcheck" --arg "qraw${i}" "$quote_raw" --arg "qbraw${i}" "$quote_b_raw")
     [ "$first" -eq 1 ] || filter="$filter,"
     first=0
-    filter="$filter({code:\$code${i},dimension:\$dim${i},severity:\$sev${i},quote:\$quote${i},quote_b:(if \$quoteb${i}==\"\" then null else \$quoteb${i} end),detail:\$detail${i},verified:\$verified${i}}+(if \$restored${i} then {restored:true} else {} end))"
+    filter="$filter({code:\$code${i},dimension:\$dim${i},severity:\$sev${i},quote:\$quote${i},quote_b:(if \$quoteb${i}==\"\" then null else \$quoteb${i} end),detail:\$detail${i},verified:\$verified${i},code_class:\$sev${i}}+(if \$restored${i} then {restored:true} else {} end)+(if \$qcheck${i} == \"\" then {} else {quote_check:\$qcheck${i}} end)+(if \$qcheck${i} == \"loose\" then {quote_raw:\$qraw${i}} + (if \$qbraw${i} != \"\" and \$qbraw${i} != \$quoteb${i} then {quote_b_raw:\$qbraw${i}} else {} end) else {} end))"
   done
   filter="$filter]"
 

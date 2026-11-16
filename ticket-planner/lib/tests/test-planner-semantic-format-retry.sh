@@ -78,13 +78,17 @@ fi
 echo "--- draft gate: a retry that adds a finding is rejected ---"
 sed -i 's/Export responds with 200/Export responds with HTTP 200/' "${SPECS}/b-api.md"
 FORMAT_PROMPTS=()
-export FMT_b_api=add PLANNER_DRAFT_WARN_CODES=""
+export FMT_b_api=add PLANNER_DRAFT_WARN_CODES=none
 _gate
 v=$(cut -d' ' -f3 "${DR}/b-api/verdict" 2>/dev/null)
 if [ "$GATE_RC" -eq 3 ] && [ "$v" = "unavailable" ] && [ "$(_harness_lines)" = 2 ] &&
   grep -q '|META|harness-error|fail|DRAFT-b-api FORMAT_RETRY_EXHAUSTED SCHEMA_VERSION$' "$LOG" &&
   [ "${#FORMAT_PROMPTS[@]}" -eq 2 ] && [ "$SPAWNS" -eq 6 ]; then
   pass "two attempts, one rejected retry each: two harness-error lines, then unavailable as before"
+  # seam-gate-safety G5: the exhaustion is the attempt's reason.
+  jq -e '.reason | startswith("FORMAT_RETRY_EXHAUSTED SCHEMA_VERSION; ")' "${DR}/b-api/semantic.json" >/dev/null &&
+    pass "the unavailable reason names FORMAT_RETRY_EXHAUSTED" ||
+    fail "draft exhausted reason" "$(cat "${DR}/b-api/semantic.json")"
 else
   fail "draft add" "rc=$GATE_RC verdict=$v spawns=$SPAWNS formats=${#FORMAT_PROMPTS[@]} $(grep harness-error "$LOG")"
 fi
@@ -196,6 +200,11 @@ if jq -e '.missing | index("SEMANTIC_UNAVAILABLE") != null' <<<"$ready" >/dev/nu
   grep -q "|META|harness-error|fail|${R_TID} FORMAT_RETRY_EXHAUSTED SCHEMA_VERSION$" "$RLOG" &&
   [ "$(cat "${RP}/semantic-attempts")" = 2 ]; then
   pass "Refinement: a rejected retry per attempt, harness-error lines, then SEMANTIC_UNAVAILABLE as before"
+  # seam-gate-safety G5: a harness error, with each attempt's reason.
+  jq -e '.harness_error.code == "SEMANTIC_UNAVAILABLE" and .harness_error.attempts == 2
+      and ([.harness_error.reasons[] | select(test("FORMAT_RETRY_EXHAUSTED SCHEMA_VERSION"))] | length) == 2' <<<"$ready" >/dev/null &&
+    pass "Refinement: ready.harness_error carries FORMAT_RETRY_EXHAUSTED for both attempts" ||
+    fail "refinement harness_error" "$(jq -c .harness_error <<<"$ready")"
 else
   fail "refinement add" "kinds=$R_KINDS harness=$(_r_harness) attempts=$(cat "${RP}/semantic-attempts" 2>/dev/null) $(jq -c .missing <<<"$ready")"
 fi
