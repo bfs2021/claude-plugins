@@ -17,6 +17,10 @@ TMPDIR=$(mktemp -d)
 trap 'rm -rf "$TMPDIR"' EXIT
 REPOS_ROOT="$TMPDIR"
 export REPOS_ROOT
+# No installed plugin cache: ticket-auto-pipeline's libs resolve to this
+# checkout (the unevaluated-tickets warning sources them, seam-gate-safety G5).
+export HOME="$TMPDIR/home"
+mkdir -p "$HOME"
 
 PASS=0
 FAIL=0

@@ -1041,14 +1041,23 @@ planner_refinement_unavailable() {
   local initiative_id="$1" tid="$2"
   _planner_refinement_source_deps || return 1
 
+  local pdir="${REPOS_ROOT:-}/.ticket-auto/initiatives/${initiative_id}/tickets/${tid}/planner"
+  # The body hash the evaluator failed on: a re-scan of the same body then
+  # carries the verdict (and ready.harness_error) forward instead of staling
+  # it into an ordinary not-ready ticket that drops out of the unevaluated
+  # count (review L5). An edited body still goes stale, as any verdict does.
+  local hash=""
+  if [ -f "${pdir}/body.md" ] && declare -f _dor_body_hash >/dev/null 2>&1; then
+    hash=$(_dor_body_hash "$(cat "${pdir}/body.md")" 2>/dev/null) || hash=""
+  fi
   local sem_json
   sem_json=$(jq -nc --arg evaluator "${DOR_SEMANTIC_EVALUATOR:-dor-semantic-v1}" \
-    --arg checked_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    --arg checked_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg hash "$hash" \
     '{evaluator: $evaluator, checked_at: $checked_at, unavailable: true,
-      findings: [], gaps: {}, audit: [], missed: []}')
+      findings: [], gaps: {}, audit: [], missed: []}
+     + (if $hash != "" then {body_hash: $hash} else {} end)')
   set_ticket_semantic "$tid" "$sem_json" || return $?
 
-  local pdir="${REPOS_ROOT:-}/.ticket-auto/initiatives/${initiative_id}/tickets/${tid}/planner"
   local attempts reasons h
   attempts=$(cat "${pdir}/semantic-attempts" 2>/dev/null) || attempts=0
   [[ "$attempts" =~ ^[0-9]+$ ]] || attempts=0
@@ -1088,6 +1097,16 @@ planner_refinement_unevaluated() {
   return 0
 }
 
+# _planner_refinement_share_exceeded <n> <m> — true when n/m is over
+# PLANNER_REFINEMENT_UNEVALUATED_MAX_SHARE (default 0.25, as the draft gate's
+# PLANNER_DRAFT_UNEVALUATED_MAX_SHARE). An unreadable share counts as
+# exceeded (fail closed); prepare refuses it first.
+_planner_refinement_share_exceeded() {
+  local share="${PLANNER_REFINEMENT_UNEVALUATED_MAX_SHARE:-0.25}"
+  [[ "$share" =~ ^(0(\.[0-9]+)?|1(\.0+)?)$ ]] || return 0
+  awk -v n="$1" -v m="$2" -v s="$share" 'BEGIN { exit !(m > 0 && n / m > s) }'
+}
+
 # _planner_refinement_unevaluated_section <INIT> — the
 # `## Not evaluated (harness error)` section, or nothing.
 _planner_refinement_unevaluated_section() {
@@ -1096,7 +1115,7 @@ _planner_refinement_unevaluated_section() {
   [ -n "$lines" ] || return 0
   echo ""
   echo "## Not evaluated (harness error)"
-  echo "The semantic evaluator could not judge these tickets — a harness fault, not a plan defect. They stay not ready (never dispatched) and do not halt the epic; /ticket-planner resume ${initiative_id} retries them."
+  echo "The semantic evaluator could not judge these tickets — a harness fault, not a plan defect. They stay not ready (never dispatched); more than ${PLANNER_REFINEMENT_UNEVALUATED_MAX_SHARE:-0.25} of the epic halts the run (HARNESS_ERROR). /ticket-planner resume ${initiative_id} retries them."
   printf '%s\n' "$lines" | while IFS=$'\t' read -r t c r; do
     echo "- ${t} ${c}${r:+: ${r}}"
   done
@@ -1360,6 +1379,15 @@ planner_refinement_gate() {
 
   if [ "$total" -gt 0 ] && [ "$no_verdict" -eq 0 ]; then
     stamp_epic_dispatch "$epic_id"
+  fi
+
+  # Too many children the evaluator could not judge halt the run, as the
+  # draft gate does (seam-gate-safety review M1): an epic that is mostly
+  # unevaluated must never end as a clean-looking Completed.
+  if [ "$not_ready" -eq 0 ] && [ "$no_verdict" -eq 0 ] && [ "$unevaluated" -gt 0 ] &&
+    _planner_refinement_share_exceeded "$unevaluated" "$total"; then
+    planner_state_write "$initiative_id" "META" "refinement-gate" "fail" "HARNESS_ERROR ${unevaluated}/${total} unevaluated: ${unevaluated_tids}"
+    return 1
   fi
 
   if [ "$not_ready" -eq 0 ] && [ "$no_verdict" -eq 0 ]; then
@@ -1727,6 +1755,12 @@ _planner_refinement_pass_file() {
 # earlier run is never applied. rc 0 = run the spawn loop, then the gate.
 planner_refinement_prepare() {
   local init="$1" refreshed="" pass tid
+  # Checked before anything is scanned or written.
+  local u="${PLANNER_REFINEMENT_UNEVALUATED_MAX_SHARE:-0.25}"
+  [[ "$u" =~ ^(0(\.[0-9]+)?|1(\.0+)?)$ ]] || {
+    echo "planner-refinement: PLANNER_REFINEMENT_UNEVALUATED_MAX_SHARE must be a number from 0 to 1, got '$u'" >&2
+    return 1
+  }
   if planner_refinement_legacy "$init"; then
     # Planned before this phase shipped: its log already carries
     # TicketGen|dispatch-gate|done (design.md Decision 10).
@@ -1761,6 +1795,7 @@ planner_refinement_prepare() {
   [ "${PLANNER_REFINEMENT_SEMANTIC:-true}" != "false" ] || return 0
   _planner_refinement_source_deps || return 1
   dor_semantic_format_budget >/dev/null || return 1
+
   for tid in "${needs[@]}"; do
     [ -n "$tid" ] || continue
     local pdir="${REPOS_ROOT:-}/.ticket-auto/initiatives/${init}/tickets/${tid}/planner"

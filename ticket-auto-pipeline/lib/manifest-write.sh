@@ -879,9 +879,11 @@ waive_ticket_readiness_code() {
 # Prints the JSON array (sorted, unique) of `SEMANTIC_*` codes a semantic
 # verdict puts into ready.missing — steps 2–4 of set_ticket_semantic below:
 # SEMANTIC_UNAVAILABLE when .unavailable is true, SEMANTIC_UNVERIFIED once
-# when a finding whose severity is not "advisory" has verified:false or
-# .unverified_gaps is non-empty (an advisory finding with an unverified quote
-# is only that finding's own problem, seam-gate-safety D4), and
+# when a finding whose code_class is not "advisory" has verified:false or
+# .unverified_gaps is non-empty (an advisory-class finding with an unverified
+# quote is only that finding's own problem, seam-gate-safety D4). code_class
+# is the code's class when dor_semantic_findings judged it, never the
+# severity after a demotion; a finding without it counts as blocking. And
 # SEMANTIC_<DIMENSION_UPPER> per finding whose severity is "blocking". Pure:
 # no manifest read or write. Extracted (planner-draft-readiness D3) so a
 # draft verdict on disk is judged by the same jq that judges a ticket. It
@@ -891,7 +893,7 @@ dor_semantic_blocking_codes() {
   local semantic_json="$1"
   echo "$semantic_json" | jq -c 'if type != "object" then error("not an object") else . end
      | (.unavailable == true) as $unavailable
-     | (([.findings[]? | select(.verified == false and .severity != "advisory")] | length > 0)
+     | (([.findings[]? | select(.verified == false and .code_class != "advisory")] | length > 0)
         or ((.unverified_gaps // []) | length > 0)) as $has_unverified
      | ([.findings[]? | select(.severity == "blocking")
          | ("SEMANTIC_" + (.dimension | ascii_upcase))]) as $blocking_codes
@@ -908,8 +910,8 @@ dor_semantic_blocking_codes() {
 #
 #   1. remove every `SEMANTIC_`-prefixed element from ready.missing;
 #   2. append `SEMANTIC_UNAVAILABLE` when semantic_json.unavailable is true;
-#   3. append `SEMANTIC_UNVERIFIED` once when any non-advisory finding has
-#      verified:false, or when semantic_json.unverified_gaps is non-empty (a gap marked
+#   3. append `SEMANTIC_UNVERIFIED` once when any finding whose code_class is
+#      not "advisory" has verified:false, or when semantic_json.unverified_gaps is non-empty (a gap marked
 #      "finding" with no matching finding in that dimension — dor_semantic_
 #      apply's own structural check, which has no single finding to mark);
 #   4. append `SEMANTIC_<DIMENSION_UPPER>` for each finding whose

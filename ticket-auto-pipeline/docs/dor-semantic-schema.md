@@ -205,8 +205,11 @@ whitespace, every piece found in the normalised body in order and at least
 never demoted by the lineage policy (drift, round-limit, draft-passed). A match stores the
 matched piece as `quote` (the agent's text as `quote_raw`) with `quote_check: "loose"`.
 A quote that still does not match makes that finding `verified: false`
-(`quote_check: "unverified-quote"`). For a finding whose severity is not `advisory`
-this adds `SEMANTIC_UNVERIFIED` next to its own `SEMANTIC_<DIMENSION>` code — a failed
+(`quote_check: "unverified-quote"`). Each finding records `code_class`, its code's
+class when it was judged (never the severity after a demotion). For a finding whose
+`code_class` is not `advisory` (or missing) this adds `SEMANTIC_UNVERIFIED` next to its
+own `SEMANTIC_<DIMENSION>` code, and drift or the round limit never demote it. Only a
+verified finding backs a gap — a failed
 quote check blocks visibly rather than silently dropping the finding.
 
 ## Result binding and versioning

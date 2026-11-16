@@ -633,7 +633,7 @@ dor_semantic_lineage_from() {
                  and (.units | all(unchanged(.))) then
               . + {severity: "advisory", demoted: "draft-passed-structural", demote_reason: "unchanged-unit"}
             else . end
-          elif .severity == "blocking" and (($structural | index($code)) == null) then
+          elif .severity == "blocking" and .verified == true and (($structural | index($code)) == null) then
             if .lineage == "drift" and $policy.drift_demote then . + {severity: "advisory", demoted: "drift"}
             elif $max > 0 and $r.round > $max then . + {severity: "advisory", demoted: "round-limit"}
             else . end
@@ -844,7 +844,6 @@ dor_semantic_findings() {
     detail=$(echo "$scan_json" | jq -r ".findings[$i].detail // empty")
     dim=$(echo "$scan_json" | jq -r ".findings[$i].dimension")
     severity=$(_dor_semantic_severity "$code")
-    dims_with_findings="$dims_with_findings $dim"
 
     # Strict test first; a quote that fails it gets the looser re-check
     # (seam-gate-safety D4), which stores the matched text as the quote and
@@ -880,6 +879,10 @@ dor_semantic_findings() {
     fi
     if [ "$verified" = "false" ]; then
       qcheck="unverified-quote" quote="$quote_raw" quote_b="$quote_b_raw"
+    else
+      # Only a verified finding backs a gap: an unverified one (whatever its
+      # class) leaves the gap unbacked, so SEMANTIC_UNVERIFIED still fires.
+      dims_with_findings="$dims_with_findings $dim"
     fi
 
     jq_args+=(--arg "code${i}" "$code" --arg "dim${i}" "$dim" --arg "sev${i}" "$severity"
@@ -888,7 +891,7 @@ dor_semantic_findings() {
       --arg "qcheck${i}" "$qcheck" --arg "qraw${i}" "$quote_raw" --arg "qbraw${i}" "$quote_b_raw")
     [ "$first" -eq 1 ] || filter="$filter,"
     first=0
-    filter="$filter({code:\$code${i},dimension:\$dim${i},severity:\$sev${i},quote:\$quote${i},quote_b:(if \$quoteb${i}==\"\" then null else \$quoteb${i} end),detail:\$detail${i},verified:\$verified${i}}+(if \$restored${i} then {restored:true} else {} end)+(if \$qcheck${i} == \"\" then {} else {quote_check:\$qcheck${i}} end)+(if \$qcheck${i} == \"loose\" then {quote_raw:\$qraw${i}} + (if \$qbraw${i} != \"\" and \$qbraw${i} != \$quoteb${i} then {quote_b_raw:\$qbraw${i}} else {} end) else {} end))"
+    filter="$filter({code:\$code${i},dimension:\$dim${i},severity:\$sev${i},quote:\$quote${i},quote_b:(if \$quoteb${i}==\"\" then null else \$quoteb${i} end),detail:\$detail${i},verified:\$verified${i},code_class:\$sev${i}}+(if \$restored${i} then {restored:true} else {} end)+(if \$qcheck${i} == \"\" then {} else {quote_check:\$qcheck${i}} end)+(if \$qcheck${i} == \"loose\" then {quote_raw:\$qraw${i}} + (if \$qbraw${i} != \"\" and \$qbraw${i} != \$quoteb${i} then {quote_b_raw:\$qbraw${i}} else {} end) else {} end))"
   done
   filter="$filter]"
 

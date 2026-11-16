@@ -182,6 +182,54 @@ codes=$(dor_semantic_blocking_codes '{"findings":[{"code":"TEST_DATA_GAP","dimen
   _pass "an unbacked gap still raises SEMANTIC_UNVERIFIED next to an advisory finding" ||
   _fail "unbacked gap ($codes)"
 
+echo "=== review fixes: an unverified finding is never demoted into silence ==="
+# Reviewer case a1: past the round limit an unverified blocking finding was
+# demoted to advisory, and the advisory test then dropped SEMANTIC_UNVERIFIED:
+# the ticket became ready. Now the round limit never demotes an unverified
+# finding, and the advisory test reads the code's class, not the severity.
+a1_body=$'## Intent\nFinance exports invoices.\n\n## Acceptance Criteria\n- [ ] Export responds with 200 for a finance user\n\n## Scope\nOnly the export endpoint.\n\n## Test User\nfinance1\n'
+a1_f='[{"code":"MISSING_CORE_AC","dimension":"requirement_completeness","severity":"blocking","quote":"Export fails with 500 for admins","detail":"x","verified":false}]'
+a1_b1=$(DOR_SEMANTIC_MAX_ROUNDS=2 dor_semantic_lineage_from null "$a1_body" h1 '[]' '[]')
+a1_p=$(jq -c '.lineage | .round=2' <<<"$a1_b1")
+a1_out=$(DOR_SEMANTIC_MAX_ROUNDS=2 dor_semantic_lineage_from "$a1_p" "$a1_body"$'\nOne extra line.\n' h2 "$a1_f" '[]')
+if [ "$(jq -c '.findings[0] | {severity, demoted}' <<<"$a1_out")" = '{"severity":"blocking","demoted":null}' ] &&
+  [ "$(jq -r '.lineage.round' <<<"$a1_out")" = "3" ]; then
+  _pass "a1: round 3 > limit 2 does not demote an unverified blocking finding"
+else
+  _fail "a1 lineage ($(jq -c '{f: .findings[0], round: .lineage.round}' <<<"$a1_out"))"
+fi
+write_ticket_manifest A1-1 INIT-1 feature '[]' >/dev/null
+set_ticket_readiness A1-1 ready '[]' '[]' >/dev/null
+set_ticket_semantic A1-1 "$(jq -c '{evaluator:"dor-semantic-v4", body_hash:"h2", findings: .findings, unverified_gaps: [], gaps:{}, audit:[], missed:[]}' <<<"$a1_out")" >/dev/null 2>&1
+r=$(_ready A1-1)
+[ "$(jq -c '{status, missing}' <<<"$r")" = '{"status":"not-ready","missing":["SEMANTIC_REQUIREMENT_COMPLETENESS","SEMANTIC_UNVERIFIED"]}' ] &&
+  _pass "a1: the ticket stays not ready with its own code and SEMANTIC_UNVERIFIED" ||
+  _fail "a1 manifest ($(jq -c '{status, missing}' <<<"$r"))"
+# Even a demoted severity cannot hide it: the class decides, not the severity.
+codes=$(dor_semantic_blocking_codes '{"findings":[{"code":"MISSING_CORE_AC","dimension":"requirement_completeness","severity":"advisory","demoted":"round-limit","code_class":"blocking","verified":false}],"unverified_gaps":[]}')
+[ "$codes" = '["SEMANTIC_UNVERIFIED"]' ] &&
+  _pass "a demoted blocking-class finding with a bad quote still raises SEMANTIC_UNVERIFIED" ||
+  _fail "class vs severity ($codes)"
+codes=$(dor_semantic_blocking_codes '{"findings":[{"code":"MISSING_CORE_AC","dimension":"requirement_completeness","severity":"advisory","verified":false}],"unverified_gaps":[]}')
+[ "$codes" = '["SEMANTIC_UNVERIFIED"]' ] &&
+  _pass "a finding with no code_class counts as blocking (fail closed)" ||
+  _fail "no code_class ($codes)"
+j=$(_judge Q-9 TEST_DATA_GAP "Duplicating a handover creates three copies of it")
+[ "$(jq -r '.findings[0].code_class' <<<"$j")" = "advisory" ] &&
+  _pass "dor_semantic_findings records the code's class" || _fail "code_class ($j)"
+
+# Reviewer L1: an unverified finding never backs a gap, whatever its class.
+_scan L1-1 EDGE_CASE_GAP "Duplicating a handover creates three copies of it"
+sed -i 's/^GAP_EDGE_CASE_SUFFICIENCY: clear/GAP_EDGE_CASE_SUFFICIENCY: finding/' "$TMP_ROOT/L1-1-scan.txt"
+s_l1=$(bash "$PARSER" --kind scan --result-file "$TMP_ROOT/L1-1-scan.txt" 2>/dev/null)
+a_l1=$(bash "$PARSER" --kind audit --result-file "$TMP_ROOT/L1-1-audit.txt" 2>/dev/null)
+j=$(DOR_SEMANTIC_ADVISORY_CODES="EDGE_CASE_GAP" dor_semantic_findings L1-1 "$(cat "$BODY")" "$s_l1" "$a_l1" 2>/dev/null)
+if [ "$(jq -c '.unverified_gaps' <<<"$j")" = '["edge_case_sufficiency"]' ]; then
+  _pass "L1: a host-advisory finding with a bad quote leaves its gap unbacked (SEMANTIC_UNVERIFIED)"
+else
+  _fail "L1 ($j)"
+fi
+
 echo "=== ready.harness_error ==="
 
 write_ticket_manifest H-1 INIT-1 feature '[]' >/dev/null

@@ -22,6 +22,8 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/draft-readiness-gate-harness.sh"
+source "${LIB_DIR}/planner-run-telemetry.sh"
+source "${LIB_DIR}/planner-completed.sh"
 
 echo "=== semantic harness errors (seam-gate-safety G5) ==="
 export PLANNER_REFINEMENT_PARALLEL=8
@@ -68,6 +70,24 @@ if grep -q '^attempt 2: ' "${DR}/c-ui/last-failure" && [ -s "${DR}/c-ui/scan-res
   pass "the halted drafts keep their failure reason and rejected results"
 else
   fail "draft diagnostics" "$(ls "${DR}/c-ui")"
+fi
+# Review M2: the HARNESS_ERROR halt has its own stop reason.
+sd=$(planner_stop_describe_json "$INIT" 2>/dev/null)
+if [ "$(jq -r '.reason' <<<"$sd")" = "DRAFT_HARNESS_ERROR" ] &&
+  jq -e '[.questions[].binding] | index("flag:accept:DRAFT_NOT_READY") != null' <<<"$sd" >/dev/null &&
+  jq -e '.questions[0].text | test("harness error")' <<<"$sd" >/dev/null; then
+  pass "stop describer: DRAFT_HARNESS_ERROR, distinct from DRAFT_NOT_READY"
+else
+  fail "draft stop reason" "$(jq -c '{reason, q: [.questions[].text]}' <<<"$sd")"
+fi
+# Review d1: an operator accept of that halt is never "nothing unevaluated".
+planner_draft_readiness_accept "$INIT" "operator accepts" >/dev/null
+BROKEN_c_ui=1 BROKEN_d_ui=1 _gate
+d_line=$(bash "${LIB_DIR}/planner-run-report.sh" "$INIT" --no-sync 2>/dev/null | grep '^Unevaluated:')
+if [ "$GATE_RC" -eq 2 ] && grep -q '^Unevaluated: drafts accepted (last measured 2/7), .* not a clean run$' <<<"$d_line"; then
+  pass "d1: an accepted HARNESS_ERROR run reports the last measured share, not clean"
+else
+  fail "d1" "rc=$GATE_RC $d_line"
 fi
 
 _edit c "third"
@@ -182,6 +202,24 @@ _r_ready() { get_ticket_manifest_field "$1" ready 2>/dev/null; }
 
 R_MODE_602=garbage _r_run
 r2=$(_r_ready "$T2")
+# Review M1: 1 of 2 unevaluated is over the default 0.25 share — the run
+# halts with HARNESS_ERROR instead of completing on a half-judged epic.
+fin_rc=0
+fin=$(planner_refinement_finish "$R_INIT" "$(planner_initiative_dir "$R_INIT")" 2>/dev/null) || fin_rc=$?
+sd=$(planner_stop_describe_json "$R_INIT" 2>/dev/null)
+if [ "$fin_rc" -eq 3 ] && tail -1 "$RLOG" | grep -q "|META|refinement-gate|fail|HARNESS_ERROR 1/2 unevaluated: ${T2}$" &&
+  grep -q '^## Not evaluated (harness error)$' <<<"$fin" &&
+  [ "$(jq -r '.reason' <<<"$sd")" = "REFINEMENT_HARNESS_ERROR" ] &&
+  [ "$(jq -r '.questions[0].binding' <<<"$sd")" = "note" ]; then
+  pass "1 of 2 unevaluated over the share: HARNESS_ERROR halt, stop reason REFINEMENT_HARNESS_ERROR"
+else
+  fail "refinement share halt" "rc=$fin_rc $(tail -2 "$RLOG") | $(jq -c '{reason, q: .questions}' <<<"$sd")"
+fi
+rc=0
+PLANNER_REFINEMENT_UNEVALUATED_MAX_SHARE=abc planner_refinement_prepare "$R_INIT" >/dev/null 2>&1 || rc=$?
+[ "$rc" -eq 1 ] && pass "prepare refuses PLANNER_REFINEMENT_UNEVALUATED_MAX_SHARE=abc" || fail "refinement share knob" "rc=$rc"
+# Below the share (here: share 1) the gate passes and lists the ticket.
+export PLANNER_REFINEMENT_UNEVALUATED_MAX_SHARE=1
 fin_rc=0
 fin=$(planner_refinement_finish "$R_INIT" "$(planner_initiative_dir "$R_INIT")" 2>/dev/null) || fin_rc=$?
 if jq -e '.status == "not-ready" and .harness_error.code == "SEMANTIC_UNAVAILABLE" and .harness_error.attempts == 2
@@ -198,7 +236,7 @@ fi
 if [ "$fin_rc" -eq 0 ] && grep -q "|Refinement|gate|done|1 of 2 tickets ready, 1 not evaluated (harness error), epic ${R_EPIC} stamped dispatch=true$" "$RLOG" &&
   grep -q "|META|refinement-gate|warn|1 of 2 not evaluated (harness error): ${T2}$" "$RLOG" &&
   grep -q '^## Not evaluated (harness error)$' <<<"$fin" && grep -q "^- ${T2} SEMANTIC_UNAVAILABLE: " <<<"$fin" &&
-  ! grep -q '|META|refinement-gate|fail|' "$RLOG"; then
+  tail -1 "$RLOG" | grep -q '|Refinement|gate|done|'; then
   pass "the gate does not halt the epic; the pass output lists the unevaluated ticket"
 else
   fail "gate" "rc=$fin_rc $(tail -3 "$RLOG") | $fin"
@@ -214,6 +252,17 @@ grep -q "tickets 1 (${T2}), .* not a clean run$" <<<"$u_line" &&
   pass "run report: 1 unevaluated ticket, not a clean run" || fail "run report ticket" "$u_line"
 
 planner_state_write "$R_INIT" "Completed" "summary" "done" "fixture"
+# Review M1: a completion with unevaluated tickets is never a bare COMPLETED.
+sd_out=$(planner_stop_describe "$R_INIT" 2>/dev/null)
+unev_json=$(planner_run_unevaluated_json "$R_INIT" 2>/dev/null)
+c_unev=$(_planner_completed_unevaluated "$R_INIT")
+if [ "$sd_out" = "REASON=COMPLETED"$'\n'"UNEVALUATED=1"$'\n'"UNEVALUATED_TICKETS=${T2}" ] &&
+  [ "$(jq -c '{tickets, ticket_ids, clean}' <<<"$unev_json")" = "{\"tickets\":1,\"ticket_ids\":[\"${T2}\"],\"clean\":false}" ] &&
+  [ "$c_unev" = "1"$'\t'"${T2}" ]; then
+  pass "Completed with an unevaluated ticket: stop describer, run record and COMPLETED.md warning say so"
+else
+  fail "completed unevaluated" "describe=$sd_out run=$unev_json completed=$c_unev"
+fi
 if planner_refinement_after_completed_pending "$R_INIT"; then
   pass "after Completed, an unevaluated child makes a resume re-run Refinement"
 else
@@ -229,6 +278,29 @@ if jq -e '.status == "ready" and (.harness_error // null) == null' <<<"$r2" >/de
 else
   fail "after-completed retry" "$(jq -c '{status, missing, harness_error}' <<<"$r2")"
 fi
+
+if [ "$(planner_stop_describe "$R_INIT" 2>/dev/null)" = "REASON=COMPLETED" ]; then
+  pass "once re-judged, the completion is a bare REASON=COMPLETED again"
+else
+  fail "completed clean" "$(planner_stop_describe "$R_INIT" 2>/dev/null)"
+fi
+
+echo "--- review r1: every child unevaluated never completes clean ---"
+unset PLANNER_REFINEMENT_UNEVALUATED_MAX_SHARE
+sed -i '/|Completed|summary|done|/d' "$RLOG"
+# A harmless edit (the Summary paragraph) makes both verdicts stale.
+sed -i '3s/$/ Edited for r1./' "${REPOS_ROOT}/.ticket-auto/initiatives/${R_INIT}/tickets/${T1}/planner/body.md" "${P2}/body.md"
+R_MODE_601=garbage R_MODE_602=garbage _r_run
+fin_rc=0
+fin=$(planner_refinement_finish "$R_INIT" "$(planner_initiative_dir "$R_INIT")" 2>/dev/null) || fin_rc=$?
+if [ "$fin_rc" -eq 3 ] && tail -1 "$RLOG" | grep -q "|META|refinement-gate|fail|HARNESS_ERROR 2/2 unevaluated: ${T1},${T2}$"; then
+  pass "r1: 2 of 2 unevaluated halts with HARNESS_ERROR, no Completed"
+else
+  fail "r1" "rc=$fin_rc $(tail -2 "$RLOG")"
+fi
+export PLANNER_REFINEMENT_UNEVALUATED_MAX_SHARE=1
+cp "${FIXTURES}/22-sourced-contract.md" "${REPOS_ROOT}/.ticket-auto/initiatives/${R_INIT}/tickets/${T1}/planner/body.md"
+_r_run
 
 echo "--- a harness error next to a real code still halts ---"
 cp "${FIXTURES}/21-unsourced-contract.md" "${P2}/body.md"

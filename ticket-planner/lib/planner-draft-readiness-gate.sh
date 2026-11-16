@@ -549,7 +549,7 @@ _planner_draft_findings() {
     else
       ((.findings // [])[] | select(.verified == true and .severity == "blocking")
         | "\(.code)\t\((.quote // .detail // "") | tostring | gsub("[\t\r\n]"; " "))"),
-      ((.findings // [])[] | select(.verified == false and .severity != "advisory")
+      ((.findings // [])[] | select(.verified == false and .code_class != "advisory")
         | "SEMANTIC_UNVERIFIED\t\(.code): \(.quote // "")"),
       ((.unverified_gaps // [])[] | "SEMANTIC_UNVERIFIED\tgap: \(.)")
     end' "${dir}/semantic.json" 2>/dev/null

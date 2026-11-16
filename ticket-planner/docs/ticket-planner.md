@@ -1120,7 +1120,14 @@ tickets after create (no draft verdict is carried over for them). More than
 `PLANNER_DRAFT_UNEVALUATED_MAX_SHARE` (default `0.25`) unevaluated drafts halt the run
 before any Linear write with `META|draft-readiness|fail|(run) HARNESS_ERROR <n>/<m>
 unevaluated` (done `blocked <b>/<m> HARNESS_ERROR`); fewer write `META|draft-readiness|warn|(run)
-UNEVALUATED <n>/<m> <slugs>`. With two drafts, one unevaluated draft already halts. A draft the loop never judged ("no verdict
+UNEVALUATED <n>/<m> <slugs>`. With two drafts, one unevaluated draft already halts.
+Refinement applies the same rule to real tickets: a child whose only codes are harness
+codes is *not evaluated* (stays not ready, listed under `## Not evaluated (harness
+error)`), and more than `PLANNER_REFINEMENT_UNEVALUATED_MAX_SHARE` (default `0.25`) of
+them halts with `HARNESS_ERROR`. The stop describer reports these halts as
+`DRAFT_HARNESS_ERROR` / `REFINEMENT_HARNESS_ERROR`, a completion that left tickets
+unevaluated as `REASON=COMPLETED` plus `UNEVALUATED=<n>`, and COMPLETED.md, the run
+record and `planner-run-report.sh` count them; such a run is never clean. A draft the loop never judged ("no verdict
 for the current draft") still blocks. A failed attempt keeps its reason in `last-failure` and
 its result files as `*-result.rejected.txt`.
 

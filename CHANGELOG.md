@@ -31,13 +31,18 @@ marketplace. Where a release also moved `ticket-planner`, `fleet-controller`, or
   `quote_raw`, `quote_check: "loose"`), so anchoring and a later import read text the
   body holds. Still unmatched: `verified: false`, `quote_check: "unverified-quote"`.
   A verbatim quote takes the strict path unchanged.
-- **An advisory finding's bad quote is its own problem.** `dor_semantic_blocking_codes`
-  (and the draft gate's finding lines) raise `SEMANTIC_UNVERIFIED` only for an unverified
-  finding whose severity is not `advisory`, or an unbacked gap. Affected codes: the
-  advisory-only `TEST_DATA_GAP` and `INCOHERENT_CHANGE`, plus any code a host lists in
-  `DOR_SEMANTIC_ADVISORY_CODES`. A blocking-code finding with an unverified quote is
-  unchanged: it keeps its own `SEMANTIC_<DIMENSION>` code and still raises
-  `SEMANTIC_UNVERIFIED`. `dor/20-28` give the same codes as on 0.120.0.
+- **An advisory finding's bad quote is its own problem.** Every finding now records
+  `code_class` — its code's class (`_dor_semantic_severity`) when it was judged, never
+  the severity after a demotion. `dor_semantic_blocking_codes` (and the draft gate's
+  finding lines) raise `SEMANTIC_UNVERIFIED` for an unverified finding unless its
+  `code_class` is `advisory` (a finding without `code_class` counts as blocking), and
+  for an unbacked gap. Affected codes: the advisory-only `TEST_DATA_GAP` and
+  `INCOHERENT_CHANGE`, plus any code a host lists in `DOR_SEMANTIC_ADVISORY_CODES`. A
+  blocking-code finding with an unverified quote keeps its own `SEMANTIC_<DIMENSION>`
+  code and still raises `SEMANTIC_UNVERIFIED`; drift and the round limit no longer
+  demote an unverified finding at all (before, a round-limit demotion removed its own
+  code). Only a verified finding backs a gap. `dor/20-28` give the same codes as on
+  0.120.0.
 - **`ready.harness_error` (ticket-auto-pipeline).** New writer
   `set_ticket_harness_error <TID> <json|null>` (`manifest-write.sh`). It never touches
   `missing` or `status`: the field explains the codes, it never replaces them.
@@ -51,9 +56,15 @@ marketplace. Where a release also moved `ticket-planner`, `fleet-controller`, or
   dispatched), the gate passes (`Refinement|gate|done|<r> of <n> tickets ready, <u> not
   evaluated (harness error), …` after `META|refinement-gate|warn|…`), and the report and
   pass output list it under `## Not evaluated (harness error)`. A harness error next to
-  any other missing code halts as before. A resume re-judges every child with a harness
-  error, also after Completed (`planner_refinement_after_completed_pending`). Rejected
-  results are kept as `semantic-{scan,audit}-result.rejected.txt`.
+  any other missing code halts as before. More than
+  `PLANNER_REFINEMENT_UNEVALUATED_MAX_SHARE` (default `0.25`, checked first in prepare)
+  of the children unevaluated halts the run with
+  `META|refinement-gate|fail|HARNESS_ERROR <u>/<n> unevaluated: <TIDs>`, so a mostly
+  unjudged epic never ends as a clean-looking Completed. A resume re-judges every child
+  with a harness error, also after Completed (`planner_refinement_after_completed_pending`);
+  the `unavailable` verdict carries the body hash it failed on, so a re-scan of the same
+  body keeps the record. Rejected results are kept as
+  `semantic-{scan,audit}-result.rejected.txt`.
 - **`FORMAT_RETRY_EXHAUSTED` is routed (G6's open seam).** The exhausted field goes into
   the failed attempt's reason: the draft's `unavailable` reason at the draft gate (the
   draft is then counted unevaluated), `ready.harness_error.reasons` at Refinement.
@@ -68,9 +79,17 @@ marketplace. Where a release also moved `ticket-planner`, `fleet-controller`, or
 - **`PLANNER_DRAFT_WARN_CODES` reads with `:-`.** Exported empty, it is the default (warn
   on the two harness codes). `PLANNER_DRAFT_WARN_CODES=none` makes them block — the old
   "set it empty" no longer does.
-- **Run report.** `planner-run-report.sh` ends with `Unevaluated: drafts <n>/<m>, tickets
-  <k> (<TIDs>), harness-error lines <h> — nothing unevaluated | not a clean run`, printed
-  even without telemetry; a count it cannot read is `unknown` and not clean.
+- **Run report, run record, stop describer, COMPLETED.md.** `planner_run_unevaluated_json`
+  (`planner-run-telemetry.sh`) is written into every `planner_run` record as
+  `unevaluated`, and `planner-run-report.sh` ends with `Unevaluated: drafts <n>/<m>,
+  tickets <k> (<TIDs>), harness-error lines <h> — nothing unevaluated | not a clean
+  run`, printed even without telemetry or when the telemetry cannot be read. A draft
+  run passed by an operator accept reads `accepted (last measured n/m)` and is never
+  clean; a count it cannot read is `unknown` and not clean. The stop describer prints
+  `UNEVALUATED=<n>` / `UNEVALUATED_TICKETS=<TIDs>` after `REASON=COMPLETED` when tickets
+  were left unevaluated, and reports the two harness halts as `DRAFT_HARNESS_ERROR`
+  and `REFINEMENT_HARNESS_ERROR`. COMPLETED.md lists unevaluated tickets under
+  Warnings.
 - **Compatibility.** The planner refuses a `manifest-write.sh` without
   `set_ticket_harness_error` (ticket-auto-pipeline < 0.121.0). Older code ignores
   `ready.harness_error`.
