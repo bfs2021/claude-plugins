@@ -1145,6 +1145,108 @@ fi
 output=$("$SELECTOR" --repo "$TMPDIR/qa-playwright" --layer FE --phase implement)
 assert_not_contains "implement phase never emits a qa specializer" "$output" "PERSONA_SPECIALIZER" "specializers/qa/"
 
+# ── Verify phase (verify-qa-persona) ───────────────────────────────────────────
+
+echo ""
+echo "--- Verify phase (--phase verify, --verify-mode) ---"
+
+QA_BASE="$PLUGIN_ROOT/personas/base/qa-engineer.md"
+QA_PW="$PLUGIN_ROOT/personas/specializers/qa/playwright-web.md"
+QA_API="$PLUGIN_ROOT/personas/specializers/qa/api-testing.md"
+
+# Each mode decides the specializer, whatever the repo holds (qa-both has
+# Playwright and Swagger; qa-openapi only an OpenAPI file).
+output=$(NEW --repo "$TMPDIR/qa-openapi" --phase verify --verify-mode browser)
+assert_eq "verify + browser → base qa-engineer" "$QA_BASE" "$(kv "$output" PERSONA_BASE)"
+assert_eq "verify + browser → qa/playwright-web (even on an OpenAPI repo)" "$QA_PW" "$(kv "$output" PERSONA_SPECIALIZER)"
+output=$(NEW --repo "$TMPDIR/qa-both" --phase verify --verify-mode live-backend)
+assert_eq "verify + live-backend → base qa-engineer" "$QA_BASE" "$(kv "$output" PERSONA_BASE)"
+assert_eq "verify + live-backend → qa/api-testing (even with a Playwright config)" "$QA_API" "$(kv "$output" PERSONA_SPECIALIZER)"
+output=$(NEW --repo "$TMPDIR/qa-both" --phase verify --verify-mode build-only)
+assert_eq "verify + build-only → base qa-engineer" "$QA_BASE" "$(kv "$output" PERSONA_BASE)"
+assert_eq "verify + build-only → no specializer" "" "$(kv "$output" PERSONA_SPECIALIZER)"
+
+# No mode: the repo's QA signals decide, as in prescan --with-qa.
+output=$(NEW --repo "$TMPDIR/qa-playwright" --phase verify)
+assert_eq "verify, no mode, Playwright repo → qa/playwright-web" "$QA_PW" "$(kv "$output" PERSONA_SPECIALIZER)"
+output=$(NEW --repo "$TMPDIR/qa-openapi" --phase verify)
+assert_eq "verify, no mode, OpenAPI repo → qa/api-testing" "$QA_API" "$(kv "$output" PERSONA_SPECIALIZER)"
+output=$(NEW --repo "$TMPDIR/python-project" --phase verify)
+assert_eq "verify, no mode, no QA signal → qa-engineer, no specializer" "$QA_BASE|" "$(kv "$output" PERSONA_BASE)|$(kv "$output" PERSONA_SPECIALIZER)"
+
+# The layer never moves the verify base or specializer.
+output=$(NEW --repo "$TMPDIR/angular-project" --layer FE --phase verify --verify-mode browser)
+assert_eq "verify + FE layer → still qa-engineer + qa/playwright-web" "$QA_BASE|$QA_PW" "$(kv "$output" PERSONA_BASE)|$(kv "$output" PERSONA_SPECIALIZER)"
+
+# Security auto-include follows the existing keyword rule.
+output=$(TICKET_TITLE="Fix login password reset" NEW --repo "$TMPDIR/qa-playwright" --phase verify --verify-mode browser)
+assert_eq "verify + security keyword → security auto-include" "$PLUGIN_ROOT/personas/base/security.md" "$(kv "$output" PERSONA_AUTO_INCLUDE)"
+output=$(TICKET_TITLE="Rename a column header" NEW --repo "$TMPDIR/qa-playwright" --phase verify --verify-mode browser)
+assert_eq "verify, no security keyword → no auto-include" "" "$(kv "$output" PERSONA_AUTO_INCLUDE)"
+
+# No debugger and no test-data overlay, whatever the signals.
+output=$(TICKET_TITLE="Seed data for the demo" TICKET_DESCRIPTION="## Test Data Provided" \
+  NEW --repo "$TMPDIR/java-project" --phase verify --verify-mode build-only --type bug --remediation)
+assert_eq "verify + test-data strong signal → base stays qa-engineer" "$QA_BASE" "$(kv "$output" PERSONA_BASE)"
+for k in PERSONA_TESTDATA PERSONA_TESTDATA_SPECIALIZERS PERSONA_DEBUG PERSONA_DEBUG_SPECIALIZER; do
+  assert_eq "verify + bug/remediation/test-data → $k empty" "" "$(kv "$output" "$k")"
+  if grep -q "^$k=" <<<"$output"; then
+    PASS=$((PASS + 1))
+    echo "  PASS: verify still emits the $k key"
+  else
+    FAIL=$((FAIL + 1))
+    echo "  FAIL: verify output lacks the $k key" >&2
+  fi
+done
+
+# Invalid mode, and a mode without --phase verify.
+set +e
+NEW --repo "$TMPDIR/qa-playwright" --phase verify --verify-mode headless >/dev/null 2>&1
+rc=$?
+set -e
+assert_exit_code "invalid --verify-mode → exit 1" 1 "$rc"
+set +e
+NEW --repo "$TMPDIR/qa-playwright" --phase implement --verify-mode browser >/dev/null 2>&1
+rc=$?
+set -e
+assert_exit_code "--verify-mode without --phase verify → exit 1" 1 "$rc"
+
+# Golden: the five existing phases emit byte-identical output to the selector
+# before this change (pinned main commit). Skipped in a shallow clone.
+VQA_GOLDEN_REV=d980708c7fbda8bfe1c52bf9be36c9804d2c9a5d
+# The old selector sources template-select.sh beside itself, so it gets its
+# own directory with that sibling from the same commit.
+mkdir -p "$TMPDIR/pre-verify-lib"
+VQA_OLD="$TMPDIR/pre-verify-lib/persona-select.sh"
+if git -C "$SCRIPT_DIR" show "$VQA_GOLDEN_REV:ticket-auto-pipeline/lib/persona-select.sh" >"$VQA_OLD" 2>/dev/null && [ -s "$VQA_OLD" ] &&
+  git -C "$SCRIPT_DIR" show "$VQA_GOLDEN_REV:ticket-auto-pipeline/lib/template-select.sh" >"$TMPDIR/pre-verify-lib/template-select.sh" 2>/dev/null; then
+  vqa_n=0
+  for fx in java-project angular-project react-project python-project unknown-project mixed-project qa-playwright qa-openapi qa-both; do
+    for phase in implement appraise review audit prescan; do
+      for layer in "" BE FE; do
+        for title in "" "Fix login password" "Seed data and fixtures"; do
+          args=(--repo "$TMPDIR/$fx" --phase "$phase")
+          [ -n "$layer" ] && args+=(--layer "$layer")
+          [ "$phase" = prescan ] && args+=(--with-qa)
+          old_out=$(TICKET_TITLE="$title" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" bash "$VQA_OLD" "${args[@]}" 2>&1 || true)
+          new_out=$(TICKET_TITLE="$title" NEW "${args[@]}" 2>&1 || true)
+          vqa_n=$((vqa_n + 1))
+          if [ "$old_out" != "$new_out" ]; then
+            FAIL=$((FAIL + 1))
+            echo "  FAIL: verify-change golden drift for $fx phase=$phase layer='$layer' title='$title'" >&2
+            diff <(echo "$old_out") <(echo "$new_out") >&2 || true
+          else
+            PASS=$((PASS + 1))
+          fi
+        done
+      done
+    done
+  done
+  echo "  (verify-change golden: $vqa_n combinations compared)"
+else
+  echo "  NOTE: pre-verify selector ($VQA_GOLDEN_REV) not in this clone — golden comparisons skipped"
+fi
+
 # ── Results ────────────────────────────────────────────────────────────────────
 
 echo ""

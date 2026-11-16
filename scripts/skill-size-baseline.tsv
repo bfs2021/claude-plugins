@@ -11,18 +11,21 @@ ticket-auto-pipeline/agents/ticket-implement-agent.md	694	2
 ticket-auto-pipeline/agents/ticket-maintenance-agent.md	2627	28
 ticket-auto-pipeline/agents/ticket-pr-review-agent.md	887	2
 ticket-auto-pipeline/agents/ticket-prescan-agent.md	987	2
-ticket-auto-pipeline/agents/ticket-verify-agent.md	2848	10
+# allow-growth: verify-qa-persona — one line telling the verify agent to plan as the Step 1g QA persona while the verdict stays on the acceptance criteria (0.122.0)
+ticket-auto-pipeline/agents/ticket-verify-agent.md	2961	12
 ticket-auto-pipeline/lib/skill-preamble-auto.md	17606	345
 ticket-auto-pipeline/lib/skill-preamble.md	11450	269
-ticket-auto-pipeline/personas/CHANGELOG.md	2963	64
-ticket-auto-pipeline/personas/README.md	16999	171
+# allow-growth: verify-qa-persona — changelog entry for the qa-engineer used-by correction and the --phase verify selection (0.122.0)
+ticket-auto-pipeline/personas/CHANGELOG.md	3621	71
+# allow-growth: verify-qa-persona — selection tables document --phase verify, --verify-mode and the verify overlay rule (0.122.0)
+ticket-auto-pipeline/personas/README.md	17554	177
 ticket-auto-pipeline/personas/base/analyzer.md	1890	32
 ticket-auto-pipeline/personas/base/architect.md	2022	31
 ticket-auto-pipeline/personas/base/backend-developer.md	1869	32
 ticket-auto-pipeline/personas/base/debugger.md	1925	32
 ticket-auto-pipeline/personas/base/frontend-developer.md	1866	32
 ticket-auto-pipeline/personas/base/product-owner.md	1821	31
-ticket-auto-pipeline/personas/base/qa-engineer.md	1828	32
+ticket-auto-pipeline/personas/base/qa-engineer.md	1787	32
 ticket-auto-pipeline/personas/base/security.md	2320	31
 ticket-auto-pipeline/personas/base/technical-writer.md	1799	31
 ticket-auto-pipeline/personas/base/test-data-engineer.md	3282	32
@@ -85,7 +88,7 @@ ticket-auto-pipeline/skills/ticket-reproduce/SKILL.md	14167	373
 ticket-auto-pipeline/skills/ticket-retro/SKILL.md	18240	356
 ticket-auto-pipeline/skills/ticket-setup/SKILL.md	4615	86
 # exception: floor ~45-60 KB (REMEDIATION_BRIEF contract, browser flow)
-ticket-auto-pipeline/skills/ticket-verify/SKILL.md	58408	952
+ticket-auto-pipeline/skills/ticket-verify/SKILL.md	58401	948
 ticket-auto-pipeline/skills/wiki-maintenance/SKILL.md	19979	345
 # allow-growth: no-source decisions become ASSUMED Scope assumptions; the agent must know the disposition and that security findings are excluded
 ticket-planner/agents/draft-revise-agent.md	1598	8

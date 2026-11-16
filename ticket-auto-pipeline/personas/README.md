@@ -4,7 +4,7 @@ Self-contained role guidance for ticket-auto-pipeline skills. Plain markdown ref
 
 ## How it works
 
-1. A pipeline skill calls `TICKET_TEXT_FILE=<file> lib/persona-select.sh --repo <path> [--layer FE|BE|infra] [--phase appraise|implement|review|audit|prescan] [--type bug|feature|improvement|security|chore|refactor] [--remediation]`
+1. A pipeline skill calls `TICKET_TEXT_FILE=<file> lib/persona-select.sh --repo <path> [--layer FE|BE|infra] [--phase appraise|implement|review|audit|prescan|verify] [--verify-mode browser|build-only|live-backend] [--type bug|feature|improvement|security|chore|refactor] [--remediation]`
 2. The helper emits `PERSONA_BASE`, `PERSONA_SPECIALIZER`, `PERSONA_AUTO_INCLUDE`, `PERSONA_TESTDATA`, `PERSONA_TESTDATA_SPECIALIZERS`, `PERSONA_DEBUG` and `PERSONA_DEBUG_SPECIALIZER` as `KEY=value` lines, in that order. Every key is always printed; an empty value means "none".
 3. The skill reads the persona files at those paths and injects their content as role context
 
@@ -14,7 +14,7 @@ The keyword triggers below (security auto-include, test-data signals, migration/
 
 | Skill | `TICKET_TEXT_FILE` |
 |-------|--------------------|
-| ticket-appraise, ticket-implement, ticket-pr-review | the ticket's `context.md` |
+| ticket-appraise, ticket-implement, ticket-pr-review, ticket-verify (Step 1g) | the ticket's `context.md` |
 | ticket-audit (both selector calls) | a tmp file holding the ticket text the skill already has |
 | ticket-prescan | `""` on purpose: prescan docs are shared by every ticket, so one ticket's wording must not choose the specializer |
 
@@ -30,6 +30,7 @@ The keyword triggers below (security auto-include, test-data signals, migration/
 | phase = appraise | `analyzer` |
 | phase = review | `analyzer` |
 | phase = audit | `product-owner` |
+| phase = verify | `qa-engineer` |
 
 ### Specializer (from stack signals)
 
@@ -47,6 +48,10 @@ The keyword triggers below (security auto-include, test-data signals, migration/
 | `vue` in `package.json` | `frontend/vue` |
 | QA + Playwright config | `qa/playwright-web` |
 | QA + OpenAPI/Postman | `qa/api-testing` |
+| `--phase verify --verify-mode browser` | `qa/playwright-web` (the mode wins over repo signals) |
+| `--phase verify --verify-mode live-backend` | `qa/api-testing` (the mode wins over repo signals) |
+| `--phase verify --verify-mode build-only` | none |
+| `--phase verify`, no `--verify-mode` | the two QA rows above, as in prescan `--with-qa` |
 | Multi-service repo structure | `architect/microservices` |
 | Single-service repo structure | `architect/monolith` |
 
@@ -64,6 +69,7 @@ The keyword triggers below (security auto-include, test-data signals, migration/
 | No `--type`, `TICKET_ID` and `REPOS_ROOT` set, planner manifest `type` = `bug` | on (manifest fallback via `lib/manifest-read.sh`) |
 | No `--type`, no manifest or manifest `type` is not `bug` | off |
 | `--phase prescan` | both keys always empty |
+| `--phase verify` | both keys always empty (the test-data keys too) |
 
 The known types mirror `KNOWN_TYPES` in `lib/template-select.sh`. The skills derive `--type` from the manifest `type` (dropping any value outside that list, so a new planner type cannot make the selector exit 1), else `bug` when the ticket's labels contain `bug`. Keep the skills' list in sync with `template-select.sh`. A hand-filed bug with neither a manifest type nor a `bug` label gets no overlay.
 
@@ -116,7 +122,7 @@ Read `base/<role>.md`, then read the matching `specializers/<group>/<stack>.md`.
 | `base/architect.md` | Systems architecture specialist | System-wide impact analysis, coupling assessment, pattern consistency, scalability planning, architecture decision records | appraise, implement, pr-review |
 | `base/backend-developer.md` | API and server-side specialist | API contract design, data integrity, error handling, performance optimization, idempotency, observability | implement (BE), audit |
 | `base/frontend-developer.md` | UI/UX and accessibility specialist | Component architecture, UX consistency, responsive design, accessibility (WCAG 2.1 AA), bundle impact, cross-browser compatibility | implement (FE), audit |
-| `base/qa-engineer.md` | Quality advocate and testing specialist | Coverage analysis, reproduction steps, regression risk, test quality, accessibility validation, performance regression detection | implement, pr-review, prescan (fan-out lens, `--with-qa`) |
+| `base/qa-engineer.md` | Quality advocate and testing specialist | Coverage analysis, reproduction steps, regression risk, test quality, accessibility validation, performance regression detection | verify (Step 1g, behind `VERIFY_QA_PERSONA`), prescan (fan-out lens, `--with-qa`) |
 | `base/analyzer.md` | Root cause specialist and systematic investigator | Complexity assessment, risk surface mapping, dependency analysis, appraisal quality, PR review depth, pattern recognition | appraise, pr-review, prescan (fan-out lens) |
 | `base/product-owner.md` | Product requirement specialist | Business value assessment, requirement clarity, duplicate detection, merge opportunities, goal alignment, scope assessment | audit, appraise |
 | `base/security.md` | Threat modeler and vulnerability specialist | Threat surface analysis, input validation, authn/authz checks, data handling, secrets management, dependency audit. Auto-includes on auth/payment/credential/PII keywords. | implement, pr-review, audit (auto-include) |

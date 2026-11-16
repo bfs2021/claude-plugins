@@ -12,4 +12,6 @@ Wait for the page to settle (`browser_wait_for`) before every snapshot that foll
 
 Never write a password into a Linear comment, PR body, log line, report or file, and never echo it in a bash block. A password is only ever typed into a login field.
 
+When Step 1g loads the QA persona, plan as that tester; the verdict still follows the acceptance criteria only.
+
 Report verification results (PASS/FAIL) to the pipeline log.

@@ -11,6 +11,9 @@
 #     injection" retro finding — a prose mention does not count);
 #   - the debugger overlay wiring is missing from implement/appraise/pr-review,
 #     or leaks into verify/reproduce/appraise-exec;
+#   - ticket-verify's QA persona (verify-qa-persona) is not behind
+#     VERIFY_QA_PERSONA, not a `--phase verify --verify-mode` call, or lets the
+#     persona reach the verdict, the REMEDIATION_BRIEF or a state transition;
 #   - the META|persona-select line would move detect-resume's resume point;
 #   - the verify cap drifts from 2 (the "last rework" wording depends on it).
 #
@@ -42,11 +45,12 @@ _run() {
 }
 
 # Skills whose SKILL.md invokes the selector and must feed it ticket text.
-CALL_SITE_SKILLS=(ticket-appraise ticket-implement ticket-pr-review ticket-audit ticket-prescan)
+CALL_SITE_SKILLS=(ticket-appraise ticket-implement ticket-pr-review ticket-audit ticket-prescan ticket-verify)
 # Skills that consume the debugger overlay.
 DEBUG_SKILLS=(ticket-appraise ticket-implement ticket-pr-review)
-# Skills that load no persona by design.
-NO_PERSONA_SKILLS=(ticket-verify ticket-reproduce ticket-appraise-exec)
+# Skills that never read the debugger overlay (ticket-verify loads only the QA
+# persona, verify-qa-persona; the other two load no persona at all).
+NO_DEBUG_SKILLS=(ticket-verify ticket-reproduce ticket-appraise-exec)
 
 # ── helpers ────────────────────────────────────────────────────────────────────
 
@@ -203,9 +207,9 @@ test_debug_skills_reference_persona_debug() {
   }
 }
 
-test_no_persona_skills_do_not_reference_persona_debug() {
+test_no_debug_skills_do_not_reference_persona_debug() {
   local skill leaked=""
-  for skill in "${NO_PERSONA_SKILLS[@]}"; do
+  for skill in "${NO_DEBUG_SKILLS[@]}"; do
     [ -f "$SKILLS_DIR/$skill/SKILL.md" ] || continue
     if _skill_files "$skill" | xargs -d '\n' grep -q 'PERSONA_DEBUG'; then leaked="$leaked $skill"; fi
   done
@@ -302,6 +306,100 @@ test_pr_review_step2_adds_bug_checks() {
   done
   [ -z "$missing" ] || {
     echo "  pr-review Step 2 missing:$missing"
+    return 1
+  }
+}
+
+# ── ticket-verify QA persona (verify-qa-persona) ─────────────────────────────
+
+test_verify_qa_persona_behind_flag_in_step_1g() {
+  local md="$SKILLS_DIR/ticket-verify/SKILL.md" sec line
+  sec=$(_section "$md" '^### 1g ' '^## Step 1[.]5')
+  [ -n "$sec" ] || {
+    echo "  ticket-verify has no Step 1g"
+    return 1
+  }
+  # shellcheck disable=SC2016 # the literal default expression, not an expansion
+  grep -qF '${VERIFY_QA_PERSONA:-false}' <<<"$sec" || {
+    echo "  Step 1g does not read VERIFY_QA_PERSONA with a false default"
+    return 1
+  }
+  line=$(grep -F 'references/qa-persona.md' <<<"$sec" | grep -F 'skill-ref.sh' | head -1)
+  for tok in 'before Step 2' '--from-step' 'Read the printed path in full' 'reference-missing' 'no Observations section'; do
+    grep -qF -- "$tok" <<<"$line" || {
+      echo "  Step 1g condition lacks: $tok"
+      return 1
+    }
+  done
+  # Step 1g sits after mode detection (1e/1f) and before the plan (Step 2).
+  [ "$(grep -n '^### 1f ' "$md" | cut -d: -f1)" -lt "$(grep -n '^### 1g ' "$md" | cut -d: -f1)" ] &&
+    [ "$(grep -n '^### 1g ' "$md" | cut -d: -f1)" -lt "$(grep -n '^## Step 2 ' "$md" | cut -d: -f1)" ] || {
+    echo "  Step 1g is not between Step 1f and Step 2"
+    return 1
+  }
+}
+
+test_verify_qa_persona_reference_selects_and_logs() {
+  local ref="ticket-verify/references/qa-persona.md" sec
+  sec=$(_section_ref "$ref" '^## Step 1g ' '^## Guard') || return 1
+  grep -qF -- '--phase verify --verify-mode "{VERIFY_MODE}"' <<<"$sec" || {
+    echo "  Step 1g does not call the selector with --phase verify --verify-mode"
+    return 1
+  }
+  grep -qF 'plog.sh META persona-select info "base=' <<<"$sec" || {
+    echo "  Step 1g does not log META|persona-select|info|base=…"
+    return 1
+  }
+  [ "$(grep -cF 'plog.sh META persona-select warn' <<<"$sec")" -ge 2 ] || {
+    echo "  Step 1g lacks the selector-failed and missing-file warnings"
+    return 1
+  }
+  grep -qF 'continue with **no persona**' <<<"$sec" || {
+    echo "  Step 1g does not continue without a persona on error"
+    return 1
+  }
+  if grep -qE 'plog\.sh VERIFY persona-select|\|VERIFY\|persona-select\|' <<<"$sec"; then
+    echo "  Step 1g writes a VERIFY|persona-select line (would move the resume point)"
+    return 1
+  fi
+}
+
+test_verify_qa_persona_keeps_verdict_on_criteria() {
+  local ref="ticket-verify/references/qa-persona.md" guard sup cls md="$SKILLS_DIR/ticket-verify/SKILL.md"
+  guard=$(_section_ref "$ref" '^## Guard' '^## Supporting') || return 1
+  for tok in 'Steps 6, 7e and 7f' 'Never file a ticket' 'page.route()' 'Never add a pass criterion' 'this skill wins'; do
+    grep -qF -- "$tok" <<<"$guard" || {
+      echo "  guard lacks: $tok"
+      return 1
+    }
+  done
+  sup=$(_section_ref "$ref" '^## Supporting' '^## Classify') || return 1
+  grep -qF 'at most three per criterion and at most twelve in total' <<<"$sup" || {
+    echo "  supporting-check caps (3 per criterion, 12 in total) missing"
+    return 1
+  }
+  cls=$(_section_ref "$ref" '^## Classify' '^## Observations') || return 1
+  for tok in 'Criterion not met' 'never change the verdict' 'REMEDIATION_BRIEF' 'Steps 6 and 7f' 'META qa-supporting'; do
+    grep -qF -- "$tok" <<<"$cls" || {
+      echo "  classification rule lacks: $tok"
+      return 1
+    }
+  done
+  # SKILL.md states it at Step 5, Step 6, 7c and 7f.
+  _section "$md" '^### Pass$' '^### Fail$' | grep -qF 'Step 1g observations are not pass criteria' &&
+    _section "$md" '^## Step 6 ' '^### Post-verdict' | grep -qF 'observations never block' &&
+    _section "$md" '^### 7c ' '^```' | grep -qF 'Step 1g observations never enter it' &&
+    _section "$md" '^### 7f ' '^### 7g ' | grep -qF 'Step 1g observations never change it' || {
+    echo "  SKILL.md does not keep observations out of Step 5/6/7c/7f"
+    return 1
+  }
+}
+
+test_qa_engineer_used_by_is_prescan_and_verify() {
+  local got
+  got=$(_used_by "$PERSONAS_DIR/base/qa-engineer.md" | sort | tr '\n' ' ')
+  [ "$got" = "ticket-prescan ticket-verify " ] || {
+    echo "  qa-engineer used-by is '$got', want 'ticket-prescan ticket-verify'"
     return 1
   }
 }

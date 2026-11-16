@@ -47,7 +47,7 @@ Event catalogue: [pipeline-heartbeat-format.md](../../pipeline-heartbeat-format.
 | `--from-step` value | Effective skip to | Restore from |
 |---------------------|-------------------|--------------|
 | `load-context` | **Step 1** (start over) | Step 1.6 (lock, env, seeds) runs after it |
-| `build-plan` | Step 3, after the 1.6a3 lock block | re-run Steps 3+ in full |
+| `build-plan` | Step 3, after the 1.6a3 lock block | re-run Steps 3+ in full (Step 1g first) |
 | `browser-session` | **falls back to `build-plan`** | browser state lost on crash |
 | `navigate` | **falls back to `build-plan`** | browser state lost on crash |
 | `execute-steps` | **falls back to `build-plan`** (browser); Step 4c / 4c-live (build-only / live-backend, after reading `references/build-only.md` / `references/live-backend.md` per Step 1f) | browser state lost on crash |
@@ -62,8 +62,7 @@ VERIFY_CHECKPOINT=$(bash "${CLAUDE_SKILLS_LIB:-$HOME/.claude/skills/lib}/verify-
 
 It prints the highest `N` with a `VERIFY|checkpoint|done|criterion-N-pass` line in the
 **current attempt only**: after the last verdict, re-implement or operator stop/reset. Only
-an unattended crash keeps earlier passes. The router also receives the same value as
-`VERIFY_CHECKPOINT` from `detect-resume.sh`.
+an unattended crash keeps earlier passes. The router gets the same value from `detect-resume.sh`.
 
 - Build-only and live-backend mode: if `VERIFY_CHECKPOINT` is a number `N`, record criteria
   1..N as PASS (`resumed from checkpoint`) and start at criterion `N+1`. If it is empty,
@@ -171,7 +170,7 @@ Some tickets are verified by running build tooling (no UI or API surface: a pare
 bash ~/.claude/skills/lib/verify-mode.sh "{TICKET-ID}" --ticket-dir "{ticket-dir}" --root "$TICKETS_ROOT"
 ```
 
-Record the printed `VERIFY_MODE` for the rest of this skill. `browser` (the default) runs every step. `build-only` skips Step 1.6, 1.7a/1.7b and Steps 3, 4 and 4b, and runs Step 4c instead. `live-backend` runs Step 1.6 (a real system must be up) but skips 1.7a/1.7b and Steps 3, 4 and 4b, and runs Step 4c-live instead. Steps 2, 6 and 7 carry per-mode variants. The REMEDIATION_BRIEF and reports keep their field names in every mode (Step 7a maps the diagnostics).
+Record the printed `VERIFY_MODE` for the rest of this skill. `browser` (the default) runs every step. `build-only` skips Step 1.6, 1.7a/1.7b and Steps 3, 4 and 4b, and runs Step 4c instead. `live-backend` runs Step 1.6 (a real system must be up) but skips 1.7a/1.7b and Steps 3, 4 and 4b, and runs Step 4c-live instead. Step 1g runs in every mode. Steps 2, 6 and 7 carry per-mode variants. The REMEDIATION_BRIEF and reports keep their field names in every mode (Step 7a maps the diagnostics).
 
 ### 1f — Mode reference (load condition)
 
@@ -184,6 +183,10 @@ VERIFY_MODE=$(grep '|VERIFY|load-context|done|' "$TAP_LOG" 2>/dev/null | tail -1
 ```
 
 If that prints nothing, run Steps 1b, 1c and 1e first. After a context compaction, read the mode reference again before continuing any of those steps.
+
+### 1g — QA persona (load condition)
+
+Run `echo "VERIFY_QA_PERSONA=${VERIFY_QA_PERSONA:-false}"`. **If it prints `true`**, before Step 2, and before re-entering Step 4b, 4c or 4c-live on a `--from-step` resume, run `bash ~/.claude/skills/lib/skill-ref.sh ticket-verify references/qa-persona.md`, then Read the printed path in full. Do not continue until you have read it. If `skill-ref.sh` exits non-zero, run `bash ~/.claude/skills/lib/plog.sh META reference-missing fail "references/qa-persona.md"` and stop. Otherwise skip it: no persona, no supporting checks, no Observations section.
 
 ---
 
@@ -363,11 +366,9 @@ bash ~/.claude/skills/lib/plog.sh VERIFY pre-flight done "User:{test_user} Nav:{
 
 ## Step 2 — Build the verification plan
 
-**If `VERIFY_MODE=build-only`, skip 2a–2c below and use this variant instead:**
+**If `VERIFY_MODE` is `build-only` or `live-backend`, skip 2a–2c and use that mode's variant below.**
 
-**If `VERIFY_MODE=live-backend`, skip 2a–2c and the build-only variant below and use the live-backend variant instead (after it).**
-
-**Every variant applies Step 2d (carry-over checks) to its plan before printing it**, even the two that skip 2a–2c.
+**Every variant applies Step 2d (carry-over checks) to its plan before printing it**, even the two that skip 2a–2c, then any Step 1g supporting checks.
 
 ### 2 (build-only variant)
 
@@ -627,7 +628,7 @@ Moved to `references/live-backend.md` (run each live check, checkpoint each pass
 
 ## Step 5 — Evaluate pass/fail
 
-Release the verify lock now, before evaluating — the app stack is no longer needed once checks have finished, so free it for the next queued verify run as early as possible rather than waiting for the pass/fail report to finish. Idempotent no-op when the lock was never acquired (`--env uat`, `--no-env-start`, or `VERIFY_MODE=build-only`):
+Release the verify lock now, before evaluating, so the next queued verify run can start. Idempotent no-op when the lock was never acquired (`--env uat`, `--no-env-start`, or `VERIFY_MODE=build-only`):
 
 ```bash
 source "$HOME/.claude/skills/lib/verify-lock.sh" 2>/dev/null || true
@@ -636,7 +637,7 @@ verify_lock_release
 
 ### Pass
 
-All pass criteria are met → proceed to Step 6. Carry-over checks (Step 2d) are not pass criteria: a failed one never routes here to Step 7.
+All pass criteria are met → proceed to Step 6. Carry-over checks (Step 2d) and Step 1g observations are not pass criteria: neither routes here to Step 7.
 
 ### Fail
 
@@ -652,7 +653,7 @@ Before writing the Step 6 pass report or the Step 7b failure report, including a
 
 Moved to `references/templates.md` (§ Pass report), read per the Step 5 condition. Print it to the user.
 
-Omit the Carry-over checks table when Step 2d added none. A failed carry-over check stays a pass verdict; also append it to notes.md (below) as `- **Carry-over failed:** {behaviour} (candidate {key}) — {observed}` so a follow-up can pick it up.
+Omit the Carry-over checks table when Step 2d added none, and the Observations section without a Step 1g persona; observations never block the PR or a transition below. A failed carry-over check stays a pass verdict; also append it to notes.md (below) as `- **Carry-over failed:** {behaviour} (candidate {key}) — {observed}` so a follow-up can pick it up.
 
 Append to `{ticket-dir}/notes.md`:
 ```markdown
@@ -670,7 +671,7 @@ You only reach this point on the pass branch (`### Fail` routes to Step 7, which
 source ~/.claude/skills/lib/verifier-result.sh && verify_record_verdict "{VERIFY_MODE}" PASS <N> <M> <A>
 ```
 
-`verify_record_verdict` picks the verifier from the mode — `browser` → `playwright_uat`, `build-only` → `build_only`, `live-backend` → `live_backend` — and writes the same `META|verifier-result` line `write_verifier_result verifier=<id> … phase=VERIFY` did. Exit 2 means the mode or verdict was not filled in and nothing was recorded: fix the call and re-run it.
+`verify_record_verdict` picks the verifier from the mode — `browser` → `playwright_uat`, `build-only` → `build_only`, `live-backend` → `live_backend`. Exit 2 means the mode or verdict was not filled in and nothing was recorded: fix the call and re-run it.
 
 ### If `--env local`: Open PR and close out
 
@@ -720,12 +721,9 @@ Verification passed on localhost — the implementation is confirmed working. No
 3. Capture the PR URL(s). Run the block above once per affected repo — each PR needs its own
    `record_pr_created` call (a `META|pr-created` line per PR).
 4. **If `--from-auto` is present: skip this item entirely** and go to item 5. ticket-auto's
-   router owns `implement-complete` in that mode — it fires it itself right after IMPLEMENT
-   (STEP_4's post-spawn `flow_trigger`, and again after every re-implement in the verify-retry
-   and pr-iterate loops), so the ticket is already in `Review` by the time VERIFY runs. A second
-   call here is not a harmless no-op: `flow.sh` logs `META|flow-warn|info|ILLEGAL_TRANSITION …
-   from Review` and still advances `rev` and emits a duplicate `implement-completed` event to
-   the outbox (#415).
+   router owns `implement-complete` in that mode (STEP_4 fires it after every IMPLEMENT), so the
+   ticket is already in `Review`. A second call logs `ILLEGAL_TRANSITION … from Review` and
+   emits a duplicate `implement-completed` event (#415).
 
    **Standalone runs only (no `--from-auto`):** delegate to the flow executor. `implement-complete`
    carries no `verdict_gate` (it only opens code review — it is not a Done/UAT-reaching trigger),
@@ -827,7 +825,7 @@ source ~/.claude/skills/lib/verifier-result.sh && verify_record_verdict "{VERIFY
 
 ### 7c — Emit the REMEDIATION_BRIEF
 
-After the failure report, emit this block verbatim (preserving delimiter lines and key names — downstream skills parse them):
+After the failure report, emit this block verbatim (preserving delimiter lines and key names — downstream skills parse them). Step 1g observations never enter it or 7c5:
 
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -913,7 +911,7 @@ Then append it:
 bash ~/.claude/skills/lib/remediation-append.sh "{TICKET-ID}" --section "{ticket-dir}/remediation-section.md" --root .
 ```
 
-The script finds the plan (`ticket-dir.sh plan`), adds `## Verification #<N>` (existing sections + 1), your file verbatim and the `<!-- /REMEDIATION_BRIEF -->` marker through a temp file and a rename, and prints `PLAN=`/`N=` for 7d2. Exit 3: no single plan artifact; report "No plan artifact found for REMEDIATION_BRIEF — brief emitted to chat and notes.md only." Exit 1: the write or rename failed and `REMEDIATION_BRIEF_TRUNCATED` is logged; stop.
+The script appends `## Verification #<N>`, your file and the `<!-- /REMEDIATION_BRIEF -->` marker to the plan atomically, and prints `PLAN=`/`N=` for 7d2. Exit 3: no single plan artifact; report "No plan artifact found for REMEDIATION_BRIEF — brief emitted to chat and notes.md only." Exit 1: the write or rename failed and `REMEDIATION_BRIEF_TRUNCATED` is logged; stop.
 
 ### 7d — Post VERIFY_EXHAUSTED summary to Linear
 
@@ -945,12 +943,10 @@ bash ~/.claude/skills/lib/flow-run.sh --log-file "{LOG_FILE}" {TICKET-ID} uat-fa
 # flow-run.sh logs any failure itself (no verdict_gate, so no exit 11); non-fatal — continue.
 ```
 
-This moves state → `Ready`, adds `rejected`, removes `reviewed`. A human must run `/ticket-approve {TICKET-ID}` before the next implementation cycle can start.
+This moves state → `Ready`, adds `rejected`, removes `reviewed`; Step 1g observations never change it. A human must run `/ticket-approve {TICKET-ID}` before the next implementation cycle can start.
 
 If `--env local`: no state change — the ticket is still in `Ready`, code just needs more work. The REMEDIATION_BRIEF above feeds `ticket-implement` for the fix round.
 
 ### 7g — Emit the PHASE_RESULT block (--from-auto only)
 
 A failure still reports. End your return with the `=== PHASE_RESULT ===` block described in **§ 6 Phase result emission** of the auto preamble: `PHASE: VERIFY`, `VERDICT: FAIL`, `VERIFIER` set to this run's actual verifier, `CRITERIA_MET` the number that passed, `CRITERIA_TOTAL` the number attempted, and `UNADDRESSED` naming any criterion never reached. This is **additive** — the REMEDIATION_BRIEF above is unchanged and keeps its canonical format. The block goes last, after everything else in the return.
-
-A FAIL with a block is a usable signal; a FAIL with no block is an absence of information, and any consumer must then fall back to whole-run classification.

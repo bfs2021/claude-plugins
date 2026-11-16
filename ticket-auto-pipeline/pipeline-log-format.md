@@ -332,7 +332,7 @@ The model value resolves from the `ANTHROPIC_MODEL` environment variable, fallin
 
 ### Persona injection entries (debugger-persona-overlay)
 
-Written by `ticket-implement` Step 2 after each `persona-select.sh` run (once per layer on a mixed ticket). Records which personas the implementer was given, so "was the debugger overlay active on this run?" is a grep, not a guess:
+Written by `ticket-implement` Step 2 after each `persona-select.sh` run (once per layer on a mixed ticket), and by `ticket-verify` Step 1g when `VERIFY_QA_PERSONA=true` (no `debug` field; `warn` when none loaded):
 
 ```bash
 echo "$(date -u +%Y-%m-%dT%H:%M:%SZ)|META|persona-select|info|base=backend-developer;spec=backend/java.md;debug=debug/jvm.md" >> "$LOG_FILE"
@@ -340,9 +340,11 @@ echo "$(date -u +%Y-%m-%dT%H:%M:%SZ)|META|persona-select|info|base=backend-devel
 
 - `base` — the base role (`PERSONA_BASE` file name without `.md`).
 - `spec` — `PERSONA_SPECIALIZER` relative to `personas/specializers/`, or `none`.
-- `debug` — `PERSONA_DEBUG_SPECIALIZER` relative to `personas/specializers/` when set; `debugger` when the overlay is on but no stack was detected; `none` when the overlay is off.
+- `debug` — `PERSONA_DEBUG_SPECIALIZER` relative to `personas/specializers/`; `debugger` when on with no stack; `none` when off.
 
-It is a `META` line on purpose: `detect-resume.sh` derives `IMPLEMENT_FROM` from the last `IMPLEMENT|<step>|done|` line, so an `IMPLEMENT|persona-select|done|` line would resume implement at a step its dispatch table does not know. `lib/tests/test-persona-injection.sh` pins that the line leaves `RESUME_STEP` and `IMPLEMENT_FROM` unchanged.
+Verify then logs `META|qa-supporting|info|checks=<S>;criterion_fails=<F>;observations=<O>`.
+
+It is a `META` line on purpose: `detect-resume.sh` derives `IMPLEMENT_FROM` from the last `IMPLEMENT|<step>|done|` line, so an `IMPLEMENT|persona-select|done|` line would resume at an unknown step. `lib/tests/test-persona-injection.sh` pins that the line leaves `RESUME_STEP` and `IMPLEMENT_FROM` unchanged.
 
 ### Run identity entries (Branch A, Commercial Evidence MVP)
 
