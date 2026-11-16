@@ -404,7 +404,7 @@ planner_draft_readiness_missed_report() {
     label="$code"
     [ "$kind" = security ] && label="Security ${code}"
     if [ -n "$earlier" ]; then
-      echo "  ${slug}: ${label} — ${reason} (from an earlier revision)"
+      echo "  ${slug}: ${label} — ${reason} (raised on an earlier revision; not re-checked since)"
     else
       echo "  ${slug}: ${label} — ${reason}"
     fi

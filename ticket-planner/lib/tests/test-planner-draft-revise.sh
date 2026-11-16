@@ -620,6 +620,45 @@ mv "${TMP_ROOT}/idea.keep" "${IDIR}/artifacts/idea.txt"
 cp "${DR}/a-export/findings.r1.json" "${TMP_ROOT}/badname.json"
 planner_prompt_spec_revise "$INIT" a-export "${TMP_ROOT}/badname.json" >/dev/null 2>&1 && fail "bad name" "accepted" || pass "findings file must be findings.r<N>.json"
 
+# Neighbour specs (rehearsal F84): direct upstream and downstream siblings are
+# listed read-only, an external blocked-by ref is not, an isolated spec gets
+# no neighbour line, and the assumption rule names neighbours and fail-closed.
+NB_INIT="INIT-DRV2"
+NB_SPECS="${REPOS_ROOT}/.ticket-auto/initiatives/${NB_INIT}/artifacts/specs"
+mkdir -p "$NB_SPECS"
+_spec "${NB_SPECS}/u-auth.md" "u-auth" "Sign-in API" "planned, feature"
+_spec "${NB_SPECS}/m-shell.md" "m-shell" "Frontend shell" "planned, feature, blocked-by:u-auth, blocked-by:WIL-83"
+_spec "${NB_SPECS}/d-editor.md" "d-editor" "Editor page" "planned, feature, blocked-by:m-shell"
+_spec "${NB_SPECS}/z-alone.md" "z-alone" "Standalone page" "planned, feature, blocked-by:WIL-83"
+NB_ROOT=$(planner_draft_readiness_root "$NB_INIT")
+for s in m-shell z-alone; do
+  mkdir -p "${NB_ROOT}/${s}"
+  printf '%s\n' "$FINDINGS" >"${NB_ROOT}/${s}/findings.r1.json"
+done
+p=$(planner_prompt_spec_revise "$NB_INIT" m-shell "${NB_ROOT}/m-shell/findings.r1.json")
+nb=$(grep -F -- '- Neighbour spec (read only; do not edit):' <<<"$p")
+if [ "$nb" = "- Neighbour spec (read only; do not edit): \`${NB_SPECS}/d-editor.md\` (downstream: it is blocked by this spec)
+- Neighbour spec (read only; do not edit): \`${NB_SPECS}/u-auth.md\` (upstream: this spec is blocked by it)" ]; then
+  pass "F84: one upstream and one downstream neighbour listed with their direction, sorted"
+else
+  fail "F84 neighbours" "$nb"
+fi
+grep -q 'WIL-83' <<<"$nb" && fail "F84 external ref" "listed" || pass "F84: an external blocked-by ref is not a neighbour"
+[[ "$p" == *'consensus.md`'$'\n'"- Neighbour spec"* ]] && pass "F84: neighbour lines follow the Consensus input" || fail "F84 placement" "not after Consensus"
+p=$(planner_prompt_spec_revise "$NB_INIT" z-alone "${NB_ROOT}/z-alone/findings.r1.json")
+if ! grep -q 'Neighbour spec' <<<"$p" && [[ "$p" == *'consensus.md`'$'\n\n'* ]]; then
+  pass "F84: an isolated spec lists no neighbours and keeps the Inputs layout"
+else
+  fail "F84 isolated" "neighbour line or layout change"
+fi
+if grep -qF 'An assumption must not contradict any neighbour spec' <<<"$p" &&
+  grep -qF 'fail-closed default: deny access, clear the stored credential, show the' <<<"$p" &&
+  grep -qF 'rebut the finding instead' <<<"$p"; then
+  pass "F84: the assumption rule names neighbours, the fail-closed default and the rebuttal"
+else
+  fail "F84 rule" "missing"
+fi
+
 # ── 8. planner_semantic_demote ────────────────────────────────────────────
 echo "--- 8. planner_semantic_demote ---"
 DS='{"evaluator":"x","findings":[{"id":"s1","code":"SCOPE_AMBIGUOUS","dimension":"deep_scope_ambiguity","severity":"blocking","verified":true},{"id":"s2","code":"INTENT_AC_MISMATCH","dimension":"intent","severity":"blocking","verified":true},{"id":"s3","code":"EDGE_CASE_GAP","dimension":"requirement_completeness","severity":"blocking","verified":false},{"id":"s4","code":"MISSING_CORE_AC","dimension":"requirement_completeness","severity":"blocking","verified":true}],"unverified_gaps":[]}'

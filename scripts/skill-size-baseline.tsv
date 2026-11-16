@@ -90,8 +90,8 @@ ticket-auto-pipeline/skills/ticket-setup/SKILL.md	4615	86
 # exception: floor ~45-60 KB (REMEDIATION_BRIEF contract, browser flow)
 ticket-auto-pipeline/skills/ticket-verify/SKILL.md	58401	948
 ticket-auto-pipeline/skills/wiki-maintenance/SKILL.md	19979	345
-# allow-growth: no-source decisions become ASSUMED Scope assumptions; the agent must know the disposition and that security findings are excluded
-ticket-planner/agents/draft-revise-agent.md	1598	8
+# allow-growth: the agent may read the neighbour specs its prompt lists, read-only, so assumptions match them (rehearsal F84)
+ticket-planner/agents/draft-revise-agent.md	1671	8
 ticket-planner/agents/goldfish-review-agent.md	1588	8
 ticket-planner/agents/panel-review-agent.md	2055	10
 # exception: pending reduction, skill-size programme changes 3-5

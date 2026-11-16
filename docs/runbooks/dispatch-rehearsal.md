@@ -34,7 +34,7 @@ Without these rules, the loop converges by making the input easier or the gates 
   - keep `ticket-auto-pipeline/lib/tests/fixtures/dor/20-28` failing with the same codes;
   - be reviewed by a separate reviewer agent before commit.
   These rules also cover the seam plan's gate-policy work (next.md Step 19, G4–G6): demotions, Refinement parity and the DoR-evaluator retry.
-- **Negative control, every iteration.** Copy a passing child body and remove one `Source:` line or the Test User credentials. Then confirm `check_ticket_ready` or `check_planned_body` fails on the copy.
+- **Negative control, every iteration.** Copy a passing child body. Then either strip the `Source:` from one Test Data Prerequisites row and keep the row, or remove the Test User credentials. Do not delete the whole row: the body stays ready, because only the semantic scan can see a missing prerequisite. Then confirm `check_ticket_ready` or `check_planned_body` fails on the copy.
 - **The clean counter resets to 0** on any code or gate commit.
 - **Never** hand-edit a generated ticket, `body.md` or manifest. Never waive a code to get a pass.
 

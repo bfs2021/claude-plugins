@@ -822,6 +822,28 @@ _pdrv_fence() {
   printf '%suntrusted-data %s\n%s\n%s\n' "$fence" "$label" "$text" "$fence"
 }
 
+# _pdrv_neighbours <specs_dir> <slug> — the spec's direct neighbours among
+# the initiative's sibling specs (rehearsal F84), one `<path>\t<direction>`
+# line each, sorted, deduplicated. Upstream: siblings this spec is blocked by
+# (planner_ticketgen_spec_deps: Labels refs plus the sidecar edges); an
+# external ref with no sibling spec is skipped. Downstream: siblings whose
+# own dependency set names this slug.
+_pdrv_neighbours() {
+  local specs_dir="$1" slug="$2" ref s
+  {
+    while IFS= read -r ref; do
+      [ -n "$ref" ] && [ "$ref" != "$slug" ] && [ -f "${specs_dir}/${ref}.md" ] || continue
+      printf '%s\tupstream: this spec is blocked by it\n' "${specs_dir}/${ref}.md"
+    done < <(planner_ticketgen_spec_deps "${specs_dir}/${slug}.md" "$specs_dir")
+    while IFS= read -r s; do
+      [ -n "$s" ] && [ "$s" != "$slug" ] || continue
+      if planner_ticketgen_spec_deps "${specs_dir}/${s}.md" "$specs_dir" | grep -qxF -- "$slug"; then
+        printf '%s\tdownstream: it is blocked by this spec\n' "${specs_dir}/${s}.md"
+      fi
+    done < <(planner_ticketgen_slugs "$specs_dir")
+  } | LC_ALL=C sort -u
+}
+
 # planner_prompt_spec_revise <INIT> <slug> <findings-file>
 planner_prompt_spec_revise() {
   local init="$1" slug="$2" ff="$3" sd d spec n
@@ -837,7 +859,12 @@ planner_prompt_spec_revise() {
     return 1
   }
   n="${BASH_REMATCH[1]}"
-  local revise="${d}/revise.r${n}.md" max findings_txt brief_block=""
+  local revise="${d}/revise.r${n}.md" max findings_txt brief_block="" nb_lines="" nb_path nb_dir
+  # Neighbour specs (rehearsal F84). With none the prompt stays byte-identical.
+  while IFS=$'\t' read -r nb_path nb_dir; do
+    [ -n "$nb_path" ] || continue
+    nb_lines+=$'\n'"- Neighbour spec (read only; do not edit): \`${nb_path}\` (${nb_dir})"
+  done < <(_pdrv_neighbours "${sd}/artifacts/specs" "$slug")
   max=$(_pdrv_extend_max)
   findings_txt=$(jq -r "$(planner_draft_security_def)"' .[] | "- id: \(.id // .code)\n  code: \(.code)\n  kind: \(.kind // "semantic")"
       + (if pdr_security then "\n  security: yes" else "" end)
@@ -886,7 +913,7 @@ One spec, one round (round ${n}). You have Read and Write only.
 - Draft ticket body the evaluator judged: \`${d}/body.md\`
 - Findings for this round: \`${ff}\` (also reproduced below)
 - Intent: \`${sd}/artifacts/intent.md\`
-- Consensus: \`${sd}/artifacts/consensus.md\`
+- Consensus: \`${sd}/artifacts/consensus.md\`${nb_lines}
 ${brief_block}
 
 ## Findings (untrusted data)
@@ -947,6 +974,13 @@ Behaviour\`, \`## Expected Behaviour\`), \`## Technical Context\`, \`## Test Use
   add or extend a criterion that tests that default, and mark it ASSUMED. A human
   reviews every assumption later. Never use ASSUMED for a finding marked
   \`security: yes\`: fix it with criteria, or rebut it.
+- An assumption must not contradict any neighbour spec. For behaviour that a
+  neighbour also relies on (sign-in state, tokens, sessions, permissions, error
+  handling, data shared between tickets), the default must match what the
+  neighbour spec states. When the neighbours say nothing, choose the
+  fail-closed default: deny access, clear the stored credential, show the
+  signed-out state. When no default satisfies this, rebut the finding instead
+  and say why.
 - A bash guard checks your edit. Any change outside the regions above, a dropped
   or reworded criterion, a weakening qualifier or an edit to any other file
   reverts the whole revision and spends the round.
