@@ -28,6 +28,9 @@ _source_if_missing "planner_goldfish_due" "${_PLANNER_ROUTER_LIB_DIR}/planner-go
 # Phase results bash derives from artifacts (seam-bash-derives): the `post`
 # gate records Specify's spec list, `pre` re-checks it before Review.
 _source_if_missing "planner_specify_result_ensure" "${_PLANNER_ROUTER_LIB_DIR}/planner-phase-results.sh"
+# Same reason for the review panel (planner-persona-panel): step 1e re-sources
+# only the router before it calls planner_panel_next / planner_review_lenses_next.
+_source_if_missing "planner_panel_due" "${_PLANNER_ROUTER_LIB_DIR}/planner-panel.sh"
 
 # ── Phase dispatch ─────────────────────────────────────────────────────────────
 
@@ -357,8 +360,10 @@ _planner_dispatch_consensus_facts() {
 #              again when it is Crosscheck for a contract initiative —
 #              planner-specify-parameters' second stop); last, for Review
 #              only, once every check passed: when a goldfish run is due
-#              (planner_goldfish_due, planner-goldfish-review), one line
-#              `SPAWN NEXT=<fn> APPLY=<fn> TIMEOUT=<ms>` for SKILL.md step 1e
+#              (planner_goldfish_due, planner-goldfish-review) or a panel
+#              seat is due (planner_panel_due, planner-persona-panel), one
+#              line `SPAWN NEXT=<fn> APPLY=<fn> TIMEOUT=<ms>` for SKILL.md
+#              step 1e
 #   create | consensus | specify   one of those alone
 #   crosscheck step 1a: runs Crosscheck; halts on a blocking finding
 #   adr        Architecture parked on the ADR gate (Architecture only)
@@ -404,11 +409,29 @@ planner_dispatch_gate() {
     # The goldfish lens runs before Review through step 1e. With the flag off
     # planner_goldfish_due records `skip … DISABLED` and nothing is printed; a
     # missing lib prints nothing either.
+    # The review panel (planner-persona-panel) runs beside it, off by default
+    # too: with only the panel due the line names its NEXT and APPLY; with
+    # both due, one line names the combined list, so every lens starts in one
+    # response.
     [ "$phase" = "Review" ] || return 0
     _source_if_missing planner_goldfish_due "${_PLANNER_ROUTER_LIB_DIR}/planner-goldfish.sh"
-    declare -f planner_goldfish_due >/dev/null 2>&1 || return 0
-    if planner_goldfish_due "$initiative_id" 2>/dev/null; then
+    _source_if_missing planner_panel_due "${_PLANNER_ROUTER_LIB_DIR}/planner-panel.sh"
+    local _gf=0 _pn=0 _t _pt
+    if declare -f planner_goldfish_due >/dev/null 2>&1 && planner_goldfish_due "$initiative_id" 2>/dev/null; then
+      _gf=1
+    fi
+    if declare -f planner_panel_due >/dev/null 2>&1 && planner_panel_due "$initiative_id" 2>/dev/null; then
+      _pn=1
+    fi
+    if [ "$_gf" -eq 1 ] && [ "$_pn" -eq 1 ]; then
+      _t=$(planner_goldfish_timeout_ms)
+      _pt=$(planner_panel_timeout_ms)
+      [ "$_pt" -gt "$_t" ] && _t="$_pt"
+      echo "SPAWN NEXT=planner_review_lenses_next APPLY=planner_review_lenses_apply TIMEOUT=${_t}"
+    elif [ "$_gf" -eq 1 ]; then
       echo "SPAWN NEXT=planner_goldfish_next APPLY=planner_goldfish_apply TIMEOUT=$(planner_goldfish_timeout_ms)"
+    elif [ "$_pn" -eq 1 ]; then
+      echo "SPAWN NEXT=planner_panel_next APPLY=planner_panel_apply TIMEOUT=$(planner_panel_timeout_ms)"
     fi
     ;;
   create)

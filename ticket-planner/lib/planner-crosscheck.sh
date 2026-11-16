@@ -113,6 +113,8 @@ _planner_crosscheck_source_if_missing "planner_crosscheck_ac_precondition" \
   "${_PLANNER_CROSSCHECK_LIB_DIR}/planner-crosscheck-ac-precondition.sh"
 _planner_crosscheck_source_if_missing "planner_crosscheck_goldfish" \
   "${_PLANNER_CROSSCHECK_LIB_DIR}/planner-crosscheck-goldfish.sh"
+_planner_crosscheck_source_if_missing "planner_crosscheck_panel" \
+  "${_PLANNER_CROSSCHECK_LIB_DIR}/planner-crosscheck-panel.sh"
 _planner_crosscheck_source_if_missing "planner_testdata_synthesize" \
   "${_PLANNER_CROSSCHECK_LIB_DIR}/planner-testdata-synth.sh"
 _planner_crosscheck_source_if_missing "planner_state_write" \
@@ -146,7 +148,10 @@ _planner_crosscheck_source_if_missing "planner_state_write" \
 # the key) and AC_PRECONDITION_NO_SOURCE (an unsupported stack) never block.
 # planner-goldfish-review: GOLDFISH_UNADDRESSED judges Consensus's bookkeeping
 # of the goldfish findings, never the plan, so it never blocks.
-PLANNER_CROSSCHECK_WARN_CODES="DISCOVERY_GAP_UNRESOLVED CONTRACT_UNDEFINED TEST_DATA_UNSOURCED_LEGACY CITED_ARTIFACTS_SECTION_MISSING TEST_DATA_INVENTORY_MISSING TEST_DATA_IMPLIED_WEAK VERIFICATION_NOTES_MISSING_LEGACY OWN_NEAR_MATCH OWN_UNDECLARED_REF OWN_EXTERNAL_UNANCHORED OWN_EDGES_DIVERGED AC_PRECONDITION_PLANNED AC_PRECONDITION_NO_SOURCE GOLDFISH_UNADDRESSED CODE_SPAN_EDGE_SPACE"
+# planner-persona-panel: PANEL_UNADDRESSED is the same kind of bookkeeping
+# check for the review panel, warn-level. PANEL_STOP_SKIPPED blocks: Consensus
+# settled a security or product-owner blocker that only a person may settle.
+PLANNER_CROSSCHECK_WARN_CODES="DISCOVERY_GAP_UNRESOLVED CONTRACT_UNDEFINED TEST_DATA_UNSOURCED_LEGACY CITED_ARTIFACTS_SECTION_MISSING TEST_DATA_INVENTORY_MISSING TEST_DATA_IMPLIED_WEAK VERIFICATION_NOTES_MISSING_LEGACY OWN_NEAR_MATCH OWN_UNDECLARED_REF OWN_EXTERNAL_UNANCHORED OWN_EDGES_DIVERGED AC_PRECONDITION_PLANNED AC_PRECONDITION_NO_SOURCE GOLDFISH_UNADDRESSED PANEL_UNADDRESSED CODE_SPAN_EDGE_SPACE"
 
 # Per-instance codes (planner-crosscheck-ownership D10). A listed code is
 # accepted one instance at a time and never code-wide: emit matches each
@@ -578,6 +583,15 @@ planner_crosscheck_run() {
   total_warn=$((total_warn + w))
   total_accepted=$((total_accepted + a))
 
+  # Panel family (planner-persona-panel): silent when no panel seat ran.
+  # PANEL_UNADDRESSED warns; PANEL_STOP_SKIPPED blocks.
+  if declare -f planner_crosscheck_panel >/dev/null 2>&1; then
+    read -r b w a < <(_planner_crosscheck_run_family "$initiative_id" planner_crosscheck_panel "$initiative_id")
+    total_blocking=$((total_blocking + b))
+    total_warn=$((total_warn + w))
+    total_accepted=$((total_accepted + a))
+  fi
+
   if [ "$total_blocking" -gt 0 ]; then
     planner_state_write "$initiative_id" "Crosscheck" "check" "fail" \
       "${total_blocking} blocking finding(s), ${total_warn} warn, ${total_accepted} accepted — see META|crosscheck entries"
@@ -817,6 +831,12 @@ planner_crosscheck_fix_hint() {
     ;;
   GOLDFISH_UNADDRESSED)
     echo "Consensus left a goldfish blocker or major finding without a disposition, or left out the status line — under ## Goldfish Findings Addressed in consensus.md, copy the planner_goldfish_status line first, then write ### G<n> — <severity> — <title> — <accepted | rejected (… covered in …) | deferred | clarified> per named finding; warn only"
+    ;;
+  PANEL_UNADDRESSED)
+    echo "Consensus left a review-panel blocker or major finding without a disposition, or left out a seat's status line — under ## Panel in consensus.md, copy the planner_panel_status lines first, then write ### <ID> — <severity> — <title> — <accepted | accepted in part (…) | rejected (…) | deferred (…)> per named finding; warn only"
+    ;;
+  PANEL_STOP_SKIPPED)
+    echo "Consensus settled a security or product-owner blocker that only a person may settle — mark the finding accepted (and change the plan), or add its panel.<ID> row to proposal.md ## Parameters with Value NEEDS_HUMAN_DECISION — <question> so the owner is asked; an objection the owner upheld must end as accepted. Override: resume --accept PANEL_STOP_SKIPPED:\"reason\""
     ;;
   TEST_DATA_IMPLIED_WEAK)
     echo "a criterion may imply test data while every row says none (a pattern match, warn only) — check it; if it does need data, add the Verification Notes row with a Source; else answer TESTDATA_CONFIRM: none in consensus.md to silence it"

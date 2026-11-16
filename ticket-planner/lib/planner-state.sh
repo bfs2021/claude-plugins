@@ -277,7 +277,9 @@ PLANNER_CONFIG_KEYS="stop-after create-authorized linear-team linear-team-id lin
 # version; every version's lines are kept. `ownership-edges` is one record per
 # Crosscheck run (planner-crosscheck.sh writes it after every edges step), so a
 # resumed Crosscheck's line is kept rather than suppressed (seam-bash-derives).
-PLANNER_REPEATABLE_META_STEPS="refinement-round refinement-converge refinement-dispute refinement-after-completed draft-readiness draft-revise goldfish ownership-edges"
+# `panel` (planner-persona-panel) records one terminal line per proposal
+# version and seat.
+PLANNER_REPEATABLE_META_STEPS="refinement-round refinement-converge refinement-dispute refinement-after-completed draft-readiness draft-revise goldfish ownership-edges panel"
 
 # Is <step> a config key rather than a progress marker?
 # Usage: _planner_is_config_key <step>

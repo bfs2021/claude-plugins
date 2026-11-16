@@ -48,6 +48,26 @@ marketplace. Where a release also moved `ticket-planner`, `fleet-controller`, or
   ticket-verify as a selector call site and pins the verdict rule.
 - Catalog: `VERIFY_QA_PERSONA` in `fleet-controller/features.json`.
 
+## ticket-planner 0.51.0 (2026-11-16) — planner-persona-panel: personas and the review panel (off by default)
+
+planner-persona-panel, both PRs in one release (first built as 0.44.0/0.45.0 on a branch; those numbers were taken on main meanwhile). ticket-auto-pipeline and fleet-controller unchanged apart from two catalog entries in `features.json`.
+
+### Changed
+
+- **Authoring phases read as a job function.** With `PLANNER_PHASE_PERSONAS=true`, `planner_prompt_for_phase` adds a `## Your perspective` block before the `## Constraints` heading of the Appraisal, Discovery, Architecture, Specify, Epic Generation and Ticket Generation prompts. Review, Consensus and Completed get none. A prompt function called directly is unchanged, so every prompt pin keeps its value.
+- **Review panel wired.** With `PLANNER_PERSONA_PANEL=true`, the Review `pre` gate asks SKILL.md to spawn one reviewer per seat before the Review agent (`SPAWN NEXT=planner_panel_next APPLY=planner_panel_apply TIMEOUT=<ms>`; one combined `planner_review_lenses_next` line when the goldfish lens is due too). For an initiative whose panel ran, the Consensus prompt gets a `## Review panel` section: status lines, one disposition per blocker or major finding, conflicts between seats, and a `## Review Trail` section in each spec an accepted finding changed, which reaches the ticket body outside the Planner Context block.
+- **Only security and the product owner can stop the plan.** A `SEC-` or `PO-` blocker that Consensus does not accept in full becomes a `panel.<ID>` row of proposal.md's `## Parameters` table, so the existing stop before Crosscheck asks a person (`specify-param:panel.<ID>`). `overrule: <reason>` continues; `uphold` sends the plan back to Consensus once (`Review|panel-uphold` lines, written by answer intake).
+- **Crosscheck.** New family `planner_crosscheck_panel`: `PANEL_UNADDRESSED` (warn only) and `PANEL_STOP_SKIPPED` (blocking, released with `--accept`). Silent when no panel seat ran.
+- Run telemetry counts a seat's transcript (`panel: <INIT>:<seat>`) under Review. The router and answer intake source `planner-panel.sh`.
+
+With both flags off (the default), prompts, stdout and halt goldens are unchanged; each proposal version gets one `META|panel|skip … DISABLED` line and no `panel/` directory is written.
+
+### Added (dormant)
+
+- `lib/planner-personas.sh`: finds the persona files of `ticket-auto-pipeline` (`TICKET_AUTO_PLUGIN_ROOT`, then the directory beside the planner, then the installed plugin path), picks the persona of each authoring phase (Appraisal the product owner, Discovery the analyzer, Architecture the architect, Specify the developer for the stack, Epic and Ticket Generation the technical writer) and renders it as a `## Your perspective` block. When no persona directory is found it writes one `META|persona|skip|NOT_AVAILABLE` line and changes nothing.
+- `lib/planner-panel.sh` and `agents/panel-review-agent.md`: a review panel of up to five seats (product owner, architect and QA engineer always; security and one developer when the proposal calls for them), one result per seat and proposal version under `panel/`, at most 6 findings with the seat's id prefix (`PO`, `ARCH`, `QA`, `SEC`, `DEV`). A missing, malformed or contaminated result is retried once and then recorded as `META|panel|fail … NOT_RUN`. `planner_review_lenses_next` / `_apply` hand out the goldfish lens and the panel as one spawn list.
+- Flags `PLANNER_PHASE_PERSONAS` and `PLANNER_PERSONA_PANEL`, both default `false`. Nothing calls the new code yet: prompts, gates and halts are unchanged.
+
 ## 0.121.0 / ticket-planner 0.50.0 (2026-11-16) — seam-gate-safety G5: an evaluator that could not judge is a harness error
 
 - **Looser quote re-check (ticket-auto-pipeline).** `dor_semantic_findings` tries a

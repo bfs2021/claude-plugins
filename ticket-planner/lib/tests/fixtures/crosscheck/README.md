@@ -97,7 +97,8 @@ exercises.
 - `log_lines` — optional. State-log lines an earlier phase already wrote,
   each `<PHASE>|<step>|<status>|<message>` and appended before the run (for
   example `META|goldfish|done|<sha12> findings=3 bm=G1,G2`, which turns on the
-  goldfish family).
+  goldfish family; `META|panel|done|<sha12> <seat>
+  findings=<N> bm=<ids> blockers=<ids>` turns on the panel family).
 - `idempotent` — optional, `true`: run `planner_crosscheck_run` a second time
   and assert no file under `artifacts/` changed (content, size or mtime).
 - `notes` — free text. Say what real false-positive class this is modeled

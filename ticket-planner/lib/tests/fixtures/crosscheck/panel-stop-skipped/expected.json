@@ -1,0 +1,14 @@
+{
+  "blocking": 1,
+  "warn": 1,
+  "accepted": 0,
+  "log_lines": [
+    "META|panel|done|abcdef012345 qa-engineer findings=2 bm=QA-1 blockers=-",
+    "META|panel|done|abcdef012345 security findings=1 bm=SEC-1 blockers=SEC-1"
+  ],
+  "log_contains": [
+    "PANEL_STOP_SKIPPED consensus.md ## Panel: SEC-1",
+    "PANEL_UNADDRESSED consensus.md ## Panel: no disposition for QA-1"
+  ],
+  "notes": "planner-persona-panel: the latest panel run recorded a security blocker SEC-1 and a QA major QA-1. consensus.md rejects SEC-1 on its own (no panel.SEC-1 decision row in a proposal) and gives QA-1 no disposition. PANEL_STOP_SKIPPED blocks; PANEL_UNADDRESSED warns."
+}
