@@ -121,6 +121,26 @@ else
   _fail "verbatim quote changed ($j)"
 fi
 
+j=$(_judge Q-8 TEST_DATA_GAP "a … Duplicating a handover from the list")
+[ "$(jq -r '.findings[0].verified' <<<"$j")" = "false" ] &&
+  _pass "a piece under ${DOR_SEMANTIC_LOOSE_PIECE_MIN} characters fails the re-check" ||
+  _fail "a one-letter piece should fail ($j)"
+
+echo "=== loose-verified findings are never demoted ==="
+f=$(jq -nc '[{code:"MISSING_CORE_AC",dimension:"requirement_completeness",severity:"blocking",quote:"Duplicating a handover from the list",quote_b:null,detail:"d",verified:true,quote_check:"loose"},
+  {code:"EDGE_CASE_GAP",dimension:"edge_cases",severity:"blocking",quote:"Archiving a handover from its detail page",quote_b:null,detail:"d",verified:true}]')
+out=$(DOR_SEMANTIC_MAX_ROUNDS=1 dor_semantic_lineage_from \
+  '{"round":5,"evaluator":"'"$DOR_SEMANTIC_EVALUATOR"'","body_hash":"x","findings":[]}' "$(cat "$BODY")" "$HASH" "$f" '[]')
+if [ "$(jq -c '[.findings[] | {code, severity, demoted}]' <<<"$out")" = '[{"code":"MISSING_CORE_AC","severity":"blocking","demoted":null},{"code":"EDGE_CASE_GAP","severity":"advisory","demoted":"round-limit"}]' ]; then
+  _pass "round limit demotes a verbatim finding but never a loose-verified one"
+else
+  _fail "loose demotion ($(jq -c '[.findings[] | {code, severity, demoted, lineage}]' <<<"$out"))"
+fi
+out=$(DOR_SEMANTIC_PRIOR_PASSED=true dor_semantic_lineage_from null "$(cat "$BODY")" "$HASH" "$f" '[]')
+[ "$(jq -r '[.findings[] | select(.code == "MISSING_CORE_AC") | .severity] | .[0]' <<<"$out")" = "blocking" ] &&
+  _pass "the draft-passed policy never demotes a loose-verified finding" ||
+  _fail "draft-passed loose ($(jq -c '.findings' <<<"$out"))"
+
 echo "=== advisory vs blocking unverified findings ==="
 
 _apply A-1 TEST_DATA_GAP "Duplicating a handover creates three copies of it" || true

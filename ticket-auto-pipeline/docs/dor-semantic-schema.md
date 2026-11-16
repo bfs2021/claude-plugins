@@ -199,8 +199,10 @@ whitespace is collapsed, smart quotes and dashes are folded to ASCII, and markdo
 emphasis markers (`*`, `_`, `` ` ``) and leading list/table markers are stripped. A
 quote that does not match gets a looser re-check (seam-gate-safety D4): split at every
 ellipsis (`…`, `...`), each piece trimmed of enclosing quotes, punctuation and
-whitespace, every piece found in the normalised body in order, the longest at least
-`DOR_SEMANTIC_LOOSE_QUOTE_MIN` (12) characters; case is never folded. A match stores the
+whitespace, every piece found in the normalised body in order and at least
+`DOR_SEMANTIC_LOOSE_PIECE_MIN` (4) characters, the longest at least
+`DOR_SEMANTIC_LOOSE_QUOTE_MIN` (12); case is never folded. A loose-verified finding is
+never demoted by the lineage policy (drift, round-limit, draft-passed). A match stores the
 matched piece as `quote` (the agent's text as `quote_raw`) with `quote_check: "loose"`.
 A quote that still does not match makes that finding `verified: false`
 (`quote_check: "unverified-quote"`). For a finding whose severity is not `advisory`

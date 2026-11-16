@@ -65,6 +65,7 @@ planner_run_unevaluated() {
   fi
   case "$drafts" in 0 | 0/*) ;; *) clean="no" ;; esac
   case "$tickets" in 0) ;; *) clean="no" ;; esac
+  case "$harness" in unknown) clean="no" ;; esac
   echo "Unevaluated: drafts ${drafts}, tickets ${tickets}, harness-error lines ${harness} — $([ "$clean" = yes ] && echo "nothing unevaluated" || echo "not a clean run")"
 }
 

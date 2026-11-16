@@ -296,6 +296,9 @@ _dor_semantic_normalise() {
 # Shortest quote text the looser re-check accepts (seam-gate-safety D4): a
 # shorter remainder ("Returns 400") occurs in too many bodies by chance.
 DOR_SEMANTIC_LOOSE_QUOTE_MIN=12
+# Shortest piece between two ellipses: a one-letter piece ("a … x") would
+# match almost any body and let an elision skip text the agent did not quote.
+DOR_SEMANTIC_LOOSE_PIECE_MIN=4
 
 # _dor_semantic_loose_trim <text> — strips leading and trailing whitespace,
 # quote marks and punctuation.
@@ -311,8 +314,10 @@ _dor_semantic_loose_trim() {
 # substring test failed. The quote is normalised as usual, split at every
 # ellipsis (`…` or `...`), and each piece is trimmed of enclosing quotes,
 # punctuation and whitespace. Every non-empty piece must occur in the body,
-# in order, and the longest piece must be at least
-# DOR_SEMANTIC_LOOSE_QUOTE_MIN characters. Prints the longest piece (the text
+# in order, every piece must be at least DOR_SEMANTIC_LOOSE_PIECE_MIN and the
+# longest at least DOR_SEMANTIC_LOOSE_QUOTE_MIN characters. A loose-verified
+# finding is never demoted by the lineage policy (drift, round-limit,
+# draft-passed): before this re-check it would have blocked as unverified. Prints the longest piece (the text
 # the finding is anchored on) and returns 0; returns 1 otherwise. Case is
 # never folded and no word is dropped, so a quote the body does not contain
 # still fails.
@@ -329,6 +334,7 @@ _dor_semantic_loose_quote() {
   done <<<"$q"
   [ "${#pieces[@]}" -gt 0 ] || return 1
   for piece in "${pieces[@]}"; do
+    [ "${#piece}" -ge "$DOR_SEMANTIC_LOOSE_PIECE_MIN" ] || return 1
     case "$rest" in
     *"$piece"*) rest="${rest#*"$piece"}" ;;
     *) return 1 ;;
@@ -620,7 +626,8 @@ dor_semantic_lineage_from() {
           else . + {lineage: "new", first_round: $r.round} end
         | del(.persisted)
         | .code as $code
-        | if $prior_passed and .severity == "blocking" and .verified == true then
+        | if (.quote_check // "") == "loose" then .
+          elif $prior_passed and .severity == "blocking" and .verified == true then
             if (($structural | index($code)) == null) then . + {severity: "advisory", demoted: "draft-passed"}
             elif .lineage != "carried" and ($pl != null) and ((.units | length) > 0)
                  and (.units | all(unchanged(.))) then

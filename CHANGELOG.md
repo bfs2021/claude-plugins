@@ -23,8 +23,11 @@ marketplace. Where a release also moved `ticket-planner`, `fleet-controller`, or
   second, looser match before a finding's quote is unverified: the quote is split at
   every ellipsis (`…`, `...`), each piece loses enclosing quotes, punctuation and
   whitespace, every piece must occur in the normalised body in order, and the longest
-  must be at least 12 characters (`DOR_SEMANTIC_LOOSE_QUOTE_MIN`). Case is never folded
-  and no word is dropped. A match is stored as the quote (the agent's text as
+  must be at least 12 characters (`DOR_SEMANTIC_LOOSE_QUOTE_MIN`), every piece at least
+  4 (`DOR_SEMANTIC_LOOSE_PIECE_MIN`). Case is never folded and no word is dropped. A
+  loose-verified finding is never demoted by the lineage policy (drift, round-limit,
+  draft-passed): before the re-check it would have blocked as unverified, so it keeps
+  blocking. A match is stored as the quote (the agent's text as
   `quote_raw`, `quote_check: "loose"`), so anchoring and a later import read text the
   body holds. Still unmatched: `verified: false`, `quote_check: "unverified-quote"`.
   A verbatim quote takes the strict path unchanged.
