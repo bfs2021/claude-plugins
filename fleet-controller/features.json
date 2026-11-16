@@ -393,6 +393,18 @@
       "docs": "ticket-auto-pipeline/docs/skills/ticket-verify.md"
     },
     {
+      "name": "VERIFY_QA_PERSONA",
+      "plugin": "ticket-auto-pipeline",
+      "default": "false",
+      "on_value": "true",
+      "category": "feature",
+      "summary": "ticket-verify loads the qa-engineer persona (Playwright or API-testing specializer by verification mode) and adds up to 3 supporting checks per acceptance criterion, 12 in total; findings no criterion covers are reported as observations and never change the verdict.",
+      "requires": [],
+      "recommend": "situational",
+      "why": "Opt-in until one ticket per verification mode has been compared with a run from before: a wider plan takes longer, and a supporting check that shows a criterion is not met adds FAILs.",
+      "docs": "ticket-auto-pipeline/docs/skills/ticket-verify.md"
+    },
+    {
       "name": "TICKET_CREATE_GUARD",
       "plugin": "ticket-auto-pipeline",
       "default": "on",

@@ -8,8 +8,7 @@ priority-hierarchy:
   - Comprehensive coverage
 used-by:
   - ticket-prescan (fan-out lens, --with-qa)
-  - ticket-implement (quality gates)
-  - ticket-pr-review (quality assessment)
+  - ticket-verify (verification plan)
 auto-include-when: []
 version: 1
 last-reviewed: 2026-06-26

@@ -1,5 +1,12 @@
 # Personas Changelog
 
+## 2026-11-16 — QA persona in ticket-verify
+
+### Changed
+- `base/qa-engineer.md` — `used-by` frontmatter corrected to `ticket-prescan (fan-out lens, --with-qa)` and `ticket-verify (verification plan)`. The `ticket-implement` and `ticket-pr-review` entries are gone: the selector never picked this persona there. Content, `version` and `last-reviewed` unchanged.
+
+`lib/persona-select.sh --phase verify [--verify-mode browser|build-only|live-backend]` now emits `qa-engineer` with `qa/playwright-web` (browser), `qa/api-testing` (live-backend) or no specializer (build-only); ticket-verify Step 1g loads it behind `VERIFY_QA_PERSONA` (verify-qa-persona).
+
 ## 2026-10-24 — Debugger overlay
 
 ### Added

@@ -22,9 +22,9 @@ fi
 
 usage() {
   cat >&2 <<'EOF'
-Usage: persona-select.sh --repo <path> [--layer FE|BE|infra] [--phase appraise|implement|review|audit|prescan]
+Usage: persona-select.sh --repo <path> [--layer FE|BE|infra] [--phase appraise|implement|review|audit|prescan|verify]
                          [--type bug|feature|improvement|security|chore|refactor] [--remediation] [--with-qa]
-                         [--ticket-dir <dir>]
+                         [--ticket-dir <dir>] [--verify-mode browser|build-only|live-backend]
 
 Emits persona file paths as KEY=value lines:
   PERSONA_BASE=personas/base/<role>.md
@@ -40,7 +40,7 @@ Emits persona file paths as KEY=value lines:
 Options:
   --repo <path>      Path to the affected repository (required)
   --layer <value>    Layer classification: FE, BE, infra (optional)
-  --phase <value>    Pipeline phase: appraise, implement, review, audit, prescan (optional)
+  --phase <value>    Pipeline phase: appraise, implement, review, audit, prescan, verify (optional)
   --type <value>     Ticket type (validated by template-select.sh). `bug` sets the
                      debugger overlay. Empty means absent; when absent and both
                      TICKET_ID and REPOS_ROOT are set, the local manifest `type` is used.
@@ -55,6 +55,11 @@ Options:
                      `--`; needs REPOS_ROOT), else `bug` when context.md's
                      `**Labels:**` line has a `bug` label, else none. An unknown
                      manifest type is dropped. Emits PERSONA_TYPE.
+  --verify-mode <m>  verify phase only (ticket-verify's VERIFY_MODE): browser →
+                     qa/playwright-web, live-backend → qa/api-testing, build-only →
+                     no specializer. Absent: the repo's QA signals decide, as in
+                     prescan --with-qa. The verify phase never emits the
+                     debugger or test-data overlays.
 
 Ticket text for the keyword detectors comes from TICKET_TITLE, TICKET_DESCRIPTION
 and the file named by TICKET_TEXT_FILE (skills pass the ticket's context.md).
@@ -72,6 +77,7 @@ TYPE=""
 REMEDIATION="false"
 TICKET_DIR=""
 TICKET_DIR_SET="false"
+VERIFY_MODE_ARG=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -102,6 +108,10 @@ while [[ $# -gt 0 ]]; do
   --ticket-dir)
     TICKET_DIR="${2:-}"
     TICKET_DIR_SET="true"
+    shift 2
+    ;;
+  --verify-mode)
+    VERIFY_MODE_ARG="${2:-}"
     shift 2
     ;;
   --help | -h)
@@ -135,12 +145,27 @@ fi
 # Validate --phase if provided
 if [ -n "$PHASE" ]; then
   case "$PHASE" in
-  appraise | implement | review | audit | prescan) ;;
+  appraise | implement | review | audit | prescan | verify) ;;
   *)
-    echo "ERROR: Invalid --phase value '$PHASE'. Must be appraise, implement, review, audit, or prescan." >&2
+    echo "ERROR: Invalid --phase value '$PHASE'. Must be appraise, implement, review, audit, prescan, or verify." >&2
     exit 1
     ;;
   esac
+fi
+
+# Validate --verify-mode if provided: a known mode, and only with --phase verify.
+if [ -n "$VERIFY_MODE_ARG" ]; then
+  case "$VERIFY_MODE_ARG" in
+  browser | build-only | live-backend) ;;
+  *)
+    echo "ERROR: Invalid --verify-mode value '$VERIFY_MODE_ARG'. Must be browser, build-only, or live-backend." >&2
+    exit 1
+    ;;
+  esac
+  if [ "$PHASE" != "verify" ]; then
+    echo "ERROR: --verify-mode needs --phase verify." >&2
+    exit 1
+  fi
 fi
 
 # Validate --type if provided. template-select.sh is sourced only here, after
@@ -233,6 +258,10 @@ select_base() {
     ;;
   audit)
     echo "product-owner"
+    return
+    ;;
+  verify)
+    echo "qa-engineer"
     return
     ;;
   implement)
@@ -467,6 +496,19 @@ select_qa_specializer() {
     return 0
   fi
   echo ""
+  return 0
+}
+
+# QA specializer for the verify phase (verify-qa-persona). The verification
+# mode says how this ticket is checked, so it decides over the repo signals;
+# with no mode, select_qa_specializer's repo signals decide. Always returns 0.
+select_verify_specializer() {
+  case "$VERIFY_MODE_ARG" in
+  browser) echo "specializers/qa/playwright-web.md" ;;
+  live-backend) echo "specializers/qa/api-testing.md" ;;
+  build-only) echo "" ;;
+  *) select_qa_specializer ;;
+  esac
   return 0
 }
 
@@ -729,7 +771,11 @@ main() {
     exit 2
   fi
 
-  specializer=$(select_specializer)
+  if [ "$PHASE" = "verify" ]; then
+    specializer=$(select_verify_specializer)
+  else
+    specializer=$(select_specializer)
+  fi
   specializer_path=""
   if [ -n "$specializer" ]; then
     specializer_path=$(_persona_path "$specializer")
@@ -745,8 +791,10 @@ main() {
   # Test-data persona: a strong signal (the ticket IS test data) or a weak
   # keyword hit both set PERSONA_TESTDATA; only a strong signal on the
   # implement phase also swapped PERSONA_BASE (select_base above).
+  # The verify phase gets neither this nor the debugger overlay: both belong
+  # to implement and review (verify-qa-persona design D1).
   local testdata_path="" testdata_specializers=""
-  if has_testdata_strong || has_testdata_weak; then
+  if [ "$PHASE" != "verify" ] && { has_testdata_strong || has_testdata_weak; }; then
     testdata_path=$(_persona_path "base/test-data-engineer.md")
     if [ -n "$testdata_path" ]; then
       testdata_specializers=$(select_testdata_channels)
@@ -756,7 +804,7 @@ main() {
   # Debugger overlay: additive, never swaps PERSONA_BASE. Only paths whose
   # file exists are emitted.
   local debug_path="" debug_spec_path="" debug_spec
-  if debug_overlay_wanted; then
+  if [ "$PHASE" != "verify" ] && debug_overlay_wanted; then
     debug_path=$(_persona_path "base/debugger.md")
     if [ -n "$debug_path" ]; then
       debug_spec=$(select_debug_specializer)

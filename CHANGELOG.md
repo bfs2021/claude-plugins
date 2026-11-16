@@ -17,6 +17,37 @@ marketplace. Where a release also moved `ticket-planner`, `fleet-controller`, or
 > - **0.19.0 never existed.** `plugin.json` went 0.18.0 → 0.20.0. The Phase 2
 >   commit message claims `0.19.0→0.20.0`, but no 0.19.0 was ever committed.
 
+## 0.122.0 (2026-11-16) — verify-qa-persona: ticket-verify works as a QA engineer (opt-in)
+
+- **`persona-select.sh --phase verify`.** Emits `qa-engineer` as the base persona. A new
+  `--verify-mode browser|build-only|live-backend` picks the specializer: `qa/playwright-web`
+  for browser, `qa/api-testing` for live-backend, none for build-only. With no mode the
+  repo's QA signals decide, as in prescan `--with-qa`. The security auto-include is
+  unchanged; the debugger and test-data overlays are never emitted for this phase. An
+  unknown mode, or `--verify-mode` without `--phase verify`, exits 1. The output for the
+  five existing phases is byte-identical to 0.121.0 (golden test against d980708).
+- **ticket-verify Step 1g, behind `VERIFY_QA_PERSONA` (default `false`).** After the mode is
+  known and before the plan, the skill reads the new `references/qa-persona.md`: it runs the
+  selector, logs `META|persona-select|info|base=qa-engineer;spec=…` and reads the persona. A
+  selector error or a missing persona file is a `META|persona-select|warn` and the run
+  continues with no persona.
+- **The persona widens the plan, not the verdict.** Step 2 may add up to three supporting
+  checks per acceptance criterion (negative path, edge value, state left behind,
+  regression), twelve in total, each naming its criterion. A supporting check that shows its
+  criterion is not met fails that criterion. Any other finding is an observation, in a new
+  `Observations` report section: it never changes the verdict, never enters the
+  REMEDIATION_BRIEF and never causes a state transition. `META|qa-supporting` logs the counts.
+  A guard keeps persona text from widening what Steps 6/7f allow (no tickets, no extra state
+  changes, no mocked responses, no URL navigation).
+- **Size.** ticket-verify's SKILL.md (an exception entry that may never grow) gains only the
+  Step 1g condition and one clause each at Steps 2, 5, 6, 7c and 7f; the rest is in the
+  reference, and SKILL.md is offset by tightening existing prose. The reference is
+  registered in the ticket-verify prompt manifest.
+- **`qa-engineer.md` `used-by`** now lists `ticket-prescan` and `ticket-verify` only (the
+  selector never picked it in implement or PR review). `test-persona-injection.sh` checks
+  ticket-verify as a selector call site and pins the verdict rule.
+- Catalog: `VERIFY_QA_PERSONA` in `fleet-controller/features.json`.
+
 ## 0.121.0 / ticket-planner 0.50.0 (2026-11-16) — seam-gate-safety G5: an evaluator that could not judge is a harness error
 
 - **Looser quote re-check (ticket-auto-pipeline).** `dor_semantic_findings` tries a
