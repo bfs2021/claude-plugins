@@ -309,15 +309,47 @@ check "stop rows: open" "$(planner_panel_stop_rows "$INIT")" "$(printf 'SEC-1\to
 check "a decision row carries the blocker: clean" "$(xc)" ""
 
 row() { printf '| Panel objection SEC-1 | `panel.SEC-1` | policy | keep the token in the URL for now | %s | human:r1:operator |' "$1"; }
+# answered <value> — the answers file that backs a human:r1:operator row, as
+# answer intake writes it.
+answered() {
+  mkdir -p "${SD}/artifacts/answers"
+  jq -n --arg v "$1" '{round: 1, answers: [{binding: "specify-param:panel.SEC-1", role: "operator", value: $v}]}' \
+    >"${SD}/artifacts/answers/round-1.json"
+}
 printf '%s%s%s\n' "$PLAN_HEAD" "$TABLE" "$(row 'overrule: internal network only')" >"${SD}/artifacts/proposal.md"
+check "a human: source no answers file backs is not an answer: the row is asked" \
+  "$(planner_panel_stop_rows "$INIT")" "$(printf 'SEC-1\topen')"
+answered 'overrule: internal network only'
 check "stop rows: overrule" "$(planner_panel_stop_rows "$INIT")" "$(printf 'SEC-1\toverrule')"
 check "overruled by the owner: clean" "$(xc)" ""
 printf '%s%s%s\n' "$PLAN_HEAD" "$TABLE" "$(row 'Uphold')" >"${SD}/artifacts/proposal.md"
+answered 'Uphold'
 check "stop rows: uphold" "$(planner_panel_stop_rows "$INIT")" "$(printf 'SEC-1\tuphold')"
 check "upheld but not accepted: blocks" "$(xc)" \
   "planner-crosscheck-panel: PANEL_STOP_SKIPPED consensus.md ## Panel: SEC-1 (upheld by the owner, not accepted)"
 consensus $'### SEC-1 — blocker — Title 1 — accepted\n### QA-1 — blocker — Title 1 — rejected (x)\n### QA-2 — major — Title 2 — deferred'
 check "upheld and accepted: clean" "$(xc)" ""
+
+# A row Consensus closed on its own is no row: the blocker still blocks.
+consensus $'### SEC-1 — blocker — Title 1 — rejected (x)\n### QA-1 — blocker — Title 1 — rejected (x)\n### QA-2 — major — Title 2 — deferred'
+printf '%s%s%s\n' "$PLAN_HEAD" "$TABLE" '| Panel objection SEC-1 | `panel.SEC-1` | duration | 30 minutes | 30 minutes | default |' \
+  >"${SD}/artifacts/proposal.md"
+check "stop rows: a self-closed row is invalid" "$(planner_panel_stop_rows "$INIT")" "$(printf 'SEC-1\tinvalid')"
+check "a self-closed row does not carry the blocker" "$(xc)" \
+  "planner-crosscheck-panel: PANEL_STOP_SKIPPED consensus.md ## Panel: SEC-1"
+printf '%s' "$PLAN_NONE" >"${SD}/artifacts/proposal.md"
+
+# The disposition is the last part of the heading, read strictly.
+consensus $'### SEC-1 — blocker — accepted — rejected (x)\n### QA-1 — blocker — Title 1 — rejected (x)\n### QA-2 — major — Title 2 — deferred'
+contains "a title that says accepted settles nothing" "$(planner_panel_dispositions "${SD}/artifacts/consensus.md")" "disp SEC-1 rejected"
+contains "… and the blocker blocks" "$(xc)" "PANEL_STOP_SKIPPED consensus.md ## Panel: SEC-1"
+consensus $'### SEC-1 — blocker — accepted\n### QA-1 — blocker — Title 1 — rejected (x)\n### QA-2 — major — Title 2 — deferred'
+lacks "a heading with no title part has no disposition" "$(planner_panel_dispositions "${SD}/artifacts/consensus.md")" "disp SEC-1"
+consensus $'### SEC-1 — blocker — Title 1 — accepted\n### SEC-1 — blocker — Title 1 — rejected (x)\n### QA-1 — blocker — Title 1 — rejected (x)\n### QA-2 — major — Title 2 — deferred'
+contains "two headings that differ are a conflict" "$(planner_panel_dispositions "${SD}/artifacts/consensus.md")" "disp SEC-1 conflict"
+contains "… and the blocker blocks" "$(xc)" "PANEL_STOP_SKIPPED consensus.md ## Panel: SEC-1"
+consensus $'### SEC-1 — blocker — Title 1 — acceptedly ignored\n### QA-1 — blocker — Title 1 — rejected (x)\n### QA-2 — major — Title 2 — deferred'
+lacks "a word that only starts like a disposition is none" "$(planner_panel_dispositions "${SD}/artifacts/consensus.md")" "disp SEC-1"
 
 # Through planner_crosscheck_run: the warn does not block, the stop does.
 consensus $'### SEC-1 — blocker — Title 1 — rejected (x)\n### QA-1 — blocker — Title 1 — rejected (x)'
@@ -410,6 +442,7 @@ check "reopen does nothing without an upheld row" "$(planner_panel_reopen_on_uph
 new_init Appraisal Discovery Architecture Specify
 run_panel "blocker" "none"
 printf '%s%s%s\n' "$PLAN_HEAD" "$TABLE" "$(row 'uphold')" >"${SD}/artifacts/proposal.md"
+answered 'uphold'
 check "reopen: not before Consensus has run" "$(planner_panel_reopen_on_uphold "$INIT")" ""
 
 echo "=== wiring: the review trail on a ticket (3.6) ==="

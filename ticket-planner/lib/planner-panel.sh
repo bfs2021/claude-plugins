@@ -60,8 +60,9 @@
 #   planner_panel_dispositions <consensus.md>
 #                                     `status <seat>` and `disp <ID> <word>`
 #                                     lines of the `## Panel` section
-#   planner_panel_stop_rows <INIT>    the `panel.<ID>` rows of `## Parameters`:
-#                                     <ID>\t<open|uphold|overrule|other>
+#   planner_panel_stop_rows <INIT>    the verified `panel.<ID>` rows of
+#                                     `## Parameters`:
+#                                     <ID>\t<open|uphold|overrule|other|invalid>
 #   planner_panel_reopen_on_uphold <INIT>
 #                                     send an upheld objection back to
 #                                     Consensus (answer intake calls it)
@@ -794,10 +795,17 @@ planner_panel_ran() {
 # planner_panel_dispositions <consensus.md> — what the `## Panel` section of
 # consensus.md settles, fence-aware:
 #   status <seat>           a line beginning `Panel <seat> (`
-#   disp <ID> <word>        a `### <ID> — … — <disposition>` heading; <word> is
-#                           accepted, partial (`accepted in part`), rejected
-#                           or deferred
-# Headings outside the section do not count.
+#   disp <ID> <word>        one line per finding id with a
+#                           `### <ID> — <severity> — <title> — <disposition>`
+#                           heading; <word> is accepted, partial (`accepted
+#                           in part`), rejected, deferred or conflict
+# The disposition is read from the LAST ` — ` part of the heading only, and
+# must start with one of the allowed words, so a title that holds the word
+# `accepted` settles nothing. A heading needs at least the four parts. An id
+# with several headings is `accepted` only when every one of them is; when
+# they differ it is `conflict`. Headings outside the section do not count.
+# These lines decide whether a person is asked (PANEL_STOP_SKIPPED), so the
+# parse is strict on purpose.
 planner_panel_dispositions() {
   [ -f "$1" ] || return 0
   # shellcheck disable=SC2016  # awk program, not shell
@@ -808,56 +816,79 @@ planner_panel_dispositions() {
     fence { next }
     /^## / { s = $0; sub(/[ \t]+$/, "", s); insec = (s == "## Panel"); next }
     !insec { next }
-    /^Panel [a-z-]+ \(/ { seat = $2; print "status " seat; next }
+    /^Panel [a-z-]+ \(/ { print "status " $2; next }
     /^### [A-Z]+-[0-9]/ {
       h = substr($0, 5)
       i = index(h, sep)
       if (i == 0) next
       id = substr(h, 1, i - 1)
       if (id !~ /^[A-Z]+-[0-9]+$/) next
-      rest = substr(h, i + length(sep))
-      while (rest != "") {
-        j = index(rest, sep)
-        if (j == 0) { seg = rest; rest = "" } else { seg = substr(rest, 1, j - 1); rest = substr(rest, j + length(sep)) }
-        sub(/^[ \t*_]+/, "", seg)
+      seg = substr(h, i + length(sep))
+      parts = 1
+      while ((j = index(seg, sep)) > 0) { seg = substr(seg, j + length(sep)); parts++ }
+      w = "none"
+      if (parts >= 3) {
         low = tolower(seg)
-        w = low; sub(/[^a-z].*$/, "", w)
-        if (w == "accepted") {
-          if (low ~ /^accepted[ \t-]+in[ \t-]+part/) print "disp " id " partial"
-          else print "disp " id " accepted"
-          break
-        }
-        if (w == "rejected" || w == "deferred") { print "disp " id " " w; break }
+        sub(/^[ \t]+/, "", low); sub(/[ \t]+$/, "", low)
+        if (low == "accepted") w = "accepted"
+        else if (low ~ /^accepted[ \t-]+in[ \t-]+part([ \t(:,.]|$)/) w = "partial"
+        else if (low ~ /^rejected([ \t(:,.]|$)/) w = "rejected"
+        else if (low ~ /^deferred([ \t(:,.]|$)/) w = "deferred"
       }
+      if (w == "none") next
+      if (!(id in disp)) { order[++n] = id; disp[id] = w }
+      else if (disp[id] != w) disp[id] = "conflict"
     }
+    END { for (k = 1; k <= n; k++) print "disp " order[k] " " disp[order[k]] }
   ' "$1" 2>/dev/null
 }
 
 # planner_panel_stop_rows <INIT> — the `panel.<ID>` rows of proposal.md's
-# `## Parameters` table, one line per row: <ID>\t<open|uphold|overrule|other>.
-# `open` is a row still waiting for a person; the other three are a person's
-# answer (Source `human:…`), by its first word.
+# `## Parameters` table, one line per row:
+#   <ID>\t<open|uphold|overrule|other|invalid>
+# These rows decide whether a person was asked, and Consensus (an agent)
+# writes the table, so a row counts only when bash can verify it:
+#   open      the row is one planner_params_scan lists: the stop before
+#             Crosscheck will ask it;
+#   uphold | overrule | other
+#             a person's answer, by its first word: the Source is
+#             `human:r<N>:<role>` AND planner_params_anchor_ok finds that
+#             value for this key and role in artifacts/answers/round-<N>.json
+#             (only answer intake writes that file);
+#   invalid   anything else: a closed row with another source, a `human:`
+#             source no answers file backs, a row the scan does not ask.
+#             Crosscheck treats it as no row at all.
 planner_panel_stop_rows() {
-  local init="$1"
+  local init="$1" rows open key value src id state v
   declare -f planner_params_rows >/dev/null 2>&1 || {
     [ -f "${_PLANNER_PANEL_LIB_DIR}/planner-specify-params.sh" ] || return 0
     source "${_PLANNER_PANEL_LIB_DIR}/planner-specify-params.sh"
   }
-  # Columns: <line>\t<key>\t<kind>\t<name>\t<default>\t<value>\t<source>;
-  # cells may be empty, so awk -F, never `IFS=$'\t' read`.
+  # Columns: <line>\t<key>\t<kind>\t<name>\t<default>\t<value>\t<source>.
+  # Cells may be empty, so they are re-joined with a unit separator: tab is
+  # IFS whitespace and `read` would collapse an empty cell.
   # shellcheck disable=SC2016  # awk program, not shell
-  planner_params_rows "$init" 2>/dev/null | _planner_panel_awk -F'\t' '
-    index($2, "panel.") != 1 { next }
-    {
-      id = substr($2, 7)
-      if (id !~ /^[A-Z]+-[0-9]+$/) next
-      v = tolower($6); sub(/^[ \t"\047]+/, "", v)
-      if (index($7, "human:") != 1) state = "open"
-      else if (index(v, "uphold") == 1) state = "uphold"
-      else if (index(v, "overrule") == 1) state = "overrule"
-      else state = "other"
-      print id "\t" state
-    }'
+  rows=$(planner_params_rows "$init" 2>/dev/null | _planner_panel_awk -F'\t' '
+    index($2, "panel.") == 1 && substr($2, 7) ~ /^[A-Z]+-[0-9]+$/ { print $2 "\037" $6 "\037" $7 }')
+  [ -n "$rows" ] || return 0
+  open=$(planner_params_scan "$init" 2>/dev/null | cut -f1)
+  while IFS=$'\037' read -r key value src; do
+    [ -n "$key" ] || continue
+    id="${key#panel.}"
+    if grep -qxF -- "$key" <<<"$open"; then
+      state="open"
+    elif [[ "$src" == human:* ]] && planner_params_anchor_ok "$init" "$key" "$value" "$src"; then
+      v=$(printf '%s' "$value" | tr '[:upper:]' '[:lower:]' | sed 's/^[^a-z]*//')
+      case "$v" in
+      uphold*) state="uphold" ;;
+      overrule*) state="overrule" ;;
+      *) state="other" ;;
+      esac
+    else
+      state="invalid"
+    fi
+    printf '%s\t%s\n' "$id" "$state"
+  done <<<"$rows"
 }
 
 # planner_panel_reopen_on_uphold <INIT> — a person upheld a security or
@@ -910,6 +941,7 @@ consensus.md under a \`## Panel\` heading, in this order:
    never call the proposal panel-clean for it.
 2. **One heading per blocker or major finding**, by its id:
    \`### <ID> — <severity> — <title> — <disposition>\`, then what you changed.
+   The disposition is the last part of the heading; bash reads only that part.
    A disposition is \`accepted\` (the proposal and specs now do all the finding
    asks), \`accepted in part (<what you left out and why>)\`,
    \`rejected (<why>, citing proposal § | spec <slug> | upstream artifact § | code path)\`
@@ -934,8 +966,9 @@ consensus.md under a \`## Panel\` heading, in this order:
    Never change the row. When its Value starts with \`uphold\`, the objection
    stands: accept that finding in full now, change the proposal and the specs,
    and write its disposition as \`accepted\`. When it starts with \`overrule\`,
-   keep the plan and end that finding's heading with
-   \` — overruled by the owner: <their reason>\`.
+   keep the plan and your disposition, and write
+   \`Overruled by the owner: <their reason>\` on the line under that
+   finding's heading.
 7. **The trail reaches the tickets.** In every spec whose scope or acceptance
    criteria you changed for a finding you marked \`accepted\` or
    \`accepted in part\`, keep a \`## Review Trail\` section directly before

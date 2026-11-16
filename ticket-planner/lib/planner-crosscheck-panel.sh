@@ -22,10 +22,14 @@
 #
 #   PANEL_STOP_SKIPPED (blocking) — at most one per run: each blocker of the
 #   security or product-owner seat that Consensus settled on its own. Such a
-#   blocker passes only when its disposition is `accepted`, or when
-#   proposal.md's `## Parameters` table carries its `panel.<ID>` row (open, or
-#   answered by a person with anything but `uphold`). An upheld objection that
-#   is still not `accepted` is listed too. Release with the existing
+#   blocker passes only when its disposition is `accepted` (read from the last
+#   part of its heading; several headings must all say so), or when
+#   proposal.md's `## Parameters` table carries a `panel.<ID>` row that bash
+#   can verify (planner_panel_stop_rows): open and about to be asked, or
+#   answered by a person, as the answers file of that round shows, with
+#   anything but `uphold`. A row Consensus closed on its own counts as no row.
+#   An upheld objection that is still not `accepted` is listed too. Release
+#   with the existing
 #   `resume <INIT> --accept PANEL_STOP_SKIPPED:"reason"`.
 #
 # Silent when the panel did not run for this initiative (no seat line: flag
