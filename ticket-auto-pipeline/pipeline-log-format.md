@@ -63,11 +63,11 @@ The router brackets auto-invoke prescan spawns as `MAINTENANCE|prescan|waiting`/
 
 ## Verdict tokens
 
-`spawn_agent_post` (in `lib/spawn-helper.sh`) accepts an optional `VERDICT=` parameter. When
-set, it is prepended to `MSG` as `{VERDICT} — {MSG}` before the `done`/`fail` line is written.
-This gives deterministic consumers (`detect-resume.sh`) a fixed token to grep instead of
-coupling to router free-text prose or emoji bytes — the router still writes whatever
-human-readable summary it wants in `MSG`, but the token in front of it is guaranteed stable.
+`spawn_agent_post` (`lib/spawn-helper.sh`) prepends `VERDICT=` to `MSG` as `{VERDICT} — {MSG}`,
+so `detect-resume.sh` greps a fixed token, never prose. For VERIFY `verify` / PR-REVIEW
+`pr-review` the token is bash's: `lib/phase-route.sh` maps the parser's first `META|phase-result`
+after post-spawn's `META|phase-route-anchor` (no record → FAIL / BLOCK), and `spawn_agent_post`
+downgrades a less conservative router claim (`META|route-override|warn|`).
 
 | Token   | Meaning                                  | Used by            |
 |---------|-------------------------------------------|--------------------|

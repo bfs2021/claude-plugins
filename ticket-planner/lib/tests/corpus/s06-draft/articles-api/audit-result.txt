@@ -1,0 +1,7 @@
+=== DOR_SEMANTIC_AUDIT ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-articles-api
+BODY_HASH: sha256:e0e1856b93a11a3fb602e2dcc96f4bbdaf5a66f9a29c9a4fe36b2b9d8748d426
+SCORE_PLAUSIBLE: yes
+SCORE_REASON: The deterministic result carries no dor_quality_score; its status ready with empty missing and advisory arrays is consistent with the body, where every described behaviour (create, slug rule and collision suffix, 401 and 422 errors, read, 404, list order, paging defaults, author filter, restart reseed) has a criterion with literal values and a matching Verification Plan row, and the cases the brief leaves undefined are explicitly listed as having no criterion.
+=== END DOR_SEMANTIC_AUDIT ===

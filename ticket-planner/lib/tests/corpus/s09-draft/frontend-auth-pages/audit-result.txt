@@ -1,0 +1,7 @@
+=== DOR_SEMANTIC_AUDIT ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-frontend-auth-pages
+BODY_HASH: sha256:cc4b983d16389cb3698ec03aec8301087a2a87343e481943fb7ff1efb3ed14db
+SCORE_PLAUSIBLE: yes
+SCORE_REASON: No dor_quality_score is present; the deterministic status "ready" with empty missing/advisory arrays is consistent with a body whose ACs cover sign-in, sign-up, API errors, header states and session restore (including 401 and backend-down paths), with seeded test data sourced and a full per-criterion Verification Plan.
+=== END DOR_SEMANTIC_AUDIT ===

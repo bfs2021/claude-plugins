@@ -69,6 +69,16 @@ planner_draft_readiness_config_check() {
     echo "planner-draft-readiness: PLANNER_DRAFT_DEMOTE_CEILING must be a number from 0 to 1, got '$c'" >&2
     return 1
   }
+  local u="${PLANNER_DRAFT_UNEVALUATED_MAX_SHARE:-0.25}"
+  [[ "$u" =~ ^(0(\.[0-9]+)?|1(\.0+)?)$ ]] || {
+    echo "planner-draft-readiness: PLANNER_DRAFT_UNEVALUATED_MAX_SHARE must be a number from 0 to 1, got '$u'" >&2
+    return 1
+  }
+  local f="${DOR_SEMANTIC_FORMAT_RETRIES-1}"
+  [[ "$f" =~ ^[0-5]$ ]] || {
+    echo "planner-draft-readiness: DOR_SEMANTIC_FORMAT_RETRIES must be an integer from 0 to 5, got '$f'" >&2
+    return 1
+  }
 }
 
 # Revision rounds per spec; an invalid value reads as 0 (halt-only) so a
@@ -246,7 +256,9 @@ _pdl_evaluate() {
   local tid="$1" dir="$2" scan="$3" audit="$4" body hash judged prior="null" built sem codes max
   body=$(cat "${dir}/body.md") || return 1
   hash=$(_dor_body_hash "$body")
-  judged=$(dor_semantic_findings "$tid" "$body" "$scan" "$audit") || return 1
+  judged=$(dor_semantic_findings "$tid" "$body" "$scan" "$audit" \
+    "$(dor_semantic_request_path "${dir}/scan-result.txt")" \
+    "$(dor_semantic_request_path "${dir}/audit-result.txt")") || return 1
   max=$(_pdl_max_rounds)
   if [ "$max" -gt 0 ] && [ -s "${dir}/lineage.json" ]; then
     prior=$(jq -c '.' "${dir}/lineage.json" 2>/dev/null) || prior="null"

@@ -378,7 +378,7 @@ halt_fixture_run() {
       ;;
     adr-gate)
       # SKILL.md step 4a.
-      planner_dispatch_gate adr "$INITIATIVE_ID" Architecture "$STATE_DIR" || exit $(($? == 3 ? 0 : 1))
+      planner_dispatch_gate post "$INITIATIVE_ID" Architecture "$STATE_DIR" || exit $(($? == 3 ? 0 : 1))
       ;;
     project-gate)
       # The Epic Gen prompt's project gate (planner-phase-prompts.sh). The

@@ -62,7 +62,16 @@
 #
 #   planner_refinement_unavailable <INIT> <TID>
 #     Records SEMANTIC_UNAVAILABLE for a ticket whose two evaluator attempts
-#     both failed. ready.lineage (the round history) is left untouched.
+#     both failed, and ready.harness_error (seam-gate-safety D4: reason,
+#     reasons per attempt, attempts). ready.lineage (the round history) is
+#     left untouched.
+#
+#   planner_refinement_unevaluated <INIT>
+#     "<TID>\t<code>\t<reason>" per child the evaluator could not judge: not
+#     ready, carrying ready.harness_error, and every unwaived missing code a
+#     harness code (SEMANTIC_UNAVAILABLE / SEMANTIC_UNVERIFIED). Such a child
+#     stays not ready (never dispatched) but does not halt the epic; any other
+#     missing code makes it an ordinary not-ready child.
 #
 #   planner_refinement_converge <INIT> <TID[,TID...]> [<by>]
 #     Operator converge (design D10). Spawns nothing. For each named child
@@ -188,11 +197,14 @@ _planner_refinement_resolve() {
 _planner_refinement_source_deps() {
   if declare -f check_ticket_ready >/dev/null 2>&1 &&
     declare -f dor_semantic_prompt >/dev/null 2>&1 &&
+    declare -f dor_semantic_request_path >/dev/null 2>&1 &&
+    declare -f dor_semantic_format_step >/dev/null 2>&1 &&
+    declare -f set_ticket_harness_error >/dev/null 2>&1 &&
     declare -f set_ticket_readiness >/dev/null 2>&1; then
     return 0
   fi
 
-  local dor_check dor_semantic manifest_write
+  local dor_check dor_semantic manifest_write dor_parse
   dor_check=$(_planner_refinement_resolve "dor-check.sh") || {
     echo "planner-refinement: dor-check.sh not found (install ticket-auto-pipeline)" >&2
     return 1
@@ -203,6 +215,10 @@ _planner_refinement_source_deps() {
   }
   manifest_write=$(_planner_refinement_resolve "manifest-write.sh") || {
     echo "planner-refinement: manifest-write.sh not found (install ticket-auto-pipeline)" >&2
+    return 1
+  }
+  dor_parse=$(_planner_refinement_resolve "dor-semantic-parse.sh") || {
+    echo "planner-refinement: dor-semantic-parse.sh not found (install ticket-auto-pipeline)" >&2
     return 1
   }
 
@@ -218,6 +234,8 @@ _planner_refinement_source_deps() {
   source "$dor_check"
   # shellcheck source=/dev/null
   source "$dor_semantic"
+  # shellcheck source=/dev/null
+  source "$dor_parse"
 
   if [ "$_had_script_dir" -eq 1 ]; then
     SCRIPT_DIR="$_saved_script_dir"
@@ -231,6 +249,22 @@ _planner_refinement_source_deps() {
   fi
   if ! declare -f dor_semantic_prompt >/dev/null 2>&1; then
     echo "planner-refinement: ${dor_semantic} sourced but did not define dor_semantic_prompt" >&2
+    return 1
+  fi
+  # The spawn request (seam-bash-derives slice 3): an older dor-semantic.sh
+  # would read `--attempt` as the ticket id.
+  if ! declare -f dor_semantic_request_path >/dev/null 2>&1; then
+    echo "planner-refinement: ${dor_semantic} is too old (no dor_semantic_request_path) — update ticket-auto-pipeline to 0.119.0 or later" >&2
+    return 1
+  fi
+  # The format retry (seam-gate-safety G6).
+  if ! declare -f dor_semantic_format_step >/dev/null 2>&1; then
+    echo "planner-refinement: ${dor_parse} is too old (no dor_semantic_format_step) — update ticket-auto-pipeline to 0.120.0 or later" >&2
+    return 1
+  fi
+  # ready.harness_error (seam-gate-safety G5).
+  if ! declare -f set_ticket_harness_error >/dev/null 2>&1; then
+    echo "planner-refinement: ${manifest_write} is too old (no set_ticket_harness_error) — update ticket-auto-pipeline to 0.121.0 or later" >&2
     return 1
   fi
   return 0
@@ -549,6 +583,10 @@ planner_refinement_scan() {
     if echo "$ready_after" | jq -e '(.missing // []) | index("SEMANTIC_STALE") != null' >/dev/null 2>&1; then
       needs="true"
     fi
+    # A verdict the evaluator could not back is retried (seam-gate-safety D4).
+    if echo "$ready_after" | jq -e '(.harness_error | type) == "object"' >/dev/null 2>&1; then
+      needs="true"
+    fi
 
     if [ "$needs" = "true" ]; then
       needs_pass+=("$tid")
@@ -599,7 +637,11 @@ planner_refinement_prompt() {
   _planner_refinement_source_deps || return 1
 
   local pdir="${REPOS_ROOT:-}/.ticket-auto/initiatives/${initiative_id}/tickets/${tid}/planner"
-  local body_file="${pdir}/body.md"
+  local body_file="${pdir}/body.md" attempt
+  # The spawn request records which attempt this is (apply_pending's count).
+  attempt=$(cat "${pdir}/semantic-attempts" 2>/dev/null) || attempt=0
+  [[ "$attempt" =~ ^[0-9]+$ ]] || attempt=0
+  attempt=$((attempt + 1))
 
   if [ "$kind" = "scan" ]; then
     # A stale verdict that recorded which sections changed gets a scoped
@@ -608,12 +650,12 @@ planner_refinement_prompt() {
     changed=$(get_ticket_manifest_field "$tid" ready 2>/dev/null |
       jq -r '(.semantic.changed_sections // []) | join("|")' 2>/dev/null) || changed=""
     if [ -n "$changed" ]; then
-      dor_semantic_prompt scan --changed-sections "$changed" "$tid" "$body_file" "${pdir}/semantic-scan-result.txt"
+      dor_semantic_prompt scan --attempt "$attempt" --changed-sections "$changed" "$tid" "$body_file" "${pdir}/semantic-scan-result.txt"
     else
-      dor_semantic_prompt scan "$tid" "$body_file" "${pdir}/semantic-scan-result.txt"
+      dor_semantic_prompt scan --attempt "$attempt" "$tid" "$body_file" "${pdir}/semantic-scan-result.txt"
     fi
   else
-    dor_semantic_prompt audit "$tid" "$body_file" "${pdir}/semantic-audit-result.txt" "${pdir}/dor-result.json"
+    dor_semantic_prompt audit --attempt "$attempt" "$tid" "$body_file" "${pdir}/semantic-audit-result.txt" "${pdir}/dor-result.json"
   fi
 }
 
@@ -639,8 +681,10 @@ planner_refinement_apply() {
   local det_file="${pdir}/dor-result.json"
 
   local scan_json audit_json scan_rc=0 audit_rc=0
-  scan_json=$(bash "$parse_script" --kind scan --result-file "$scan_file" 2>/dev/null) || scan_rc=$?
-  audit_json=$(bash "$parse_script" --kind audit --result-file "$audit_file" --det-result "$det_file" 2>/dev/null) || audit_rc=$?
+  # The parser's stderr (why a block was rejected) is left visible
+  # (rehearsal F50): with it discarded, SEMANTIC_UNAVAILABLE had no cause.
+  scan_json=$(bash "$parse_script" --kind scan --result-file "$scan_file") || scan_rc=$?
+  audit_json=$(bash "$parse_script" --kind audit --result-file "$audit_file" --det-result "$det_file") || audit_rc=$?
 
   if [ "$scan_rc" -ne 0 ] || [ "$audit_rc" -ne 0 ]; then
     return 1
@@ -660,7 +704,8 @@ planner_refinement_apply() {
     DOR_SEMANTIC_DRIFT_DEMOTE=true \
     DOR_SEMANTIC_ROUND_RESET_SHARE="${DOR_SEMANTIC_ROUND_RESET_SHARE:-0.5}" \
     DOR_SEMANTIC_PRIOR_PASSED="$prior_passed" \
-    dor_semantic_apply "$tid" "$body_file" "$scan_json" "$audit_json" || apply_rc=$?
+    dor_semantic_apply "$tid" "$body_file" "$scan_json" "$audit_json" \
+    "$(dor_semantic_request_path "$scan_file")" "$(dor_semantic_request_path "$audit_file")" || apply_rc=$?
   if [ "$apply_rc" -eq 0 ]; then
     rm -f "${pdir}/draft-passed" 2>/dev/null
     if [ "${PLANNER_REFINEMENT_AUDIT_DEMOTE:-false}" = "true" ]; then
@@ -668,8 +713,34 @@ planner_refinement_apply() {
     fi
     _planner_refinement_note_round "$initiative_id" "$tid" || true
     _planner_refinement_note_testdata "$initiative_id" "$tid" || true
+    _planner_refinement_note_unverified "$initiative_id" "$tid" || apply_rc=1
   fi
   return "$apply_rc"
+}
+
+# _planner_refinement_note_unverified <INIT> <TID>
+# A fresh verdict whose unwaived missing holds SEMANTIC_UNVERIFIED (a gap
+# with no backing finding, or a blocking-code finding whose quote did not
+# verify) records ready.harness_error (seam-gate-safety D4): the evaluator
+# could not back its own verdict. The code stays in missing, so the ticket
+# stays not ready; whether the epic halts is the gate's call
+# (planner_refinement_unevaluated). rc 1 when the record cannot be written,
+# so the caller counts the attempt failed rather than leave the code
+# unexplained.
+_planner_refinement_note_unverified() {
+  local initiative_id="$1" tid="$2" ready h
+  ready=$(get_ticket_manifest_field "$tid" ready 2>/dev/null) || return 1
+  h=$(jq -c '((.missing // []) - ((.waived // {}) | keys)) as $m
+    | if ($m | index("SEMANTIC_UNVERIFIED")) == null then null
+      else {code: "SEMANTIC_UNVERIFIED",
+            reason: "the evaluator'"'"'s quoted evidence did not verify against the body",
+            findings: [(.semantic.findings // [])[] | select(.verified == false and .severity != "advisory") | .code],
+            gaps: (.semantic.unverified_gaps // []),
+            at: (now | todate)} end' <<<"$ready" 2>/dev/null) || return 1
+  [ "$h" != "null" ] || return 0
+  set_ticket_harness_error "$tid" "$h" >/dev/null || return 1
+  planner_state_write "$initiative_id" "META" "harness-error" "warn" "${tid} SEMANTIC_UNVERIFIED not evaluated" 2>/dev/null || true
+  return 0
 }
 
 # _planner_refinement_hash8 <TID> — first 8 hex of ready.lineage.body_hash
@@ -960,16 +1031,94 @@ _planner_refinement_demoted_summary() {
 # planner_refinement_unavailable <INIT> <TID>
 # A fresh {unavailable:true} verdict through set_ticket_semantic, which never
 # touches ready.lineage — the ticket keeps its round history (design D9).
+# Then ready.harness_error (seam-gate-safety D4) with the reason of each
+# failed attempt (planner/semantic-failures, written by apply_pending; a
+# FORMAT_RETRY_EXHAUSTED record names the field). SEMANTIC_UNAVAILABLE stays
+# in ready.missing so every reader of missing/status still sees a not-ready
+# ticket; if the harness record cannot be written the ticket is an ordinary
+# not-ready one and halts the epic as before (fail closed).
 planner_refinement_unavailable() {
   local initiative_id="$1" tid="$2"
   _planner_refinement_source_deps || return 1
 
+  local pdir="${REPOS_ROOT:-}/.ticket-auto/initiatives/${initiative_id}/tickets/${tid}/planner"
+  # The body hash the evaluator failed on: a re-scan of the same body then
+  # carries the verdict (and ready.harness_error) forward instead of staling
+  # it into an ordinary not-ready ticket that drops out of the unevaluated
+  # count (review L5). An edited body still goes stale, as any verdict does.
+  local hash=""
+  if [ -f "${pdir}/body.md" ] && declare -f _dor_body_hash >/dev/null 2>&1; then
+    hash=$(_dor_body_hash "$(cat "${pdir}/body.md")" 2>/dev/null) || hash=""
+  fi
   local sem_json
   sem_json=$(jq -nc --arg evaluator "${DOR_SEMANTIC_EVALUATOR:-dor-semantic-v1}" \
-    --arg checked_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    --arg checked_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg hash "$hash" \
     '{evaluator: $evaluator, checked_at: $checked_at, unavailable: true,
-      findings: [], gaps: {}, audit: [], missed: []}')
-  set_ticket_semantic "$tid" "$sem_json"
+      findings: [], gaps: {}, audit: [], missed: []}
+     + (if $hash != "" then {body_hash: $hash} else {} end)')
+  set_ticket_semantic "$tid" "$sem_json" || return $?
+
+  local attempts reasons h
+  attempts=$(cat "${pdir}/semantic-attempts" 2>/dev/null) || attempts=0
+  [[ "$attempts" =~ ^[0-9]+$ ]] || attempts=0
+  reasons=$(jq -Rsc 'split("\n") | map(select(. != ""))' "${pdir}/semantic-failures" 2>/dev/null) || reasons='[]'
+  [ -n "$reasons" ] || reasons='[]'
+  h=$(jq -nc --argjson n "$attempts" --argjson r "$reasons" \
+    '{code: "SEMANTIC_UNAVAILABLE",
+      reason: (if ($r | length) > 0 then $r[-1] else "no usable result after the evaluator'"'"'s attempts" end),
+      reasons: $r, attempts: $n, at: (now | todate)}') || return 1
+  set_ticket_harness_error "$tid" "$h" >/dev/null || return 1
+  planner_state_write "$initiative_id" "META" "harness-error" "warn" "${tid} SEMANTIC_UNAVAILABLE not evaluated after ${attempts} attempt(s)" 2>/dev/null || true
+  return 0
+}
+
+# _planner_refinement_unevaluated_from <ready-json> — prints
+# "<code>\t<reason>" when the ready object is unevaluated (see
+# planner_refinement_unevaluated), nothing otherwise. A malformed object
+# prints nothing: it is judged as an ordinary not-ready ticket.
+_planner_refinement_unevaluated_from() {
+  jq -r 'select(type == "object")
+    | select((.status // "") != "ready")
+    | select((.harness_error | type) == "object")
+    | ((.missing // []) - ((.waived // {}) | keys)) as $m
+    | select(($m | length) > 0
+        and ($m | all(. == "SEMANTIC_UNAVAILABLE" or . == "SEMANTIC_UNVERIFIED")))
+    | "\(.harness_error.code // ($m | join(",")))\t\((.harness_error.reason // "") | tostring | gsub("[\t\r\n]"; " "))"' \
+    <<<"$1" 2>/dev/null || true
+}
+
+# planner_refinement_unevaluated <INIT>
+planner_refinement_unevaluated() {
+  local initiative_id="$1" tid line
+  for tid in $(_planner_refinement_children "$initiative_id"); do
+    line=$(_planner_refinement_unevaluated_from "$(get_ticket_manifest_field "$tid" ready 2>/dev/null)")
+    [ -z "$line" ] || printf '%s\t%s\n' "$tid" "$line"
+  done
+  return 0
+}
+
+# _planner_refinement_share_exceeded <n> <m> — true when n/m is over
+# PLANNER_REFINEMENT_UNEVALUATED_MAX_SHARE (default 0.25, as the draft gate's
+# PLANNER_DRAFT_UNEVALUATED_MAX_SHARE). An unreadable share counts as
+# exceeded (fail closed); prepare refuses it first.
+_planner_refinement_share_exceeded() {
+  local share="${PLANNER_REFINEMENT_UNEVALUATED_MAX_SHARE:-0.25}"
+  [[ "$share" =~ ^(0(\.[0-9]+)?|1(\.0+)?)$ ]] || return 0
+  awk -v n="$1" -v m="$2" -v s="$share" 'BEGIN { exit !(m > 0 && n / m > s) }'
+}
+
+# _planner_refinement_unevaluated_section <INIT> — the
+# `## Not evaluated (harness error)` section, or nothing.
+_planner_refinement_unevaluated_section() {
+  local initiative_id="$1" lines
+  lines=$(planner_refinement_unevaluated "$initiative_id")
+  [ -n "$lines" ] || return 0
+  echo ""
+  echo "## Not evaluated (harness error)"
+  echo "The semantic evaluator could not judge these tickets — a harness fault, not a plan defect. They stay not ready (never dispatched); more than ${PLANNER_REFINEMENT_UNEVALUATED_MAX_SHARE:-0.25} of the epic halts the run (HARNESS_ERROR). /ticket-planner resume ${initiative_id} retries them."
+  printf '%s\n' "$lines" | while IFS=$'\t' read -r t c r; do
+    echo "- ${t} ${c}${r:+: ${r}}"
+  done
 }
 
 # ── Operator converge (planner-refinement-convergence D10) ───────────────
@@ -1151,7 +1300,10 @@ planner_refinement_after_completed_pending() {
   if [ "$(planner_config_get "$initiative_id" "refresh-bodies" 2>/dev/null)" = "true" ]; then
     return 0
   fi
-  planner_config_is_set "$initiative_id" "converge" 2>/dev/null
+  planner_config_is_set "$initiative_id" "converge" 2>/dev/null && return 0
+  # A child the evaluator could not judge (seam-gate-safety D4) is retried
+  # by a plain resume, since the gate let the run complete without it.
+  [ -n "$(planner_refinement_unevaluated "$initiative_id" 2>/dev/null)" ]
 }
 
 # planner_refinement_after_completed_finish <INIT>
@@ -1197,6 +1349,7 @@ planner_refinement_gate() {
 
   local semantic_enabled="${PLANNER_REFINEMENT_SEMANTIC:-true}"
   local total=0 not_ready=0 no_verdict=0 tid ready_json status has_semantic
+  local unevaluated=0 unevaluated_tids=""
 
   for tid in $(echo "$children" | jq -r '.[]' 2>/dev/null); do
     total=$((total + 1))
@@ -1208,7 +1361,15 @@ planner_refinement_gate() {
     fi
 
     status=$(echo "$ready_json" | jq -r '.status // "unavailable"' 2>/dev/null)
-    [ "$status" = "ready" ] || not_ready=$((not_ready + 1))
+    if [ "$status" != "ready" ]; then
+      # Not evaluated (seam-gate-safety D4): stays not ready, never halts.
+      if [ -n "$(_planner_refinement_unevaluated_from "$ready_json")" ]; then
+        unevaluated=$((unevaluated + 1))
+        unevaluated_tids+="${unevaluated_tids:+,}${tid}"
+      else
+        not_ready=$((not_ready + 1))
+      fi
+    fi
 
     if [ "$semantic_enabled" != "false" ]; then
       has_semantic=$(echo "$ready_json" | jq -r 'if has("semantic") and (.semantic != null) then "true" else "false" end' 2>/dev/null)
@@ -1220,12 +1381,26 @@ planner_refinement_gate() {
     stamp_epic_dispatch "$epic_id"
   fi
 
+  # Too many children the evaluator could not judge halt the run, as the
+  # draft gate does (seam-gate-safety review M1): an epic that is mostly
+  # unevaluated must never end as a clean-looking Completed.
+  if [ "$not_ready" -eq 0 ] && [ "$no_verdict" -eq 0 ] && [ "$unevaluated" -gt 0 ] &&
+    _planner_refinement_share_exceeded "$unevaluated" "$total"; then
+    planner_state_write "$initiative_id" "META" "refinement-gate" "fail" "HARNESS_ERROR ${unevaluated}/${total} unevaluated: ${unevaluated_tids}"
+    return 1
+  fi
+
   if [ "$not_ready" -eq 0 ] && [ "$no_verdict" -eq 0 ]; then
+    if [ "$unevaluated" -gt 0 ]; then
+      planner_state_write "$initiative_id" "META" "refinement-gate" "warn" "${unevaluated} of ${total} not evaluated (harness error): ${unevaluated_tids}"
+      planner_state_write "$initiative_id" "Refinement" "gate" "done" "$((total - unevaluated)) of ${total} tickets ready, ${unevaluated} not evaluated (harness error), epic ${epic_id} stamped dispatch=true"
+      return 0
+    fi
     planner_state_write "$initiative_id" "Refinement" "gate" "done" "${total} tickets ready, epic ${epic_id} stamped dispatch=true"
     return 0
   fi
 
-  planner_state_write "$initiative_id" "META" "refinement-gate" "fail" "${not_ready} of ${total} not ready"
+  planner_state_write "$initiative_id" "META" "refinement-gate" "fail" "${not_ready} of ${total} not ready${unevaluated_tids:+, ${unevaluated} not evaluated (harness error)}"
   return 1
 }
 
@@ -1254,6 +1429,8 @@ planner_refinement_report() {
     status=$(echo "$ready_json" | jq -r '.status // "unavailable"' 2>/dev/null)
     [ "$status" = "ready" ] && continue
     any_not_ready=1
+    # Listed under "## Not evaluated (harness error)" below.
+    [ -z "$(_planner_refinement_unevaluated_from "$ready_json")" ] || continue
 
     echo ""
     echo "## ${tid}"
@@ -1407,6 +1584,8 @@ planner_refinement_report() {
       echo "A Linear edit is adopted on the next resume when body.md is unchanged; to take Linear's text over a local edit: /ticket-planner resume ${initiative_id} --refresh-bodies."
     fi
   fi
+
+  _planner_refinement_unevaluated_section "$initiative_id"
 
   # Advisory findings never put a child in the not-ready loop above, so a
   # ready child's TEST_DATA_GAP would otherwise go unreported
@@ -1576,6 +1755,12 @@ _planner_refinement_pass_file() {
 # earlier run is never applied. rc 0 = run the spawn loop, then the gate.
 planner_refinement_prepare() {
   local init="$1" refreshed="" pass tid
+  # Checked before anything is scanned or written.
+  local u="${PLANNER_REFINEMENT_UNEVALUATED_MAX_SHARE:-0.25}"
+  [[ "$u" =~ ^(0(\.[0-9]+)?|1(\.0+)?)$ ]] || {
+    echo "planner-refinement: PLANNER_REFINEMENT_UNEVALUATED_MAX_SHARE must be a number from 0 to 1, got '$u'" >&2
+    return 1
+  }
   if planner_refinement_legacy "$init"; then
     # Planned before this phase shipped: its log already carries
     # TicketGen|dispatch-gate|done (design.md Decision 10).
@@ -1588,6 +1773,14 @@ planner_refinement_prepare() {
     planner_config_set "$init" "refresh-bodies" "none"
   fi
   local -a needs=()
+  if [ "${REFINEMENT_AFTER_COMPLETED:-}" = "true" ]; then
+    # After Completed: the refreshed children plus every unevaluated one.
+    local unev
+    unev=$(planner_refinement_unevaluated "$init" | cut -f1 | paste -sd, -)
+    if [ -n "$unev" ]; then
+      refreshed="${refreshed:+${refreshed},}${unev}"
+    fi
+  fi
   if [ "${REFINEMENT_AFTER_COMPLETED:-}" != "true" ]; then
     mapfile -t needs < <(planner_refinement_scan "$init")
   elif [ -n "$refreshed" ]; then
@@ -1600,10 +1793,17 @@ planner_refinement_prepare() {
   # would count every listed ticket as a failed attempt.
   rm -f "${pass}.pending"
   [ "${PLANNER_REFINEMENT_SEMANTIC:-true}" != "false" ] || return 0
+  _planner_refinement_source_deps || return 1
+  dor_semantic_format_budget >/dev/null || return 1
+
   for tid in "${needs[@]}"; do
     [ -n "$tid" ] || continue
     local pdir="${REPOS_ROOT:-}/.ticket-auto/initiatives/${init}/tickets/${tid}/planner"
-    rm -f "${pdir}/semantic-scan-result.txt" "${pdir}/semantic-audit-result.txt" "${pdir}/semantic-attempts"
+    dor_semantic_format_clear "${pdir}/semantic-scan-result.txt" --all
+    dor_semantic_format_clear "${pdir}/semantic-audit-result.txt" --all
+    rm -f "${pdir}/semantic-scan-result.txt" "${pdir}/semantic-audit-result.txt" "${pdir}/semantic-attempts" \
+      "${pdir}/semantic-scan-result.request.json" "${pdir}/semantic-audit-result.request.json" \
+      "${pdir}/semantic-failures" "${pdir}/semantic-format-exhausted"
     echo "$tid" >>"$pass"
   done
   return 0
@@ -1625,6 +1825,7 @@ planner_refinement_finish() {
     planner_refinement_report "$initiative_id"
   elif planner_refinement_gate "$initiative_id"; then
     planner_refinement_advisory_summary "$initiative_id"
+    _planner_refinement_unevaluated_section "$initiative_id"
   else
     echo "Refinement halted — one or more tickets are not ready."
     echo ""
@@ -1658,7 +1859,15 @@ planner_refinement_next() {
       [ "$n" -lt "$max" ] || break
       n=$((n + 1))
       pdir="${REPOS_ROOT:-}/.ticket-auto/initiatives/${init}/tickets/${tid}/planner"
-      if [ ! -s "${pdir}/semantic-scan-result.txt" ]; then
+      local fl="" k aw
+      for k in scan audit; do
+        if aw=$(dor_semantic_format_awaiting "${pdir}/semantic-${k}-result.txt"); then
+          fl+="${tid}"$'\t'"format"$'\t'"ticket-auto-pipeline:dor-semantic-agent"$'\t'"${aw%%$'\t'*}"$'\t'"${aw#*$'\t'}"$'\n'
+        fi
+      done
+      if [ -n "$fl" ]; then
+        out+="$fl"
+      elif [ ! -s "${pdir}/semantic-scan-result.txt" ]; then
         planner_refinement_prompt "$init" "$tid" scan >"${pdir}/semantic-scan-prompt.txt" || return 1
         out+="${tid}"$'\t'"scan"$'\t'"ticket-auto-pipeline:dor-semantic-agent"$'\t'"${pdir}/semantic-scan-prompt.txt"$'\t'"${pdir}/semantic-scan-result.txt"$'\n'
       else
@@ -1687,19 +1896,28 @@ planner_refinement_apply_pending() {
   local init="$1" pass tid kind agent pf rf pdir n
   pass=$(_planner_refinement_pass_file "$init")
   [ -f "${pass}.pending" ] || return 0
-  local -A seen=() failed=()
+  local -A seen=() failed=() fspawned=()
   local -a order=()
   while IFS=$'\t' read -r tid kind agent pf rf; do
     [ -n "$tid" ] || continue
     [ -n "${seen[$tid]:-}" ] || order+=("$tid")
     seen[$tid]="$kind"
-    [ -s "$rf" ] || failed[$tid]=1
+    # A format retry that wrote nothing is the retry's own failure
+    # (dor_semantic_format_step --spawned), not a failed attempt.
+    if [ "$kind" = "format" ]; then
+      fspawned[$rf]=1
+      continue
+    fi
+    [ -s "$rf" ] || failed[$tid]="${failed[$tid]:+${failed[$tid]}, }no ${kind} result written"
   done <"${pass}.pending"
   rm -f "${pass}.pending"
   for tid in "${order[@]}"; do
     pdir="${REPOS_ROOT:-}/.ticket-auto/initiatives/${init}/tickets/${tid}/planner"
     if [ -z "${failed[$tid]:-}" ]; then
-      [ "${seen[$tid]}" = "audit" ] || continue
+      case "${seen[$tid]}" in audit | format) ;; *) continue ;; esac
+      # A format slip is re-serialised first (seam-gate-safety G6); while a
+      # retry waits the ticket stays on the pass list with no attempt spent.
+      _planner_refinement_format_steps "$init" "$tid" "$pdir" fspawned || continue
       if planner_refinement_apply "$init" "$tid" >&2; then
         _planner_refinement_pass_drop "$pass" "$tid"
         continue
@@ -1707,13 +1925,63 @@ planner_refinement_apply_pending() {
     fi
     n=$(($(cat "${pdir}/semantic-attempts" 2>/dev/null || echo 0) + 1))
     echo "$n" >"${pdir}/semantic-attempts"
-    rm -f "${pdir}/semantic-scan-result.txt" "${pdir}/semantic-audit-result.txt"
+    # Why this attempt failed (seam-gate-safety D4): planner_refinement_
+    # unavailable puts these in ready.harness_error.
+    local why="${failed[$tid]:-the scan or audit result did not parse, or apply refused it}"
+    if [ -s "${pdir}/semantic-format-exhausted" ]; then
+      why="$(paste -sd';' "${pdir}/semantic-format-exhausted"); ${why}"
+      rm -f "${pdir}/semantic-format-exhausted"
+    fi
+    printf 'attempt %s: %s\n' "$n" "$(printf '%s' "$why" | tr '\t\r\n' '   ' | cut -c1-300)" >>"${pdir}/semantic-failures"
+    dor_semantic_format_clear "${pdir}/semantic-scan-result.txt" --all
+    dor_semantic_format_clear "${pdir}/semantic-audit-result.txt" --all
+    # The rejected results are kept for diagnosis (rehearsal F50), as the
+    # draft gate keeps them; the next attempt starts clean.
+    local k
+    for k in scan audit; do
+      if [ -f "${pdir}/semantic-${k}-result.txt" ]; then
+        mv -f "${pdir}/semantic-${k}-result.txt" "${pdir}/semantic-${k}-result.rejected.txt"
+      fi
+    done
     if [ "$n" -ge 2 ]; then
       planner_refinement_unavailable "$init" "$tid" >&2
       _planner_refinement_pass_drop "$pass" "$tid"
     fi
   done
   return 0
+}
+
+# _planner_refinement_format_steps <INIT> <TID> <pdir> <spawned-assoc-name>
+# dor_semantic_format_step on both result files (seam-gate-safety G6). rc 1
+# while a retry waits (the next spawn list carries it); rc 0 otherwise. An
+# exhausted retry writes `META|harness-error|fail|<TID> FORMAT_RETRY_EXHAUSTED
+# <field>` and records it in planner/semantic-format-exhausted; the attempt
+# then fails in planner_refinement_apply, apply_pending puts the record in
+# the attempt's reason, and two failed attempts end in
+# planner_refinement_unavailable — ready.harness_error, never a plan defect
+# (seam-gate-safety D4).
+_planner_refinement_format_steps() {
+  local init="$1" tid="$2" pdir="$3" k r fk out rc wait=0
+  local -n _sp="$4"
+  for k in scan audit; do
+    r="${pdir}/semantic-${k}-result.txt"
+    [ -s "$r" ] || continue
+    local -a fa=(--kind "$k" --result-file "$r")
+    [ "$k" = "audit" ] && fa+=(--det-result "${pdir}/dor-result.json")
+    # The key in a variable: shfmt reads `a[x-y]` as arithmetic.
+    fk="${r%.txt}.format-result.txt"
+    [ -n "${_sp[$fk]:-}" ] && fa+=(--spawned)
+    rc=0
+    out=$(dor_semantic_format_step "${fa[@]}" 2>/dev/null) || rc=$?
+    case "$rc" in
+    4) wait=1 ;;
+    5)
+      planner_state_write "$init" "META" "harness-error" "fail" "${tid} FORMAT_RETRY_EXHAUSTED ${out#exhausted }"
+      printf 'FORMAT_RETRY_EXHAUSTED %s\n' "${out#exhausted }" >>"${pdir}/semantic-format-exhausted"
+      ;;
+    esac
+  done
+  [ "$wait" -eq 0 ]
 }
 
 _planner_refinement_pass_drop() {

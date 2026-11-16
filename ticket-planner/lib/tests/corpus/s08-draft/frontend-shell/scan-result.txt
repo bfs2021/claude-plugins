@@ -1,0 +1,14 @@
+=== DOR_SEMANTIC_SCAN ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-frontend-shell
+BODY_HASH: sha256:9ec68ec347873c2c1bbe9a34de511806dbbf6cd86261acb102cd8d59a1f17127
+PARAPHRASE: Scaffold the Vite vanilla-JS frontend shell (dev server on 5173 with /api proxy, History router, fetch API client, jwt session restore with 401/unreachable handling, and a signed-in/signed-out header), leaving the actual page contents to later tickets.
+GAP_REQUIREMENT_COMPLETENESS: clear
+GAP_REQUIREMENT_COMPLETENESS_REASON: Build, proxy, routing (incl. deep link and Back), both header states, Token auth header, 401 removal and unreachable handling all have acceptance criteria.
+GAP_CONTRADICTORY_REQUIREMENTS: clear
+GAP_CONTRADICTORY_REQUIREMENTS_REASON: Load order, unreachable message rule and header state on unreachable agree across Proposed Behaviour, Technical Context and criteria.
+GAP_DEEP_SCOPE_AMBIGUITY: clear
+GAP_DEEP_SCOPE_AMBIGUITY_REASON: Scope is bounded to named new files under frontend/, with page contents, editor guard, sign-out and backend CORS explicitly out of scope.
+GAP_EDGE_CASE_SUFFICIENCY: clear
+GAP_EDGE_CASE_SUFFICIENCY_REASON: Rejected token, stopped backend (proxy 500 with non-JSON body), deep-link reload and history Back are each specified and tested.
+=== END DOR_SEMANTIC_SCAN ===

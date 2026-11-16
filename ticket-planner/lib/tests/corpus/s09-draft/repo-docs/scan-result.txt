@@ -1,0 +1,14 @@
+=== DOR_SEMANTIC_SCAN ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-repo-docs
+BODY_HASH: sha256:a3d1a63d785acc3d51f145e5a95a33a2db2a7e778b3c4a486a93e0ef5d116449
+PARAPHRASE: Docs-only update: replace the calculator/empty-repo wording in README.md and the CLAUDE.md Purpose, Codebase Projects and conventions lines with a Conduit-lite description, and add backend/frontend run instructions (ports, JWT_SECRET fallback, in-memory data) to the README, leaving CLAUDE.md build, URL and Linear config untouched.
+GAP_REQUIREMENT_COMPLETENESS: clear
+GAP_REQUIREMENT_COMPLETENESS_REASON: The edited criteria cover every proposed change: wording removal, Conduit-lite text in both files, run commands with their directories and ports, JWT_SECRET fallback, in-memory note, and the preserved BE_TEST_CMD, LOCAL_URL and BE server row.
+GAP_CONTRADICTORY_REQUIREMENTS: clear
+GAP_CONTRADICTORY_REQUIREMENTS_REASON: The edited criteria and Verification Plan rows agree with the Proposed Changes, Technical Context (including the BE server row added by backend-scaffold) and Out of Scope.
+GAP_DEEP_SCOPE_AMBIGUITY: clear
+GAP_DEEP_SCOPE_AMBIGUITY_REASON: Scope is pinned to named lines of two files, with explicit must-not-change lines, and the criteria stay inside that boundary.
+GAP_EDGE_CASE_SUFFICIENCY: clear
+GAP_EDGE_CASE_SUFFICIENCY_REASON: A wording-only docs change that does not branch; the line shift from backend-scaffold is handled by content-based checks rather than line numbers.
+=== END DOR_SEMANTIC_SCAN ===

@@ -1472,7 +1472,7 @@ _dor_test_data_source_state "$(cat "$FIXTURES_DIR/26-contract-implied-miss.md")"
 # A template used verbatim fails INTENT by design ({...} tokens are
 # placeholders), so each token is replaced with distinct filler — one shared
 # string would trip the Summary-Jaccard restatement rule. Only INTENT is
-# asserted: other codes (e.g. NAV_PATH_MISSING on bug/security, whose
+# asserted: other codes (e.g. NAV_PATH_MISSING on bug, whose
 # backticked path is replaced by filler) fail on filler text by design.
 TEMPLATES_DIR="$LIB_DIR/../templates"
 _render_template() {
@@ -1547,6 +1547,19 @@ check_ticket_ready "NAV-HDR" --body "$nav_file" --type feature --no-fetch >/dev/
 echo "$DOR_MISSING" | jq -e 'index("NAV_PATH_MISSING") != null' >/dev/null &&
   _pass "FE body whose only nav evidence is the Verification Plan column header → NAV_PATH_MISSING" ||
   _fail "column header alone should fire NAV_PATH_MISSING (got $DOR_MISSING)"
+
+# Rehearsal F51: chore and security have no Navigation Path section (their
+# templates carry none, planned-ticket-body-check.sh asks only feature and
+# improvement), so the same FE body with no path is not blocked for them.
+for _nt in chore security; do
+  check_ticket_ready "NAV-$_nt" --body "$nav_file" --type "$_nt" --no-fetch >/dev/null 2>&1 || true
+  if ! echo "$DOR_MISSING" | jq -e 'index("NAV_PATH_MISSING") != null' >/dev/null &&
+    [ "$(jq -r '.NAV_PATH_MISSING.class // empty' <<<"$DOR_CHECKS")" = "inapplicable" ]; then
+    _pass "type $_nt FE body without a path: NAV_PATH_MISSING inapplicable"
+  else
+    _fail "type $_nt should not need a Navigation Path (missing=$DOR_MISSING checks=$(jq -c '.NAV_PATH_MISSING' <<<"$DOR_CHECKS"))"
+  fi
+done
 
 _write_body "$nav_file" "$nav_base
 ## Navigation Path

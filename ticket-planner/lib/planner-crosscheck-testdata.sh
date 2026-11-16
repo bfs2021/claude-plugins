@@ -617,15 +617,115 @@ planner_cited_artifacts_missing() {
   return 0
 }
 
-# Canonical open-question lines for every NOT FOUND cited artifact — the
-# Consensus agent copies these verbatim into consensus.md `## Open Questions`.
+# One canonical open-question line. Usage: _planner_cited_question_line <name> <answer>
+_planner_cited_question_line() {
+  printf -- '- CITED_ARTIFACT: `%s` — cited but not retrievable. Provide it, or confirm it should be synthesised. Answer: %s\n' "$1" "$2"
+}
+
+# Canonical open-question lines for every NOT FOUND cited artifact. Bash puts
+# them into consensus.md `## Open Questions` after Consensus
+# (planner_cited_questions_sync) — the agent no longer copies them.
 # Usage: planner_cited_artifacts_questions <initiative_id>
 planner_cited_artifacts_questions() {
   local name
   while IFS= read -r name; do
     [ -n "$name" ] || continue
-    printf -- '- CITED_ARTIFACT: `%s` — cited but not retrievable. Provide it, or confirm it should be synthesised. Answer: PENDING\n' "$name"
+    _planner_cited_question_line "$name" PENDING
   done < <(planner_cited_artifacts_missing "$1")
+}
+
+# After Consensus (seam-bash-derives slice 2, audit row 19): every NOT FOUND
+# cited artifact gets exactly its canonical question in consensus.md. A line
+# the parser reads as a question for one of them is rewritten to the
+# canonical text, keeping its answer (PENDING when it has none); an artifact
+# with no such line gets one appended at the end of `## Open Questions` (the
+# section is added at the end of the file when missing). Every other line is
+# kept, CRLF endings included; the file is written (tmp + mv) only when it
+# changes, so a repeat run is a no-op and an operator's answer survives it.
+# Exit: 0 (also when there is nothing to do), 1 consensus.md cannot be written.
+# Usage: planner_cited_questions_sync <initiative_id>
+planner_cited_questions_sync() {
+  [ -n "${REPOS_ROOT:-}" ] || {
+    echo "ERROR: REPOS_ROOT is not set — refusing to guess (#459)" >&2
+    return 1
+  }
+  local consensus name key
+  consensus="$(_planner_testdata_state_dir "$1")/artifacts/consensus.md"
+  [ -f "$consensus" ] || return 0
+  local -A want=() have=()
+  local -a order=()
+  while IFS= read -r name; do
+    [ -n "$name" ] || continue
+    key=$(_planner_testdata_name_key "$name")
+    [ -n "${want[$key]+set}" ] && continue
+    want["$key"]="$name"
+    order+=("$key")
+  done < <(planner_cited_artifacts_missing "$1")
+  [ "${#order[@]}" -gt 0 ] || return 0
+
+  local -a lines=()
+  mapfile -t lines <"$consensus"
+  local cr="" lcr i parsed pname pkind pvalue praw raw new fence=0 sec=-1 sec_end=-1 low changed=0
+  if [[ "${lines[0]:-}" == *$'\r' ]]; then cr=$'\r'; fi
+  for i in "${!lines[@]}"; do
+    raw="${lines[$i]%$'\r'}"
+    lcr="${lines[$i]:${#raw}}"
+    if [[ "$raw" =~ ^[[:space:]]*(\`\`\`|~~~) ]]; then
+      fence=$((1 - fence))
+      continue
+    fi
+    [ "$fence" -eq 0 ] || continue
+    if [[ "$raw" =~ ^##[[:space:]] ]] && ! [[ "$raw" =~ ^###[[:space:]] ]]; then
+      low=$(_planner_testdata_lower "$(_planner_testdata_trim "${raw#\#\#}")")
+      if [ "$sec" -ge 0 ] && [ "$sec_end" -lt 0 ]; then sec_end=$i; fi
+      [ "$sec" -lt 0 ] && [ "$low" = "open questions" ] && sec=$i
+      continue
+    fi
+    parsed=$(_planner_cited_answer_parse "$raw") || continue
+    IFS=$'\037' read -r pname pkind pvalue praw <<<"$parsed"
+    key=$(_planner_testdata_name_key "$pname")
+    [ -n "${want[$key]+set}" ] || continue
+    new="$(_planner_cited_question_line "${want[$key]}" "${praw:-PENDING}")${lcr}"
+    if [ "$new" != "${lines[$i]}" ]; then
+      lines[i]="$new"
+      changed=1
+    fi
+    have["$key"]=1
+  done
+  if [ "$sec" -ge 0 ] && [ "$sec_end" -lt 0 ]; then sec_end=${#lines[@]}; fi
+
+  local -a add=()
+  for key in "${order[@]}"; do
+    [ -n "${have[$key]+set}" ] && continue
+    add+=("$(_planner_cited_question_line "${want[$key]}" PENDING)${cr}")
+  done
+
+  local -a outl=()
+  if [ "${#add[@]}" -eq 0 ]; then
+    [ "$changed" -eq 1 ] || return 0
+    outl=("${lines[@]}")
+  elif [ "$sec" -ge 0 ]; then
+    # After the section's last non-blank line, so its trailing blank stays.
+    local at=$sec
+    for ((i = sec + 1; i < sec_end; i++)); do
+      [[ "${lines[$i]%$'\r'}" =~ [^[:space:]] ]] && at=$i
+    done
+    outl=("${lines[@]:0:at+1}" "${add[@]}" "${lines[@]:at+1}")
+  else
+    outl=("${lines[@]}" "$cr" "## Open Questions${cr}" "$cr" "${add[@]}")
+  fi
+
+  local tmp="${consensus}.tmp.$$"
+  cp -p "$consensus" "$tmp" && printf '%s\n' "${outl[@]}" >"$tmp" || {
+    rm -f "$tmp"
+    echo "planner_cited_questions_sync: could not write ${consensus}" >&2
+    return 1
+  }
+  mv -f "$tmp" "$consensus" || {
+    rm -f "$tmp"
+    echo "planner_cited_questions_sync: could not write ${consensus}" >&2
+    return 1
+  }
 }
 
 # Parse one consensus.md line as a CITED_ARTIFACT open question. Prints
@@ -1318,16 +1418,27 @@ _planner_testdata_span_args() {
 # names a document (README, CHANGELOG, docs, documentation, runbook) or a
 # docs/config file (*.md, *.json, *.yml, *.toml, *.env, ...), a content verb
 # follows that name (states, mentions, documents, describes, says,
-# explains, labelled, reads, names, warns, tells, defines, declares), and no
+# explains, labelled, reads, names, warns, tells, defines, declares,
+# contains, includes, lists — rehearsal F39), and no
 # app-behaviour clause is present (shows, returns, renders, displays,
 # appears, loads, responds, redirects, log/sign in). Its quoted spans
 # are then quoted content, not data.
+# A search of a named document is document text too (rehearsal F48): a
+# search verb (search, grep) before the document name and a match count
+# after it ("returns 0 matches", "finds no hits"), with no other
+# app-behaviour clause. "returns" there is the search's result, not the app's.
 _planner_testdata_crit_is_doc_text() {
-  local lower after
+  local lower after before
   lower=$(_planner_testdata_lower "$1")
   [[ "$lower" =~ (^|[^a-z0-9_])(readme|changelog|docs|documentation|runbook|[a-z0-9_.-]*\.(md|json|ya?ml|toml|ini|cfg|conf|env|txt|xml|properties|lock))([^a-z0-9_]|$) ]] || return 1
   after="${lower#*"${BASH_REMATCH[0]}"}"
-  [[ " $after" =~ [^a-z](states?|stated|mentions?|mentioned|documents?|documented|describes?|described|says|said|explains?|explained|labell?ed|labels?|reads|names|named|warns?|warned|tells?|instructs?|defines?|defined|declares?|declared)([^a-z]|$) ]] || return 1
+  before="${lower%%"${BASH_REMATCH[0]}"*}"
+  if [[ " $before" =~ [^a-z](search|searches|searching|searched|grep|greps|grepping|grepped)([^a-z]|$) ]] &&
+    [[ " $after" =~ [^a-z](returns?|finds?|found|yields?|gives?|reports?)[[:space:]]+(no|zero|one|[0-9]+)[[:space:]]+(matches|match|hits?|results?|occurrences?|lines?)([^a-z]|$) ]]; then
+    [[ " $lower" =~ [^a-z](shows?|showing|renders?|rendered|displays?|appears?|loads?|responds?|redirects?|logs?[[:space:]]+in|logging[[:space:]]+in|signs?[[:space:]]+in|signing[[:space:]]+in)([^a-z]|$) ]] && return 1
+    return 0
+  fi
+  [[ " $after" =~ [^a-z](states?|stated|mentions?|mentioned|documents?|documented|describes?|described|says|said|explains?|explained|labell?ed|labels?|reads|names|named|warns?|warned|tells?|instructs?|defines?|defined|declares?|declared|contains?|contained|containing|includes?|included|lists?|listed)([^a-z]|$) ]] || return 1
   [[ " $lower" =~ [^a-z](shows?|showing|returns?|renders?|rendered|displays?|appears?|loads?|responds?|redirects?|logs?[[:space:]]+in|logging[[:space:]]+in|signs?[[:space:]]+in|signing[[:space:]]+in)([^a-z]|$) ]] && return 1
   return 0
 }
@@ -1375,7 +1486,9 @@ _planner_testdata_strip_quotes() {
 # Words that, right before or after a backticked span, make it the name of a
 # key, field, setting or script — an identifier in code, not a record
 # (`jwt` value, the `following` field, the scripts `dev`).
-PLANNER_TESTDATA_IDENT_NOUNS="value values key keys helper helpers module modules component components hook hooks field fields header headers property properties prop props param params parameter parameters argument arguments arg args variable variables column columns flag flags attribute attributes cookie cookies script scripts command commands option options setting settings function functions method methods"
+# "empty", "blank" and "missing" name a field's state (an empty `username`),
+# not a record (rewording tests).
+PLANNER_TESTDATA_IDENT_NOUNS="empty blank missing value values key keys helper helpers module modules component components hook hooks field fields header headers property properties prop props param params parameter parameters argument arguments arg args variable variables column columns flag flags attribute attributes cookie cookies script scripts command commands option options setting settings function functions method methods"
 
 # Classify one acceptance criterion for implied test data (design Decision 3).
 # Pure: no I/O beyond stdout. Prints "<tier>\x1f<reason>\x1f<matched phrase>",
@@ -1553,6 +1666,8 @@ _planner_testdata_implied_match() {
     [[ "$nx" =~ ^[a-z][a-z-]*$ ]] || continue
     _planner_testdata_in_list "$nx" "$PLANNER_TESTDATA_UNIT_DENYLIST" && continue
     _planner_testdata_in_list "$nx" "$_PLANNER_TESTDATA_STOPWORDS x" && continue
+    # A count of search matches is a result, not records (rehearsal F48).
+    _planner_testdata_in_list "$nx" "match matches hit hits occurrence occurrences" && continue
     if [[ "$num" =~ ^[1-5][0-9][0-9]$ ]]; then
       pv=""
       [ "$i" -gt 0 ] && pv="${w[i - 1]}"
@@ -1958,12 +2073,22 @@ planner_crosscheck_testdata_tripwires() {
     IFS=$'\037' read -r tier reason phrase hash crit <<<"$trig"
     [ "${resolved[$slug]:-}" = "$hash" ] && continue
     phrase="${phrase//\"/}"
-    if [ "$tier" = "strong" ] && [ "$strict" = true ]; then
+    # A strong match warns by default (block audit, iterations 01-06: 5
+    # blocks, none a real data gap — a pattern cannot tell a quoted literal
+    # from a record). PLANNER_TESTDATA_IMPLIED_BLOCKS=true restores blocking.
+    # Real data needs still go through Verification Notes, synthesis and
+    # Refinement's strict test-data checks.
+    if [ "$tier" = "strong" ] && [ "$strict" = true ] &&
+      [ "${PLANNER_TESTDATA_IMPLIED_BLOCKS:-false}" = true ]; then
       code="TEST_DATA_IMPLIED"
       blocking=1
     else
       code="TEST_DATA_IMPLIED_WEAK"
-      [ "$tier" = "strong" ] && reason="${reason}; strong, warn-only because the initiative predates the test-data contract"
+      if [ "$tier" = "strong" ] && [ "$strict" = true ]; then
+        reason="${reason}; strong, warn-only (PLANNER_TESTDATA_IMPLIED_BLOCKS is not true)"
+      elif [ "$tier" = "strong" ]; then
+        reason="${reason}; strong, warn-only because the initiative predates the test-data contract"
+      fi
     fi
     _planner_testdata_emit "planner-crosscheck-testdata: ${code} ${slug}.md [${hash}] match=\"${phrase}\" (${tier}: ${reason}) — every Verification Notes row says Test data none, but this criterion implies data must exist first: \"${crit}\" — derive the need from its Given/When with a Source, or answer TESTDATA_CONFIRM: \`${slug}\` [${hash}] in consensus.md (none, generate: <what>, exists:<where>, external:<who>)"
   done

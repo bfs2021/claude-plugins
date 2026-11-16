@@ -1,0 +1,14 @@
+=== DOR_SEMANTIC_SCAN ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-backend-articles
+BODY_HASH: sha256:20128d7fd320d539c08b07c980c2b6c8875e2d841154b429809893587616984c
+PARAPHRASE: Add articles to the backend: two seeded articles plus three endpoints - authenticated create with slug generation, uniqueness suffixes and blank-field validation, public read-one by slug, and public list with newest-first order, limit/offset paging with defaults and an author filter - with no password data in any response.
+GAP_REQUIREMENT_COMPLETENESS: clear
+GAP_REQUIREMENT_COMPLETENESS_REASON: Every described behaviour (seed, create, slug rule and suffixes, 401/422 errors, malformed JSON, read-one, 404, list order, paging defaults, author filter, tie-break, no password leak) has at least one acceptance criterion and a matching Verification Plan row.
+GAP_CONTRADICTORY_REQUIREMENTS: clear
+GAP_CONTRADICTORY_REQUIREMENTS_REASON: The changed sections agree with Proposed Behaviour and Technical Context; the Scope assumption on non-string and whitespace-only fields matches the three criteria that test it, and counts (2 seeded, 25 after 23 creates) are consistent.
+GAP_DEEP_SCOPE_AMBIGUITY: clear
+GAP_DEEP_SCOPE_AMBIGUITY_REASON: Scope is one backend service with named areas (store and seed, slug helper, serializer, router, tests), and Out of Scope excludes tags, comments, favorites, feed, edit/delete, profiles and frontend.
+GAP_EDGE_CASE_SUFFICIENCY: clear
+GAP_EDGE_CASE_SUFFICIENCY_REASON: Criteria cover invalid, negative and zero paging values, offset past the end, unknown and case-mismatched author, slug collisions including a seeded slug, symbol-only titles, missing/malformed/Bearer/expired tokens, malformed JSON, missing body, non-string and whitespace-only fields, and equal createdAt ordering.
+=== END DOR_SEMANTIC_SCAN ===

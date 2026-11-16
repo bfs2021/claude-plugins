@@ -1,0 +1,20 @@
+=== DOR_SEMANTIC_SCAN ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-frontend-shell
+BODY_HASH: sha256:76802a18849839038cf8dce6f5b7c2a5e8ed32b99c4dd404fc738fb2ce092d51
+PARAPHRASE: Add a new Vite frontend package that provides the single-page app shell: a strict-port dev server proxying /api to the backend, a History-API router for five placeholder pages, a start-up token check that sets the signed-in state, a header that reflects that state, and a guard redirecting signed-out visitors from /editor to /login.
+FINDING_1_CODE: MISSING_CORE_AC
+FINDING_1_QUOTE: In-app links change the address bar and the page content without reloading the document, and the browser Back button returns to the previous page.
+FINDING_1_DETAIL: Every routing criterion in the changed Acceptance Criteria and Verification Plan asserts only the address bar path or the header. No criterion checks that the page area shows the placeholder for the current path (for example the login heading after clicking "Sign in", or the article placeholder at /article/placeholder-slug). A router that calls pushState but never renders a page module would pass all 30 criteria, yet later tickets rely on the route table already rendering these modules.
+FINDING_2_CODE: EDGE_CASE_GAP
+FINDING_2_QUOTE: Opening any app path directly in a new tab loads the app at that path.
+FINDING_2_DETAIL: A path that matches none of the five routes (for example /nope, or /article with no slug) has no stated behaviour and no criterion. The dev server serves index.html for it, so the router must do something: render a blank page, throw before the header renders, or fall back to home. The implementer has to guess, and the Scope assumption covers only start-up call failures, not unmatched paths.
+GAP_REQUIREMENT_COMPLETENESS: finding
+GAP_REQUIREMENT_COMPLETENESS_REASON: Start-up, header, guard, port and proxy behaviours all have criteria, but rendering the page content for the current route has none.
+GAP_CONTRADICTORY_REQUIREMENTS: clear
+GAP_CONTRADICTORY_REQUIREMENTS_REASON: The token-removed criteria (401 from a running backend) and the token-kept criteria (backend stopped) are separated by backend state and agree with the Scope assumption and the code rules.
+GAP_DEEP_SCOPE_AMBIGUITY: clear
+GAP_DEEP_SCOPE_AMBIGUITY_REASON: Scope names one layer and repository, the file list is explicit, Out of Scope excludes page content, sign-out, production serving and unit tests, and the one assumption is concrete.
+GAP_EDGE_CASE_SUFFICIENCY: finding
+GAP_EDGE_CASE_SUFFICIENCY_REASON: Invalid token, expired token, backend down, port taken and HTML in a username are covered, but an unmatched path is not.
+=== END DOR_SEMANTIC_SCAN ===

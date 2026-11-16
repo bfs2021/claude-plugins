@@ -236,8 +236,11 @@ an export, an attachment). It first tries the source's attachments, the initiati
 
 ### consensus.md — `## Open Questions`
 
-`planner_cited_artifacts_questions <id>` renders one line per NOT FOUND artifact. The
-Consensus agent copies it verbatim:
+`planner_cited_artifacts_questions <id>` renders one line per NOT FOUND artifact. Bash writes
+them into the section after Consensus (`planner_cited_questions_sync`, run by the router's `post`
+gate and again before Crosscheck): a line that names one of the artifacts is rewritten to the
+canonical text, keeping its answer, and a missing one is appended. The agent no longer copies
+them, so a paraphrase cannot turn into `CITED_ARTIFACT_UNRAISED`:
 
 ```
 - CITED_ARTIFACT: `<name>` — cited but not retrievable. Provide it, or confirm it should be synthesised. Answer: PENDING
@@ -352,7 +355,9 @@ beforehand, and writes `Source: generate` for data no one produces yet.
   get the warn variant `VERIFICATION_NOTES_MISSING_LEGACY`.
 - `TEST_DATA_IMPLIED` / `TEST_DATA_IMPLIED_WEAK` — every row of a spec says `none`, yet a
   criterion implies data. One finding per spec, on the first strong criterion (else the first weak):
-  - **strong** (blocks): an inventory or backticked entity; existing/seeded/pre-existing state;
+  - **strong** (warns by default as `TEST_DATA_IMPLIED_WEAK`, with the TESTDATA_CONFIRM line to
+    answer; blocks as `TEST_DATA_IMPLIED` only with `PLANNER_TESTDATA_IMPLIED_BLOCKS=true` — the
+    rehearsal block audit found no real data gap among its blocks): an inventory or backticked entity; existing/seeded/pre-existing state;
     "given a/an/the … with"; "when there are"; a count followed by an entity noun; list, filter,
     search or export over an entity.
   - **weak** (warns): a count followed by a non-entity noun, or a state word
@@ -392,7 +397,7 @@ An implied-data question is answered with one persisted line (any `##` section; 
 - Any well-formed answer with the current hash suppresses `TEST_DATA_IMPLIED`. `generate:`
   becomes a synthesis need; `exists:`/`external:` becomes the Source of the trigger
   criterion's row (`planner_testdata_spec_effective_needs`); `none` changes nothing else.
-- Headless: `planner-stop-describe.sh` asks one question per blocking `TEST_DATA_IMPLIED` spec,
+- Headless (blocking mode only): `planner-stop-describe.sh` asks one question per blocking `TEST_DATA_IMPLIED` spec,
   id `testdata-<slug>-<hash8>`, binding `consensus-answer:testdata:<slug>`, default
   `generate: <match phrase>`. `planner-answers.sh` re-derives the hash at intake (a mismatch is
   `STALE_QUESTION`, exit 2) and writes the line with `planner_testdata_answer_set`.

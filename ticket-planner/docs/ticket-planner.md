@@ -83,7 +83,7 @@ Crosscheck → EpicGen → TicketGen → Refinement → Completed
 | 3 | **Architecture** | Determines technical approach, evaluates alternatives | Architecture decision record | — |
 | 4 | **Specify** | Synthesizes proposal + writes per-ticket spec files with signals and a `## Verification Notes` table keyed by each AC's verbatim text (role, test data, test-data `Source` — [#503](https://github.com/willard-pro/claude-plugins/issues/503), expected value, verifiable — planner-ready-by-construction, [#499](https://github.com/willard-pro/claude-plugins/issues/499)) in a single pass; each row's test data is derived from the criterion's Given/When, naming inventory entities, and unowned data is written `Source: generate` (never a hand-written test-data pack); the Description is humanized here, since TicketGen copies it verbatim | `proposal.md`, spec files in `artifacts/specs/` | — |
 | 5 | **Review** | Critiques the proposal for gaps, risks, and feasibility | Review findings | Before dispatch, the Specify decision gate halts on an open `NEEDS_HUMAN_DECISION` (deterministic bash — see [Open business decisions](#open-business-decisions-stop-the-run-before-review)) |
-| 6 | **Consensus** | Resolves review findings into a settled, actionable plan | Finalized proposal | — |
+| 6 | **Consensus** | Resolves review findings into a settled, actionable plan, one `### <id> — <severity> — <title> — <disposition>` heading per finding | Finalized proposal | After the agent, bash writes the canonical `CITED_ARTIFACT:` questions into `## Open Questions` and records the dispositions in `artifacts/phase-results/consensus.json` (seam-bash-derives; no file when the headings cannot be read, nothing blocks on it yet) |
 | 7 | **Crosscheck** | *(not an agent — bash)* Runs the citation ([#172](https://github.com/willard-pro/claude-plugins/issues/172)) and cross-ticket propagation ([#173](https://github.com/willard-pro/claude-plugins/issues/173)) linters against the settled artifacts and the live repo, plus the test-data checks. Its first sub-step, `testdata-synth`, synthesizes test-data (TD) specs and `artifacts/testdata-synth.json` for unowned needs before any check family runs ([test-data-source.md §3](test-data-source.md)) | `META|crosscheck` findings in state.log; TD specs + sidecar | Blocking finding halts the dispatch loop before the create gate is even checked ([#178](https://github.com/willard-pro/claude-plugins/issues/178)) |
 | 8 | **EpicGen** | Creates the initiative epic in Linear with no labels; writes the epic manifest. A shared-branch epic with synthesized TD specs, or with any spec blocked by a sibling, gets `**UAT Policy:** epic` unless the `uat-policy` config key (`PLANNER_UAT_POLICY`) is set | Linear epic, epic manifest (`branch`/`uat_policy`/`merge_policy`/`children`) | Idempotency: records intent before creation, checks existence by initiative ID |
 | 9 | **TicketGen** | Creates planned child tickets in Backlog with no labels. Every body is composed in bash by `planner-ticket-body.sh` ([#499](https://github.com/willard-pro/claude-plugins/issues/499)) — the same spec set always produces byte-identical bodies: the spec's Description verbatim (ticket-auto-pipeline's required body sections, [#285](https://github.com/willard-pro/claude-plugins/issues/285)), `## Test Data Prerequisites` (`- <what>. Source: <source>` per need) and a `## Verification Plan` table (Test data needed cell `<what> (Source: <source>)`), both generated from Specify's `## Verification Notes` matched to Acceptance Criteria by text (never position), `## Related Tickets` from the resolved dependencies, and the Planner Context block (`Generated` = the epic's creation time, not the clock); the parent epic identifier is resolved to its UUID in the lib. Requires `## Test Data Prerequisites` on every type (planner-ready-by-construction — closes the gap Refinement's deterministic check otherwise reports advisory on every ticket). Validates dependency DAG, writes each ticket manifest, persists each body to `planner/body.md`. Sidecar edges join each consumer's dependencies and sidecar overrides render as `seeded-by:<td-slug>`; synth-marked TD tickets are created at Linear priority High. No longer stamps the epic `dispatch` flag (planner-refinement-phase) — its only phase-named success line is `TicketGen\|verify\|done`, so a post-creation verify failure no longer hides behind an earlier `generate\|done` line | Linear tickets, ticket manifests, per-ticket `body.md` | `planner-ticket-body.sh` (order, deps, body, Verification Plan), `planner-deps-check.sh` (acyclicity), `planner-context-gen.sh` (block format), `planned-ticket-check.sh` (Planner Context block validation), `planned-ticket-body-check.sh` (required `##` section validation before creation — [#285](https://github.com/willard-pro/claude-plugins/issues/285)) |
@@ -446,8 +446,8 @@ cycle through a sidecar edge (consumer → TD spec, or reader → writer from
 `## Labels` blocked-by, the test-data synthesis edges in `artifacts/testdata-synth.json` and
 the ownership edges in `artifacts/ownership-edges.json`.
 
-`planner_replan_validate_deps` (re-planning) still sees `## Labels` refs only, not either
-sidecar. That gap predates the ownership edges.
+`planner_replan_validate_deps` (re-planning) reads the same graph through
+`planner_replan_deps_json`, so it sees `## Labels` refs and both sidecars' edges.
 
 ### Cross-initiative prerequisites
 
@@ -908,6 +908,17 @@ disposition is the first word of a ` — ` segment after the id: `accepted`, `re
 and nit findings are never checked. Without any terminal goldfish line the family is silent,
 so legacy initiatives and the halt goldens are unchanged. It never blocks.
 
+**`CODE_SPAN_EDGE_SPACE` (Crosscheck, warn only; rehearsal F53).** `planner_crosscheck_codespan`
+(`lib/planner-crosscheck-codespan.sh`, after the AC coverage family) emits one warning per
+inline code span whose content starts and ends with a space and is not only spaces. CommonMark
+removes one space from each end of such a span, so a spec value like `` `  Hello,  World!! ` ``
+renders, and is stored by Linear, as `` ` Hello,  World!!` ``: a test that depends on the spaces
+silently loses them, and the draft-to-Linear body comparison reports the ticket as changed. The
+fix is to quote the value inside the span (`` `"  Hello,  World!! "` ``) or describe the spaces
+in words. A span is a backtick run and the next run of the same length on the same line; fenced
+lines, INDEX.md and synth-marked test-data specs are skipped. Specify's Part 4 self-lint runs
+the same check so the agent fixes its own specs. It never blocks.
+
 ### Personas and the review panel
 
 planner-persona-panel. Two flags, both **opt-in** (default `false`) and independent of each
@@ -1211,8 +1222,40 @@ files live under `artifacts/draft-readiness/<slug>/` (`body.md`, `dor-result.jso
 `semantic.json`, `verdict` written last; revision history `spec.r<N-1>.md`,
 `findings.r<N>.json`, `revise.r<N>.*` once the revision loop runs).
 
+A draft the evaluator could not judge is a harness error, never a plan defect
+(seam-gate-safety D4). `SEMANTIC_UNAVAILABLE` (two attempts whose result was missing or
+unreadable, including an exhausted format retry) and `SEMANTIC_UNVERIFIED` (a non-advisory
+finding or a gap without evidence) are the codes in `PLANNER_DRAFT_WARN_CODES` (that
+default, also when the variable is exported empty; `none` blocks on them). They log
+`META|draft-readiness|warn|<slug> <CODE> "<reason>"`, the draft counts as *unevaluated*, the
+report lists them under "Not judged by the semantic evaluator", and Refinement judges those
+tickets after create (no draft verdict is carried over for them). More than
+`PLANNER_DRAFT_UNEVALUATED_MAX_SHARE` (default `0.25`) unevaluated drafts halt the run
+before any Linear write with `META|draft-readiness|fail|(run) HARNESS_ERROR <n>/<m>
+unevaluated` (done `blocked <b>/<m> HARNESS_ERROR`); fewer write `META|draft-readiness|warn|(run)
+UNEVALUATED <n>/<m> <slugs>`. With two drafts, one unevaluated draft already halts.
+Refinement applies the same rule to real tickets: a child whose only codes are harness
+codes is *not evaluated* (stays not ready, listed under `## Not evaluated (harness
+error)`), and more than `PLANNER_REFINEMENT_UNEVALUATED_MAX_SHARE` (default `0.25`) of
+them halts with `HARNESS_ERROR`. The stop describer reports these halts as
+`DRAFT_HARNESS_ERROR` / `REFINEMENT_HARNESS_ERROR`, a completion that left tickets
+unevaluated as `REASON=COMPLETED` plus `UNEVALUATED=<n>`, and COMPLETED.md, the run
+record and `planner-run-report.sh` count them; such a run is never clean. A draft the loop never judged ("no verdict
+for the current draft") still blocks. A failed attempt keeps its reason in `last-failure` and
+its result files as `*-result.rejected.txt`.
+
 ### Revision loop: reasons, assumptions, security
 
+- **Which findings a round revises.** A verified, blocking, non-structural semantic
+  finding, or a deterministic code in the audit-demotable list. Structural codes
+  (`_dor_semantic_structural_codes`) halt the gate unrevised, with one exception
+  (rehearsal F62): an `INTENT_AC_MISMATCH` whose unit is a single acceptance criterion
+  (`Acceptance Criteria/ac:<hash>`) gets revise rounds, because narrowing or adding a
+  criterion is its fix (`PLANNER_DRAFT_REVISABLE_AC_CODES`, a constant). The revise
+  prompt then tells the agent that a rebuttal does not clear it. It stays structural for
+  demotion: rebutted (one round, the spec is unchanged) or still unfixed after the round
+  budget, it keeps blocking and the gate halts. Only the finding's first anchor (`unit`)
+  is read, so a quote that also touches another section counts as one criterion.
 - **Reason class per finding.** At the end of the loop every demoted finding records why
   it was not fixed, judged per finding: `assumed`, `rebutted`, `revised`, `reverted` or
   `failed` from the rounds the finding was given to (highest of that order wins), else
@@ -1493,8 +1536,9 @@ both plans and creates would be the footgun this design exists to remove.
 ### Accepting a genuine Crosscheck finding (`--accept`)
 
 Some blocking findings are correct about the artifacts but not defects — most often
-`CARVE_SCOPE_LOST` when a ticket count was deliberately rescoped after Specify and the
-rescope is already documented in `consensus.md` or a post-Consensus coverage-audit doc.
+`CARVE_SCOPE_LOST` when a spec was deliberately carved, split or dropped after Specify (carve
+scope compares the slugs bash recorded in `artifacts/phase-results/specify.json` when
+Specify finished with the specs on disk) and the rescope is already documented in `consensus.md` or a post-Consensus coverage-audit doc.
 Before this flag existed the only way to unblock the create gate was hand-writing a
 `META|crosscheck|accepted|...`-shaped line directly into `state.log` — undocumented,
 easy to get wrong, and indistinguishable from an automated pass unless you already knew
@@ -1503,6 +1547,11 @@ to look for it (#222).
 ```
 /ticket-planner resume INIT-42 --accept CARVE_SCOPE_LOST:"documented rescope, see consensus.md#tickets-6"
 ```
+
+`CHECK_ERRORED` (blocking) means a check could not read its input and so did not run: for carve
+scope, `specify.json` is missing or unreadable — an initiative whose Specify ran before
+ticket-planner 0.44.0 has none. Audit the scope by hand, then accept it the same way, or
+re-run Specify.
 
 `--accept CODE:"reason"` is **`resume` only**, same restriction as `--create` — a
 finding can only be accepted after Crosscheck has reported it. It is parsed and

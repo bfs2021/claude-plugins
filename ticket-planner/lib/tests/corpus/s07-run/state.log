@@ -1,0 +1,115 @@
+2026-11-14T17:16:38Z|META|schema|start|1
+2026-11-14T17:16:38Z|META|initiative-id|start|INIT-0000000000-0612
+2026-11-14T17:16:38Z|META|idea|start|Build the first slice of a RealWorld Conduit-style blogging app in app: register, login, current user, create/read/list articles, plus frontend pages, created from scratch on Express (3000) + Vite vanilla JS (5173), replacing the calculator placeholder. 
+2026-11-14T17:16:38Z|META|contract|start|test-data-source-v1
+2026-11-14T17:16:38Z|META|no-tests-rule|done|false
+2026-11-14T17:16:53Z|Appraisal|scope|start|Interpreting idea: Build the first slice of a RealWorld Conduit-style blogging app in app: register, login, current user, create/read/list articles, plus frontend pages, created from scratch on Express (3000) + Vite vanilla JS (5173), replacing the calculator placeholder.
+2026-11-14T17:17:34Z|Appraisal|scope|done|Scope summary written to artifacts/appraisal.md
+2026-11-14T17:17:51Z|Discovery|explore|start|Exploring affected repositories
+2026-11-14T17:18:11Z|META|discovery|repo-ref|app@main@54d88f7c38c68fe8229b5bd0d135ca9b6e6c78fb
+2026-11-14T17:19:02Z|Discovery|explore|done|Discovery report: 1 services, 6 symbols resolved
+2026-11-14T17:19:19Z|Architecture|design|start|Evaluating technical approaches
+2026-11-14T17:20:23Z|Architecture|design|done|Architecture decision: layered CommonJS Express 5 + in-memory store with reset/seed + Jest/supertest; Vite vanilla-JS History router with /api dev proxy (+CORS); 23 recorded defaults; 8-step order
+2026-11-14T17:20:30Z|META|contract|start|specify-parameters-v1
+2026-11-14T17:20:30Z|META|contract|start|spec-ownership-v1
+2026-11-14T17:20:30Z|META|contract|start|ac-precondition-v1
+2026-11-14T17:20:41Z|Specify|synthesize|start|Synthesizing proposal and writing specs
+2026-11-14T17:27:29Z|META|ac-precondition|done|0 checked, 0 unchecked, 9 planned, 5 input
+2026-11-14T17:31:33Z|META|ac-precondition|done|0 checked, 0 unchecked, 26 planned, 11 input
+2026-11-14T17:31:46Z|META|ac-precondition|done|0 checked, 0 unchecked, 26 planned, 11 input
+2026-11-14T17:32:46Z|META|ac-precondition|done|0 checked, 0 unchecked, 26 planned, 11 input
+2026-11-14T17:32:53Z|META|ac-precondition|done|0 checked, 0 unchecked, 26 planned, 11 input
+2026-11-14T17:33:10Z|Specify|synthesize|done|Proposal written, 8 ticket specs in artifacts/specs/, self-lint clean
+2026-11-14T17:33:19Z|META|goldfish|skip|860d66616057 DISABLED
+2026-11-14T17:33:29Z|Review|critique|start|Critiquing proposal for gaps and risks
+2026-11-14T17:35:45Z|Review|critique|done|Review complete: 0 blockers, 2 major, 8 minor, 4 nit; verdict needs-revision
+2026-11-14T17:36:02Z|Consensus|resolve|start|Resolving review findings
+2026-11-14T17:41:29Z|Consensus|resolve|done|Consensus: 10 accepted, 2 rejected, 2 deferred
+2026-11-14T17:41:38Z|Crosscheck|check|start|running testdata-synth + citation + propagation + bypass + contracts + signals + deps + testdata checks
+2026-11-14T17:41:38Z|Crosscheck|testdata-synth|start|synthesizing test-data specs for unowned needs
+2026-11-14T17:41:40Z|Crosscheck|testdata-synth|done|0 TD spec(s), 0 need(s)
+2026-11-14T17:41:40Z|META|ownership-edges|done|14 edge(s)
+2026-11-14T17:41:42Z|META|crosscheck|warn|info DISCOVERY_GAP_UNRESOLVED ~/work/e2e-conduit/.ticket-auto/initiatives/INIT-0000000000-0612/artifacts/discovery.md:95 → "- **Pipeline base branch:** `develop` (the repo also has `main`; both at `200f5a4`). Diverged tags hold old calculator code (see Prior Art) " not recorded in proposal.md Out of Scope
+2026-11-14T17:41:49Z|META|crosscheck|fail|DEPENDENCY_CYCLE article-create-api.md is on a blocked-by cycle among: article-create-api, article-read-api — counting ## Labels blocked-by, the test-data synthesis edges in artifacts/testdata-synth.json and the ownership edges in artifacts/ownership-edges.json; TicketGen can order none of them
+2026-11-14T17:41:49Z|META|crosscheck|fail|DEPENDENCY_CYCLE article-read-api.md is on a blocked-by cycle among: article-create-api, article-read-api — counting ## Labels blocked-by, the test-data synthesis edges in artifacts/testdata-synth.json and the ownership edges in artifacts/ownership-edges.json; TicketGen can order none of them
+2026-11-14T17:41:58Z|META|crosscheck|warn|info TEST_DATA_IMPLIED_WEAK frontend-foundation.md [3f2ae857] match="article" (strong: entity; strong, warn-only (PLANNER_TESTDATA_IMPLIED_BLOCKS is not true)) — every Verification Notes row says Test data none, but this criterion implies data must exist first: "Signed out, the header on the page at port 5173 shows no link with the text `New Article`." — derive the need from its Given/When with a Source, or answer TESTDATA_CONFIRM: `frontend-foundation` [3f2ae857] in consensus.md (none, generate: <what>, exists:<where>, external:<who>)
+2026-11-14T17:41:59Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/article-read-api.md:37 ## Technical Context names keys neither ## Writes nor ## Reads declares: articles.list_default_limit, articles.list_default_offset, articles.paging_invalid — declare each in the table it belongs to
+2026-11-14T17:41:59Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/auth-api.md:45 ## Technical Context names keys neither ## Writes nor ## Reads declares: bcryptjs.compare, req.user, auth.jwt_secret_default, auth.jwt_expiry, auth.bcrypt_cost — declare each in the table it belongs to
+2026-11-14T17:41:59Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/auth-pages.md:39 ## Technical Context names keys neither ## Writes nor ## Reads declares: body.errors — declare each in the table it belongs to
+2026-11-14T17:41:59Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/backend-foundation.md:36 ## Technical Context names keys neither ## Writes nor ## Reads declares: api.port, auth.bcrypt_cost — declare each in the table it belongs to
+2026-11-14T17:41:59Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/frontend-foundation.md:32 ## Technical Context names keys neither ## Writes nor ## Reads declares: web.port, api.port — declare each in the table it belongs to
+2026-11-14T17:41:59Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/reader-pages.md:35 ## Technical Context names keys neither ## Writes nor ## Reads declares: articles.list_default_limit, articles.list_default_offset — declare each in the table it belongs to
+2026-11-14T17:42:00Z|META|ac-precondition|done|0 checked, 0 unchecked, 27 planned, 11 input
+2026-11-14T17:42:00Z|Crosscheck|check|fail|2 blocking finding(s), 8 warn, 0 accepted — see META crosscheck entries
+2026-11-14T18:26:50Z|Crosscheck|check|start|running testdata-synth + citation + propagation + bypass + contracts + signals + deps + testdata checks
+2026-11-14T18:26:50Z|Crosscheck|testdata-synth|start|synthesizing test-data specs for unowned needs
+2026-11-14T18:26:52Z|Crosscheck|testdata-synth|done|0 TD spec(s), 0 need(s)
+2026-11-14T18:26:55Z|META|crosscheck|warn|info DISCOVERY_GAP_UNRESOLVED ~/work/e2e-conduit/.ticket-auto/initiatives/INIT-0000000000-0612/artifacts/discovery.md:95 → "- **Pipeline base branch:** `develop` (the repo also has `main`; both at `200f5a4`). Diverged tags hold old calculator code (see Prior Art) " not recorded in proposal.md Out of Scope
+2026-11-14T18:27:11Z|META|crosscheck|warn|info TEST_DATA_IMPLIED_WEAK frontend-foundation.md [3f2ae857] match="article" (strong: entity; strong, warn-only (PLANNER_TESTDATA_IMPLIED_BLOCKS is not true)) — every Verification Notes row says Test data none, but this criterion implies data must exist first: "Signed out, the header on the page at port 5173 shows no link with the text `New Article`." — derive the need from its Given/When with a Source, or answer TESTDATA_CONFIRM: `frontend-foundation` [3f2ae857] in consensus.md (none, generate: <what>, exists:<where>, external:<who>)
+2026-11-14T18:27:12Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/article-read-api.md:37 ## Technical Context names keys neither ## Writes nor ## Reads declares: articles.list_default_limit, articles.list_default_offset, articles.paging_invalid — declare each in the table it belongs to
+2026-11-14T18:27:12Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/auth-api.md:45 ## Technical Context names keys neither ## Writes nor ## Reads declares: bcryptjs.compare, req.user, auth.jwt_secret_default, auth.jwt_expiry, auth.bcrypt_cost — declare each in the table it belongs to
+2026-11-14T18:27:12Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/auth-pages.md:39 ## Technical Context names keys neither ## Writes nor ## Reads declares: body.errors — declare each in the table it belongs to
+2026-11-14T18:27:12Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/backend-foundation.md:36 ## Technical Context names keys neither ## Writes nor ## Reads declares: api.port, auth.bcrypt_cost — declare each in the table it belongs to
+2026-11-14T18:27:12Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/frontend-foundation.md:32 ## Technical Context names keys neither ## Writes nor ## Reads declares: web.port, api.port — declare each in the table it belongs to
+2026-11-14T18:27:12Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/reader-pages.md:35 ## Technical Context names keys neither ## Writes nor ## Reads declares: articles.list_default_limit, articles.list_default_offset — declare each in the table it belongs to
+2026-11-14T18:27:13Z|META|ac-precondition|done|0 checked, 0 unchecked, 27 planned, 11 input
+2026-11-14T18:27:13Z|Crosscheck|check|done|clean (8 warn, 0 accepted)
+2026-11-14T18:27:18Z|META|draft-readiness|start|evaluator=dor-semantic-v4
+2026-11-14T18:27:57Z|META|draft-readiness|info|round=0 revise=0 reevaluate=4 spawns=4/64
+2026-11-14T18:29:39Z|META|draft-readiness|info|round=0 revise=0 reevaluate=4 spawns=8/64
+2026-11-14T18:31:17Z|META|draft-readiness|info|round=0 revise=0 reevaluate=4 spawns=12/64
+2026-11-14T18:32:25Z|META|draft-readiness|info|round=0 revise=0 reevaluate=4 spawns=16/64
+2026-11-14T18:33:32Z|META|draft-readiness|info|round=1 revise=4 reevaluate=0 spawns=20/64
+2026-11-14T18:33:32Z|META|draft-revise|start|auth-pages round=1 findings=1
+2026-11-14T18:33:32Z|META|draft-revise|start|backend-foundation round=1 findings=1
+2026-11-14T18:33:32Z|META|draft-revise|start|frontend-foundation round=1 findings=1
+2026-11-14T18:33:32Z|META|draft-revise|start|reader-pages round=1 findings=1
+2026-11-14T18:35:44Z|META|draft-revise|info|auth-pages ASSUMED EDGE_CASE_GAP f-89a667b61d21 "When the page-load check of a stored token fails with a network error or a status of 500 or above, the token is kept and the header shows the signed-out links."
+2026-11-14T18:35:44Z|META|draft-revise|done|auth-pages round=1 status=applied resolved=0 rebutted=0 unaddressed=0 added=2 extended=0 assumed=1
+2026-11-14T18:36:11Z|META|draft-revise|done|backend-foundation round=1 status=applied resolved=1 rebutted=0 unaddressed=0 added=2 extended=0
+2026-11-14T18:36:38Z|META|draft-revise|info|frontend-foundation ASSUMED MISSING_CORE_AC f-ba10a119817a "A route render function receives an object of the matched path parameters keyed by parameter name and returns the page content as a string, which the router places in the main area."
+2026-11-14T18:36:38Z|META|draft-revise|done|frontend-foundation round=1 status=applied resolved=0 rebutted=0 unaddressed=0 added=3 extended=0 assumed=1
+2026-11-14T18:37:05Z|META|draft-revise|done|reader-pages round=1 status=applied resolved=1 rebutted=0 unaddressed=0 added=1 extended=0
+2026-11-14T18:37:06Z|Crosscheck|check|start|running testdata-synth + citation + propagation + bypass + contracts + signals + deps + testdata checks
+2026-11-14T18:37:06Z|Crosscheck|testdata-synth|start|synthesizing test-data specs for unowned needs
+2026-11-14T18:37:09Z|Crosscheck|testdata-synth|done|0 TD spec(s), 0 need(s)
+2026-11-14T18:37:12Z|META|crosscheck|warn|info DISCOVERY_GAP_UNRESOLVED ~/work/e2e-conduit/.ticket-auto/initiatives/INIT-0000000000-0612/artifacts/discovery.md:95 → "- **Pipeline base branch:** `develop` (the repo also has `main`; both at `200f5a4`). Diverged tags hold old calculator code (see Prior Art) " not recorded in proposal.md Out of Scope
+2026-11-14T18:37:30Z|META|crosscheck|warn|info TEST_DATA_IMPLIED_WEAK frontend-foundation.md [3f2ae857] match="article" (strong: entity; strong, warn-only (PLANNER_TESTDATA_IMPLIED_BLOCKS is not true)) — every Verification Notes row says Test data none, but this criterion implies data must exist first: "Signed out, the header on the page at port 5173 shows no link with the text `New Article`." — derive the need from its Given/When with a Source, or answer TESTDATA_CONFIRM: `frontend-foundation` [3f2ae857] in consensus.md (none, generate: <what>, exists:<where>, external:<who>)
+2026-11-14T18:37:31Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/article-read-api.md:37 ## Technical Context names keys neither ## Writes nor ## Reads declares: articles.list_default_limit, articles.list_default_offset, articles.paging_invalid — declare each in the table it belongs to
+2026-11-14T18:37:31Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/auth-api.md:45 ## Technical Context names keys neither ## Writes nor ## Reads declares: bcryptjs.compare, req.user, auth.jwt_secret_default, auth.jwt_expiry, auth.bcrypt_cost — declare each in the table it belongs to
+2026-11-14T18:37:31Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/auth-pages.md:39 ## Technical Context names keys neither ## Writes nor ## Reads declares: body.errors — declare each in the table it belongs to
+2026-11-14T18:37:31Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/backend-foundation.md:36 ## Technical Context names keys neither ## Writes nor ## Reads declares: api.port, auth.bcrypt_cost — declare each in the table it belongs to
+2026-11-14T18:37:31Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/frontend-foundation.md:32 ## Technical Context names keys neither ## Writes nor ## Reads declares: web.port, api.port — declare each in the table it belongs to
+2026-11-14T18:37:31Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/reader-pages.md:35 ## Technical Context names keys neither ## Writes nor ## Reads declares: articles.list_default_limit, articles.list_default_offset — declare each in the table it belongs to
+2026-11-14T18:37:32Z|META|ac-precondition|done|0 checked, 0 unchecked, 27 planned, 11 input
+2026-11-14T18:37:32Z|Crosscheck|check|done|clean (8 warn, 0 accepted)
+2026-11-14T18:37:51Z|META|draft-readiness|info|round=1 revise=0 reevaluate=4 spawns=24/64
+2026-11-14T18:39:01Z|META|draft-readiness|info|round=1 revise=0 reevaluate=4 spawns=28/64
+2026-11-14T18:40:09Z|META|draft-readiness|info|round=2 revise=1 reevaluate=0 spawns=29/64
+2026-11-14T18:40:09Z|META|draft-revise|start|backend-foundation round=2 findings=1
+2026-11-14T18:41:42Z|META|draft-revise|done|backend-foundation round=2 status=applied resolved=1 rebutted=0 unaddressed=0 added=2 extended=0
+2026-11-14T18:41:42Z|Crosscheck|check|start|running testdata-synth + citation + propagation + bypass + contracts + signals + deps + testdata checks
+2026-11-14T18:41:42Z|Crosscheck|testdata-synth|start|synthesizing test-data specs for unowned needs
+2026-11-14T18:41:45Z|Crosscheck|testdata-synth|done|0 TD spec(s), 0 need(s)
+2026-11-14T18:41:48Z|META|crosscheck|warn|info DISCOVERY_GAP_UNRESOLVED ~/work/e2e-conduit/.ticket-auto/initiatives/INIT-0000000000-0612/artifacts/discovery.md:95 → "- **Pipeline base branch:** `develop` (the repo also has `main`; both at `200f5a4`). Diverged tags hold old calculator code (see Prior Art) " not recorded in proposal.md Out of Scope
+2026-11-14T18:42:07Z|META|crosscheck|warn|info TEST_DATA_IMPLIED_WEAK frontend-foundation.md [3f2ae857] match="article" (strong: entity; strong, warn-only (PLANNER_TESTDATA_IMPLIED_BLOCKS is not true)) — every Verification Notes row says Test data none, but this criterion implies data must exist first: "Signed out, the header on the page at port 5173 shows no link with the text `New Article`." — derive the need from its Given/When with a Source, or answer TESTDATA_CONFIRM: `frontend-foundation` [3f2ae857] in consensus.md (none, generate: <what>, exists:<where>, external:<who>)
+2026-11-14T18:42:08Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/article-read-api.md:37 ## Technical Context names keys neither ## Writes nor ## Reads declares: articles.list_default_limit, articles.list_default_offset, articles.paging_invalid — declare each in the table it belongs to
+2026-11-14T18:42:08Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/auth-api.md:45 ## Technical Context names keys neither ## Writes nor ## Reads declares: bcryptjs.compare, req.user, auth.jwt_secret_default, auth.jwt_expiry, auth.bcrypt_cost — declare each in the table it belongs to
+2026-11-14T18:42:08Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/auth-pages.md:39 ## Technical Context names keys neither ## Writes nor ## Reads declares: body.errors — declare each in the table it belongs to
+2026-11-14T18:42:08Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/backend-foundation.md:36 ## Technical Context names keys neither ## Writes nor ## Reads declares: api.port, auth.bcrypt_cost — declare each in the table it belongs to
+2026-11-14T18:42:08Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/frontend-foundation.md:32 ## Technical Context names keys neither ## Writes nor ## Reads declares: web.port, api.port — declare each in the table it belongs to
+2026-11-14T18:42:08Z|META|crosscheck|warn|info OWN_UNDECLARED_REF specs/reader-pages.md:35 ## Technical Context names keys neither ## Writes nor ## Reads declares: articles.list_default_limit, articles.list_default_offset — declare each in the table it belongs to
+2026-11-14T18:42:08Z|META|ac-precondition|done|0 checked, 0 unchecked, 27 planned, 11 input
+2026-11-14T18:42:08Z|Crosscheck|check|done|clean (8 warn, 0 accepted)
+2026-11-14T18:42:25Z|META|draft-readiness|info|round=2 revise=0 reevaluate=1 spawns=30/64
+2026-11-14T18:43:25Z|META|draft-readiness|info|round=2 revise=0 reevaluate=1 spawns=31/64
+2026-11-14T18:44:36Z|META|draft-readiness|done|ready 8/8
+2026-11-14T20:28:10Z|META|create-authorized|done|operator passed --create
+2026-11-14T20:28:10Z|META|stop-after|done|none
+2026-11-14T20:28:10Z|META|linear-team|done|TKT
+2026-11-14T20:28:10Z|META|linear-project|done|user Sandbox
+2026-11-14T20:28:16Z|META|draft-readiness|start|evaluator=dor-semantic-v4
+2026-11-14T20:29:09Z|META|draft-readiness|done|ready 8/8
+2026-11-14T20:29:10Z|META|base-branch|done|develop
+2026-11-14T20:29:10Z|META|base-branch-source|done|detected:app=develop
+2026-11-14T20:29:50Z|EpicGen|team|fail|cannot resolve Linear team (ref='TKT')

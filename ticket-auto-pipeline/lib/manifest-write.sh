@@ -812,7 +812,12 @@ set_ticket_readiness() {
        } + $extras
        + (if $sem.semantic != null then {semantic: $sem.semantic} else {} end)
        + (if $lineage != null then {lineage: $lineage} else {} end)
-       + (if ($dem_codes | length) > 0 then {demoted: $demoted} else {} end))' \
+       + (if ($dem_codes | length) > 0 then {demoted: $demoted} else {} end)
+       # A harness error (seam-gate-safety D4) describes the semantic verdict:
+       # it survives only while that verdict is carried forward unstaled.
+       + (if ($old_ready.harness_error // null) != null and $sem.semantic != null
+             and (($sem.semantic.stale // false) | not)
+          then {harness_error: $old_ready.harness_error} else {} end))' \
     "$manifest_path") || {
     _manifest_unlock
     return 1
@@ -874,7 +879,11 @@ waive_ticket_readiness_code() {
 # Prints the JSON array (sorted, unique) of `SEMANTIC_*` codes a semantic
 # verdict puts into ready.missing — steps 2–4 of set_ticket_semantic below:
 # SEMANTIC_UNAVAILABLE when .unavailable is true, SEMANTIC_UNVERIFIED once
-# when any finding has verified:false or .unverified_gaps is non-empty, and
+# when a finding whose code_class is not "advisory" has verified:false or
+# .unverified_gaps is non-empty (an advisory-class finding with an unverified
+# quote is only that finding's own problem, seam-gate-safety D4). code_class
+# is the code's class when dor_semantic_findings judged it, never the
+# severity after a demotion; a finding without it counts as blocking. And
 # SEMANTIC_<DIMENSION_UPPER> per finding whose severity is "blocking". Pure:
 # no manifest read or write. Extracted (planner-draft-readiness D3) so a
 # draft verdict on disk is judged by the same jq that judges a ticket. It
@@ -884,7 +893,7 @@ dor_semantic_blocking_codes() {
   local semantic_json="$1"
   echo "$semantic_json" | jq -c 'if type != "object" then error("not an object") else . end
      | (.unavailable == true) as $unavailable
-     | (([.findings[]? | select(.verified == false)] | length > 0)
+     | (([.findings[]? | select(.verified == false and .code_class != "advisory")] | length > 0)
         or ((.unverified_gaps // []) | length > 0)) as $has_unverified
      | ([.findings[]? | select(.severity == "blocking")
          | ("SEMANTIC_" + (.dimension | ascii_upcase))]) as $blocking_codes
@@ -901,8 +910,8 @@ dor_semantic_blocking_codes() {
 #
 #   1. remove every `SEMANTIC_`-prefixed element from ready.missing;
 #   2. append `SEMANTIC_UNAVAILABLE` when semantic_json.unavailable is true;
-#   3. append `SEMANTIC_UNVERIFIED` once when any finding has verified:false,
-#      or when semantic_json.unverified_gaps is non-empty (a gap marked
+#   3. append `SEMANTIC_UNVERIFIED` once when any finding whose code_class is
+#      not "advisory" has verified:false, or when semantic_json.unverified_gaps is non-empty (a gap marked
 #      "finding" with no matching finding in that dimension — dor_semantic_
 #      apply's own structural check, which has no single finding to mark);
 #   4. append `SEMANTIC_<DIMENSION_UPPER>` for each finding whose
@@ -910,7 +919,10 @@ dor_semantic_blocking_codes() {
 #      dor-semantic.sh's dor_semantic_apply — never by this function);
 #   5. de-duplicate, set ready.semantic to semantic_json verbatim, recompute
 #      ready.status from the new missing minus the keys of the *existing*
-#      waived map.
+#      waived map;
+#   6. drop ready.harness_error: a fresh verdict replaces the record of the
+#      evaluator failing (the caller re-records it after an `unavailable`
+#      verdict, set_ticket_harness_error).
 #
 # checked_at, advisory, waived, score, dimensions, gaps, body_hash and
 # lineage are never touched — checked_at stays because fleet-controller's
@@ -945,8 +957,50 @@ set_ticket_semantic() {
     '.ready.missing = (((.ready.missing // []) | map(select(startswith("SEMANTIC_") | not)))
                           + $new_semantic_codes | unique)
      | .ready.semantic = $semantic
+     | del(.ready.harness_error)
      | .ready.status = (if ((.ready.missing - (.ready.waived // {} | keys)) == []) then "ready" else "not-ready" end)' \
     "$manifest_path") || {
+    _manifest_unlock
+    return 1
+  }
+  write_rc=0
+  _manifest_atomic_write "$manifest_path" "$content" || write_rc=$?
+  _manifest_unlock
+  return "$write_rc"
+}
+
+# set_ticket_harness_error <TID> <harness_json|null>
+# The writer of `ready.harness_error` (seam-gate-safety D4): the semantic
+# evaluator could not judge the ticket (no usable result after its attempts,
+# or quoted evidence that does not verify). An object records it, `null`
+# removes it. Requires an existing `ready` object (exit 3, nothing written).
+# Touches nothing else: never `missing`, never `status`, so the ticket stays
+# exactly as not-ready as its codes make it — the field explains the codes,
+# it never replaces them. set_ticket_semantic drops it; set_ticket_readiness
+# carries it only while the semantic verdict is carried unstaled.
+set_ticket_harness_error() {
+  local tid="$1" harness_json="$2"
+
+  if ! echo "$harness_json" | jq -e 'type == "object" or type == "null"' >/dev/null 2>&1; then
+    echo "manifest-write: harness_json must be a JSON object or null, got '$harness_json'" >&2
+    return 3
+  fi
+
+  local manifest_path
+  manifest_path=$(get_ticket_manifest_path "$tid" 2>/dev/null) || return 1
+  [ -f "$manifest_path" ] || return 1
+
+  _manifest_lock "$manifest_path" || return 1
+
+  if ! jq -e '(.ready // null) != null' "$manifest_path" >/dev/null 2>&1; then
+    _manifest_unlock
+    echo "manifest-write: ticket $tid has no ready object — set_ticket_readiness must run first" >&2
+    return 3
+  fi
+
+  local content write_rc
+  content=$(jq -c --argjson h "$harness_json" \
+    'if $h == null then del(.ready.harness_error) else .ready.harness_error = $h end' "$manifest_path") || {
     _manifest_unlock
     return 1
   }

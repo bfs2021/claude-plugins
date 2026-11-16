@@ -228,6 +228,64 @@ planner_ac_checklist() {
   done
 }
 
+# planner_sibling_blocker_rule — a spec that takes a file, module, route or
+# page from a sibling ticket names that sibling as a direct blocker (rehearsal
+# F43). The Definition-of-Ready evaluator reads one ticket body: a blocker
+# reached only through another blocker reads as UNSTATED_DEPENDENCY there,
+# and that code is structural, so no revise round can clear it.
+planner_sibling_blocker_rule() {
+  cat <<'RULE'
+   **Every sibling a spec builds on is a direct blocker.** When a spec's prose
+   (behaviour, `## Technical Context`, `## Proposed Changes`) says a file,
+   module, route, page or script comes from another ticket in this initiative,
+   that spec carries `blocked-by:<that sibling's slug>` — also when one of its
+   other blockers already depends on that sibling. The readiness evaluator
+   reads one ticket at a time and cannot follow a chain; a blocker that is only
+   transitive halts the ticket as an unstated dependency.
+RULE
+}
+
+# planner_sibling_citation_rule — how TargetSymbols cites a file an earlier
+# ticket in this initiative creates (rehearsal F38): `(new)` is for the
+# ticket's own new file; a sibling's is `(new in <slug>)`.
+planner_sibling_citation_rule() {
+  cat <<'RULE'
+- A file this ticket creates is `Name (new):path`. A file an earlier ticket in
+  this initiative creates, which this ticket then reads or extends, is
+  `Name (new in <sibling-slug>):path` — for example
+  `envStart (new in backend-foundation):scripts/env-start.sh`. With no marker
+  the linter looks for the file in the repository today and reports
+  `CITATION_UNRESOLVED`.
+RULE
+}
+
+# planner_sibling_citation_consensus_section <initiative_id> — the Consensus
+# prompt's section on citations: the sibling marker rule, and a re-run of the
+# citation linter after Consensus edits a spec (rehearsal F38: Consensus moved
+# a script to an earlier ticket and nothing re-linted the later spec).
+planner_sibling_citation_consensus_section() {
+  local initiative_id="$1"
+  cat <<SECTION
+## A spec edit keeps its citations valid
+
+When an edit adds or changes an entry in a spec's \`## Signals\` \`TargetSymbols\`
+(a new file, a file moved to another ticket, a script a sibling now owns), the
+entry follows the Specify grammar: annotations on the \`Name\` side, and
+
+$(planner_sibling_citation_rule)
+
+After your last spec edit, run the citation linter Crosscheck runs and fix
+what it reports in the files you edited (up to 3 passes):
+
+\`\`\`bash
+$(_planner_prompt_repos_root_export)
+CLAUDE_PLUGIN_ROOT="${_PLANNER_PROMPT_LIB_ROOT}"
+source "\${CLAUDE_PLUGIN_ROOT}/lib/planner-crosscheck-citations.sh"
+planner_crosscheck_citations "${initiative_id}"
+\`\`\`
+SECTION
+}
+
 # ── Appraisal ────────────────────────────────────────────────────────────────
 
 planner_prompt_appraisal() {
@@ -623,7 +681,7 @@ $(_planner_prompt_repos_root_export)
 source "\${CLAUDE_PLUGIN_ROOT}/lib/planner-state.sh"
 planner_state_write "${initiative_id}" "Discovery" "explore" "start" "Exploring affected repositories"
 # ... do your work, including the repo-ref writes above ...
-planner_state_write "${initiative_id}" "Discovery" "explore" "done" "Discovery report: N services, M symbols resolved"
+planner_state_write "${initiative_id}" "Discovery" "explore" "done" "Discovery report written to artifacts/discovery.md"
 \`\`\`
 
 On failure, write \`fail\` instead of \`done\`.
@@ -862,6 +920,8 @@ ${state_dir}/artifacts/specs/<ticket-slug>.md. Each spec must include:
    \`blocked-by:<ref>\` entry per dependency. \`<ref>\` is either:
    - a **sibling spec slug** in this initiative — the spec filename minus \`.md\`, or an unambiguous \`-\`-bounded prefix of one (\`blocked-by:exc-1\` for \`exc-1-something.md\`); or
    - a **cross-initiative prerequisite** — the existing Linear identifier of the blocking ticket, e.g. \`blocked-by:WIL-83\`. Use this whenever work in this initiative cannot start until a ticket from *another* initiative is Done. Do not leave such a prerequisite as prose in the Description only: prose never reaches the ticket manifest's \`blocked_by\` array, so an unrecorded prerequisite is unenforceable.
+
+$(planner_sibling_blocker_rule)
 4. **## Signals** — a JSON code block with the 5 raw confidence signals (see below)
 5. **## Verification Notes** — a table keyed by each acceptance criterion's verbatim
    text: role, test data, where that data comes from (Source), expected value,
@@ -1138,6 +1198,7 @@ location := [path ':'] line ['-' line2]
   (the latter folds the annotation into the literal filename, which never
   resolves). This one mistake alone caused the majority of Crosscheck
   findings across prior initiatives.
+$(planner_sibling_citation_rule)
 - \`(new ...)\` on the Name side skips the unresolved-path check only — it
   does not skip line-range or symbol-proximity checks once the file exists.
 - Do not cite two symbols against two different line ranges in one compound
@@ -1168,7 +1229,13 @@ surface as a Crosscheck finding 3 phases later, outside this context window.
 $(_planner_prompt_repos_root_export)
 source "\${CLAUDE_PLUGIN_ROOT}/lib/planner-crosscheck-citations.sh"
 planner_crosscheck_citations "${initiative_id}"
+source "\${CLAUDE_PLUGIN_ROOT}/lib/planner-crosscheck-codespan.sh"
+planner_crosscheck_codespan "${initiative_id}"
 \`\`\`
+
+A \`CODE_SPAN_EDGE_SPACE\` line means an inline code value starts and ends
+with a space, which markdown drops: quote the value inside the span
+(\`"  a b "\`) so the spaces a test depends on survive.
 
 If it reports failures, read each \`planner-crosscheck-citations: <CODE>
 <file>:<line> → <detail>\` line, fix the cited file, and re-run. Up to 3
@@ -1196,9 +1263,9 @@ fi
 export CLAUDE_PLUGIN_ROOT
 $(_planner_prompt_repos_root_export)
 source "\${CLAUDE_PLUGIN_ROOT}/lib/planner-state.sh"
-planner_state_write "${initiative_id}" "Specify" "synthesize" "start" "Synthesizing proposal and writing specs for N tickets"
+planner_state_write "${initiative_id}" "Specify" "synthesize" "start" "Synthesizing proposal and writing ticket specs"
 # ... do your work, then self-lint per Part 4 ...
-planner_state_write "${initiative_id}" "Specify" "synthesize" "done" "Proposal written, N ticket specs in artifacts/specs/, self-lint clean"
+planner_state_write "${initiative_id}" "Specify" "synthesize" "done" "Proposal and ticket specs written to artifacts/specs/, self-lint clean"
 \`\`\`
 
 On failure, write \`fail\` instead of \`done\`.
@@ -1289,8 +1356,7 @@ $(_planner_prompt_repos_root_export)
 source "\${CLAUDE_PLUGIN_ROOT}/lib/planner-state.sh"
 planner_state_write "${initiative_id}" "Review" "critique" "start" "Critiquing proposal for gaps and risks"
 # ... do your work ...
-severity_counts="\$(grep -c 'blocker' artifacts/review.md || true) blockers, ..."
-planner_state_write "${initiative_id}" "Review" "critique" "done" "Review complete: \${severity_counts}"
+planner_state_write "${initiative_id}" "Review" "critique" "done" "Review written to artifacts/review.md"
 \`\`\`
 
 On failure, write \`fail\` instead of \`done\`.
@@ -1348,14 +1414,16 @@ sweep would misread.
 $(planner_params_consensus_rule)
 $(planner_ownership_consensus_rule)
 $(planner_acpre_consensus_rule)
+$(planner_sibling_blocker_rule)
 4. Write a consensus digest to ${state_dir}/artifacts/consensus.md:
-   - **Findings Addressed** — each review finding, its disposition (accepted/rejected/deferred),
-     and what changed (if anything), naming the acceptance criterion you added or
-     changed for it (see below)
+   - **Findings Addressed** — one \`### <id> — <severity> — <title> — <disposition>\`
+     heading per review finding, its disposition last and exactly one of accepted,
+     rejected or deferred (bash counts these headings), and what changed (if anything),
+     naming the acceptance criterion you added or changed for it (see below)
    - **Changes from Original Proposal** — summary of what's different
    - **Deferred Items** — things consciously left unresolved, with rationale
-   - **Open Questions** — questions only the operator can answer, including one
-     line per cited artifact Discovery could not retrieve (see below)
+   - **Open Questions** — questions only the operator can answer (bash adds one
+     line per cited artifact Discovery could not retrieve — see below)
    - **Readiness** — ready-for-spec / needs-further-discovery / blocked
 $(planner_goldfish_consensus_rule)
 
@@ -1376,14 +1444,17 @@ Every criterion you add or change passes this checklist:
 
 $(planner_ac_checklist)
 
+$(planner_sibling_citation_consensus_section "${initiative_id}")
+
 ## Cited artifacts the operator must answer for (#504)
 
 discovery.md's \`## Cited Artifacts\` section lists every external artifact the
 source material cites (a sample file, a template, an export) and whether
 Discovery could retrieve it. Each NOT FOUND one is a question for the operator,
-asked at this gate: "is it coming, or should it be synthesised?". Bash renders
-the questions — copy its output verbatim into consensus.md's
-\`## Open Questions\` section, do not paraphrase it:
+asked at this gate: "is it coming, or should it be synthesised?". Bash writes
+one \`CITED_ARTIFACT:\` line per such artifact into consensus.md's
+\`## Open Questions\` section after this phase ends, and rewrites any line of
+yours that names one — do not write those lines yourself. To see them:
 
 \`\`\`bash
 $(_planner_prompt_repos_root_export)
@@ -1392,8 +1463,8 @@ source "\${CLAUDE_PLUGIN_ROOT}/lib/planner-crosscheck-testdata.sh"
 planner_cited_artifacts_questions "${initiative_id}"
 \`\`\`
 
-Each line ends \`Answer: PENDING\`. Leave it PENDING — you cannot answer for the
-operator. Crosscheck blocks on a missing line (CITED_ARTIFACT_UNRAISED) or a
+Each line ends \`Answer: PENDING\`. You cannot answer for the operator.
+Crosscheck blocks on a missing line (CITED_ARTIFACT_UNRAISED) or a
 PENDING answer (CITED_ARTIFACT_UNRESOLVED) and stops the run there for the
 operator, who records \`Answer: exists:<where>\` (they supplied it),
 \`Answer: external:<who>\` or \`Answer: generate\`. That answer becomes the
@@ -1416,9 +1487,9 @@ fi
 export CLAUDE_PLUGIN_ROOT
 $(_planner_prompt_repos_root_export)
 source "\${CLAUDE_PLUGIN_ROOT}/lib/planner-state.sh"
-planner_state_write "${initiative_id}" "Consensus" "resolve" "start" "Resolving N review findings"
+planner_state_write "${initiative_id}" "Consensus" "resolve" "start" "Resolving review findings"
 # ... do your work ...
-planner_state_write "${initiative_id}" "Consensus" "resolve" "done" "Consensus: X accepted, Y rejected, Z deferred"
+planner_state_write "${initiative_id}" "Consensus" "resolve" "done" "Consensus written to artifacts/consensus.md"
 \`\`\`
 
 On failure, write \`fail\` instead of \`done\`.
@@ -1429,8 +1500,6 @@ On failure, write \`fail\` instead of \`done\`.
 - The finalized proposal must still satisfy the Planner Context schema — if the
   review found contract compliance issues, those must be resolved here.
 - Deferred items are a conscious choice, not an omission — explain why each is deferred.
-- Every NOT FOUND cited artifact has its \`CITED_ARTIFACT:\` line in \`## Open Questions\`,
-  copied verbatim from \`planner_cited_artifacts_questions\`.
 - Every behaviour sentence you added or changed has an acceptance criterion and a
   Verification Notes row that checks it.
 AGENT_PROMPT

@@ -1,0 +1,14 @@
+=== DOR_SEMANTIC_SCAN ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-auth-api
+BODY_HASH: sha256:c0af3b600f1fcb347d26b377bbda162623ff56db2bfa2b5f3dc82506166caac0
+PARAPHRASE: Add the register, login and current-user API endpoints with blank-field and uniqueness validation, HS256 24h JWT issuance, and a reusable requireAuth token-check middleware that guards GET /api/user with a uniform 401 body.
+GAP_REQUIREMENT_COMPLETENESS: clear
+GAP_REQUIREMENT_COMPLETENESS_REASON: Every described behaviour (register, login, current user, validation, uniqueness, wrong credentials, token properties, each 401 token failure) has a concrete criterion.
+GAP_CONTRADICTORY_REQUIREMENTS: clear
+GAP_CONTRADICTORY_REQUIREMENTS_REASON: Validation ordering, case rules for email vs username, and error bodies are stated consistently across Proposed Behaviour, Technical Context and the criteria.
+GAP_DEEP_SCOPE_AMBIGUITY: clear
+GAP_DEEP_SCOPE_AMBIGUITY_REASON: Scope is bounded to three endpoints, named files and functions, with explicit Out of Scope items including malformed JSON.
+GAP_EDGE_CASE_SUFFICIENCY: clear
+GAP_EDGE_CASE_SUFFICIENCY_REASON: Blank, non-string, missing-body, case-insensitive email, case-sensitive username, both-taken, and all token failure modes are each covered by a criterion.
+=== END DOR_SEMANTIC_SCAN ===

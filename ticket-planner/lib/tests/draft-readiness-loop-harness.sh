@@ -194,8 +194,7 @@ SPEC
 # AFTER_<slug> (code|quote[|detail]), if set. STRUCT_<slug> is always raised.
 _hash_of() { planner_draft_readiness_body_hash "${DR}/$1/body.md"; }
 _scan_block() {
-  local slug="$1" tid="DRAFT-$1" h body var i=0 f g
-  h=$(_hash_of "$slug")
+  local slug="$1" body var i=0 f g
   body=$(cat "${DR}/${slug}/body.md")
   local -a list=()
   var="FINDINGS_${slug//-/_}"
@@ -207,8 +206,6 @@ _scan_block() {
   [ -n "${!var:-}" ] && list+=("${!var}")
   echo "=== DOR_SEMANTIC_SCAN ==="
   echo "SCHEMA_VERSION: 1"
-  echo "TICKET: ${tid}"
-  echo "BODY_HASH: ${h}"
   echo "PARAPHRASE: The ticket makes one change, described consistently."
   local rest
   for f in "${list[@]}"; do
@@ -235,8 +232,6 @@ _audit_block() {
   local var m
   echo "=== DOR_SEMANTIC_AUDIT ==="
   echo "SCHEMA_VERSION: 1"
-  echo "TICKET: DRAFT-$1"
-  echo "BODY_HASH: $(_hash_of "$1")"
   var="MISSED_${1//-/_}"
   grep -qF "$MISSFIX" "${DR}/$1/body.md" && var="MISSED_AFTER_${1//-/_}"
   m="${!var:-}"

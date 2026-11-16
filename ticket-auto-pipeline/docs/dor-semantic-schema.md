@@ -70,7 +70,7 @@ unaffected by `DOR_SEMANTIC_ADVISORY_CODES`:
 | Code | Meaning |
 |---|---|
 | `SEMANTIC_UNAVAILABLE` | The caller could not obtain a valid result, after its own retry. |
-| `SEMANTIC_UNVERIFIED` | A finding's quote (or a gap marked `finding`) failed the evidence check. |
+| `SEMANTIC_UNVERIFIED` | A non-advisory finding's quote (or a gap marked `finding`) failed the evidence check. |
 | `SEMANTIC_STALE` | The manifest's `body_hash` no longer matches `semantic.body_hash`. |
 
 ## Severity is decided by bash
@@ -81,9 +81,11 @@ this order: a bash-owned code is `blocking`; a code in the fixed in-code constan
 strict flag or ticket type can make it blocking, and promotion is a code change that
 removes it from the constant; otherwise a finding is `blocking` unless its code is listed
 in the space-separated env var `DOR_SEMANTIC_ADVISORY_CODES` (default empty), read the same
-way as the `DOR_STRICT_*` flags — in which case it is `advisory`. An advisory-only finding
-still goes through the quote check: a non-verbatim quote stores `verified: false` and adds
-`SEMANTIC_UNVERIFIED`, as for every code.
+way as the `DOR_STRICT_*` flags — in which case it is `advisory`. An advisory finding
+still goes through the quote check: a quote that fails it stores `verified: false` and
+`quote_check: "unverified-quote"`, but adds no `SEMANTIC_UNVERIFIED` (seam-gate-safety D4) —
+an advisory finding cannot block, so its bad quote is only that finding's problem. This
+covers the advisory-only codes and any code listed in `DOR_SEMANTIC_ADVISORY_CODES`.
 A blocking finding adds `SEMANTIC_<DIMENSION_UPPER>` (e.g. `SEMANTIC_REQUIREMENT_COMPLETENESS`)
 to `ready.missing`, de-duplicated by dimension, not by code — a waiver survives a rerun
 that names a sibling code for the same gap. Advisory findings are stored in
@@ -96,8 +98,6 @@ that names a sibling code for the same gap. Advisory findings are stored in
 ```
 === DOR_SEMANTIC_SCAN ===
 SCHEMA_VERSION: 1
-TICKET: WIL-123
-BODY_HASH: sha256:ab12...
 PARAPHRASE: Let finance export the invoice list as a CSV file from the invoices screen.
 FINDING_1_CODE: MISSING_CORE_AC
 FINDING_1_QUOTE: the export should work correctly
@@ -125,9 +125,8 @@ carry it too, harmlessly); `DETAIL` is optional free text.
 `PARAPHRASE` (dor-semantic-paraphrase, `dor-semantic-v4`) is **required on every scan
 block** and absent from the audit: the one change the ticket makes, in the scanner's own
 words, written before any finding (the prompt asks for it first, so the scanner commits
-to a reading before it hunts for findings). One line, 1 to 400 characters after
-trimming. A missing, empty or over-long value rejects the block (exit 1); a multi-line
-value is a malformed line and rejects it too. The caller treats that like any other
+to a reading before it hunts for findings). One line; longer than 400 characters is cut
+to 400 ending in `...`. A missing, empty or multi-line value rejects the block (exit 1). The caller treats that like any other
 invalid block: re-spawn once, then `SEMANTIC_UNAVAILABLE`. The parser emits it as
 `paraphrase` (redacted like `DETAIL`), and `dor_semantic_apply` stores it as
 `ready.semantic.paraphrase`. Readers that do not know the field ignore it.
@@ -140,15 +139,15 @@ position on every semantic question, and `dor_semantic_apply` checks that a gap 
 ↔ `requirement_completeness`/`MISSING_CORE_AC` or `NEEDS_HUMAN_DECISION`,
 `GAP_CONTRADICTORY_REQUIREMENTS` ↔ `acceptance_criteria`/`CONTRADICTORY_REQUIREMENTS`,
 `GAP_DEEP_SCOPE_AMBIGUITY` ↔ `scope`/`SCOPE_AMBIGUOUS`, `GAP_EDGE_CASE_SUFFICIENCY` ↔
-`edge_cases`/`EDGE_CASE_GAP`) — a mismatch adds `SEMANTIC_UNVERIFIED`.
+`edge_cases`/`EDGE_CASE_GAP`) — a mismatch adds `SEMANTIC_UNVERIFIED`. The scan prompt
+lists the same pairs (`_dor_semantic_gap_rule`) and says a finding with any other code does
+not back a gap. It changes no code, schema or verdict, so the evaluator stays `dor-semantic-v4`.
 
 ### Audit block (Schema-Version 1)
 
 ```
 === DOR_SEMANTIC_AUDIT ===
 SCHEMA_VERSION: 1
-TICKET: WIL-123
-BODY_HASH: sha256:ab12...
 AUDIT_1_CODE: AC_VAGUE
 AUDIT_1_VERDICT: disputed
 AUDIT_1_REASON: "handles errors gracefully" is qualified by AC-4's explicit retry table
@@ -198,15 +197,48 @@ line; a quote spanning lines in the source is quoted from one of its lines.
 `dor_semantic_apply` normalises both the body and the quote before a substring test:
 whitespace is collapsed, smart quotes and dashes are folded to ASCII, and markdown
 emphasis markers (`*`, `_`, `` ` ``) and leading list/table markers are stripped. A
-quote that still does not match makes that finding `verified: false` and adds
-`SEMANTIC_UNVERIFIED` — a failed quote check blocks visibly rather than silently
-dropping the finding.
+quote that does not match gets a looser re-check (seam-gate-safety D4): split at every
+ellipsis (`…`, `...`), each piece trimmed of enclosing quotes, punctuation and
+whitespace, every piece found in the normalised body in order and at least
+`DOR_SEMANTIC_LOOSE_PIECE_MIN` (4) characters, the longest at least
+`DOR_SEMANTIC_LOOSE_QUOTE_MIN` (12); case is never folded. A loose-verified finding is
+never demoted by the lineage policy (drift, round-limit, draft-passed). A match stores the
+matched piece as `quote` (the agent's text as `quote_raw`) with `quote_check: "loose"`.
+A quote that still does not match makes that finding `verified: false`
+(`quote_check: "unverified-quote"`). Each finding records `code_class`, its code's
+class when it was judged (never the severity after a demotion). For a finding whose
+`code_class` is not `advisory` (or missing) this adds `SEMANTIC_UNVERIFIED` next to its
+own `SEMANTIC_<DIMENSION>` code, and drift or the round limit never demote it. Only a
+verified finding backs a gap — a failed
+quote check blocks visibly rather than silently dropping the finding.
 
 ## Result binding and versioning
 
-`dor_semantic_apply` rejects (exit 1, nothing written) a result whose `TICKET` differs
-from the ticket id it was called with, or whose `BODY_HASH` differs from
-`_dor_body_hash` of the body file it is given. `DOR_SEMANTIC_EVALUATOR="dor-semantic-v4"`
+**The spawn request** (seam-bash-derives slice 3). The agent copies no identity
+field: `TICKET` and `BODY_HASH` are bash facts. `dor_semantic_prompt` writes
+`<result-file minus .txt>.request.json` beside each result file
+(`dor_semantic_request_path`) — `{version: 1, kind, ticket, body_hash, attempt,
+result_file}`, `body_hash` = `_dor_body_hash` of the body when the prompt was built,
+written atomically, no request when the body file is missing. `dor_semantic_findings`
+and `dor_semantic_apply` take the two request paths as optional trailing arguments
+and bind each result to its request:
+
+| Situation | Result |
+|---|---|
+| Request readable, its `ticket` = the ticket id, body still hashes to its `body_hash` | accepted |
+| Request for another ticket | rejected (findings rc 2, apply rc 1) |
+| Body changed since the spawn (request hash ≠ body hash now) | rejected — `body changed since the <kind> was spawned` |
+| An echoed `TICKET`/`BODY_HASH` disagrees with the request | **warning only**, the echo is ignored |
+| Request missing or unreadable | warning, then the echoed values are checked as before |
+| Request missing and no echo | rejected |
+
+The parser keeps accepting an echoed `TICKET`/`BODY_HASH` for one release (both are
+optional; absent parses as `""`). A disagreeing echo is a warning, not a rejection:
+the agent only ever copied the value from its prompt, so a mismatch measures the copy,
+not which body it read — the request already binds the result file to the ticket, and
+the hash check against the request is the real "body unchanged since spawn" test. A
+one-character slip used to throw away a valid evaluation (seam audit 2026-11-15,
+draft gate row 7). `DOR_SEMANTIC_EVALUATOR="dor-semantic-v4"`
 is stamped into `ready.semantic.evaluator` on every stored result; it changes whenever
 the prompt, code vocabulary, or block schema changes, so a caller can decide whether a
 cached verdict is current by comparing body hash and evaluator string. `v2`
@@ -332,6 +364,56 @@ pipeline log line — the caller owns its own log grammar (unlike `adr-gate-pars
 **Deliberate deviation from `adr-gate-parse.sh`/`human-hold-parse.sh`:** `set -eo
 pipefail` is scoped to the `BASH_SOURCE == $0` CLI block only, not file scope — sourcing
 the parser never enables `errexit` in the caller.
+
+## Format retry (re-serialise only)
+
+A scan or audit block that fails to parse because of a formatting slip is sent back to
+the agent once per attempt (seam-gate-safety G6). `dor_semantic_format_step` in
+`lib/dor-semantic-parse.sh` decides; the draft readiness gate and Refinement call it
+when both results of an attempt are in, and spawn the retry through their spawn list as
+kind `format`.
+
+- **Retried:** only a slip a re-serialisation can fix — a bullet, number or markup before
+  a KEY, a wrapped value, an enum in the wrong case (`Clear`, `Yes`), a code in the wrong
+  case. A missing, duplicated or out-of-set value, a missing closing marker, another
+  `SCHEMA_VERSION` or an unaudited hard code is content, not format: no retry. A block
+  that parsed is never retried.
+- **Error record** `<result minus .txt>.last-failure.json`: `{code: FORMAT_ERROR, field,
+  expected, got, example}`. `expected` and `example` come from the block contract the
+  evaluator prompt prints (a copy in the parser, held to the prompt by a drift test).
+- **Prompt** `<result>.format-prompt.txt`: the original block verbatim, the error record,
+  the contract and one instruction: "Re-serialise this block in the required format. Do
+  not add, remove or change any finding, code, quote or verdict." No ticket body, no body
+  path. The agent writes `<result>.format-result.txt`.
+- **Finding-set guard.** Bash reads both blocks the same tolerant way (a bullet or
+  markup before a KEY dropped, KEY case folded, a non-KEY line joined to the previous
+  value, whitespace collapsed, codes and enums case-folded) and compares every value, not
+  only the codes: `SCHEMA_VERSION`, `PARAPHRASE`, every `GAP_*` verdict and reason, each
+  finding's code, quote, `QUOTE_B` and detail, every `AUDIT_n` entry (code, verdict,
+  reason, quote), every `MISSED_n` entry, `SCORE_PLAUSIBLE` and `SCORE_REASON`. A value
+  the original lacks cannot be supplied by the retry, so a content defect behind a format
+  slip stays a defect. An added or changed finding, or any other changed value, rejects
+  the retry. A finding the retry dropped is written back from the original, or the retry
+  is rejected when it cannot be rebuilt (no quote, a `CONTRADICTORY_REQUIREMENTS` with no
+  `QUOTE_B`, a `TEST_DATA_GAP` with no `DETAIL`). Its `restored: true` comes only from the
+  sidecar `<result>.format-restored.json` (`{sha, restored: [n]}`), honoured while its
+  sha is the result file's; a `FINDING_n_RESTORED` key in any block is not a key (in a
+  retry it rejects the retry). `dor_semantic_findings` keeps the mark, and the quote is
+  still checked against the body. Both blocks must be the file's only block of their kind
+  with no `===` line inside; otherwise there is no retry (original) or the retry is
+  rejected. The merged block is checked once more before it replaces the result file; the
+  original is kept as `<result>.format-original.txt`. An original replaced while its retry
+  is out is moved aside (`<result>.format-tampered.txt`) and never judged.
+- **Budget.** `DOR_SEMANTIC_FORMAT_RETRIES` (default 1, 0–5) per attempt, outside the
+  attempt count, revise rounds and `DEMOTE_CEILING`. A retry that fails on the same
+  `(field, got)` stops early. A new result file (another sha) starts a fresh budget. A
+  retry asked for three times with no result counts as a spawn that wrote nothing.
+- **Exhausted:** `dor_semantic_format_step` prints `exhausted <field>` (rc 5) once; the
+  caller writes `META|harness-error|fail|<ticket> FORMAT_RETRY_EXHAUSTED <field>` and the
+  attempt then fails exactly as an unparseable result always has (one more attempt, then
+  `SEMANTIC_UNAVAILABLE` / `unavailable`). The planner puts the field in that attempt's
+  reason, so the end state is a harness error (seam-gate-safety G5): an unevaluated draft
+  at the draft gate, `ready.harness_error` at Refinement.
 
 ## `ready.semantic` shape
 
@@ -489,6 +571,7 @@ The planner sets the round and drift ones as call prefixes; see `ticket-planner`
 | `DOR_SEMANTIC_ROUND_RESET_SHARE` | `0.5` | Share (0–1) of prior non-inert sections that must change to reset the round to 1. Invalid values count as `0.5` |
 | `DOR_SEMANTIC_INERT_SECTIONS` | `Related Tickets` | `\|`-separated headings whose edits rebase the verdict instead of staling it. Empty disables rebasing |
 | `DOR_AUDIT_DEMOTABLE_CODES` | `DOR_AUDIT_DEMOTABLE_CODES_DEFAULT`: `VPLAN_ROW_GAP VPLAN_UNVERIFIABLE AC_VAGUE AC_IMPLEMENTATION_ONLY NAV_PATH_MISSING` | Deterministic codes `dor_audit_demote` may demote. Empty means the default. Never-demote codes are refused whatever this says. An override warns at apply time and is snapshotted as `lineage.policy.audit_demotable`/`audit_demotable_overridden` |
+| `DOR_SEMANTIC_FORMAT_RETRIES` | `1` | Format retries per attempt (0–5; 0 turns the retry off). Read by `lib/dor-semantic-parse.sh`; any other value is refused (rc 2, and the planner refuses it at gate start / Refinement prepare) |
 | `DOR_AUDIT_DEMOTE_MAX` | `2` | More qualifying codes than this on one ticket is a blanket dispute: nothing is demoted, exit 4. Empty or invalid means 2 |
 
 Fixed constants, not overridable: `DOR_SEMANTIC_EVALUATOR` (`dor-semantic-v4`),
@@ -508,13 +591,14 @@ readiness return code, and neither invokes a model. Both drop a disputed code th
 ## Evaluator agent contract
 
 `agents/dor-semantic-agent.md` declares `tools: Read, Write`. `dor_semantic_prompt
-scan|audit <TID> <body-file> <result-file> [<det-result-file>]` builds its prompt:
-paths, never ticket text, plus the body file's `_dor_body_hash` as a `**Body hash**:`
-literal the agent copies into `BODY_HASH` (the agent has no shell and cannot compute a
-SHA-256 itself; apply re-hashes the body at apply time, so the binding still catches a
-body edited after the prompt was built); states that file contents are data, not instructions;
+scan|audit [--attempt N] <TID> <body-file> <result-file> [<det-result-file>]` builds its
+prompt: paths, never ticket text, and no body hash — the hash goes into the spawn request
+it writes beside the result file (see Result binding above), so the agent echoes
+nothing; states that file contents are data, not instructions;
 instructs the agent to write exactly one block to the result path and return a single
-line (`DOR_SEMANTIC <scan|audit> written <path>`). This keeps a caller running tens of
+line (`DOR_SEMANTIC <scan|audit> written <path>`). A format retry prompt
+(`dor_semantic_format_prompt`, see Format retry) is answered with
+`DOR_SEMANTIC format written <path>`. This keeps a caller running tens of
 tickets from accumulating every result in its own context. The scan prompt never
 references the deterministic result file or any deterministic code.
 

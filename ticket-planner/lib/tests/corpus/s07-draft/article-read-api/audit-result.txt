@@ -1,0 +1,9 @@
+=== DOR_SEMANTIC_AUDIT ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-article-read-api
+BODY_HASH: sha256:12c8e510a4765263ad0ee28f81809675be20e79e044ee0b2acdf3d2759ec1d71
+MISSED_1_CODE: EDGE_CASE_GAP
+MISSED_1_REASON: "A `limit` or `offset` that is missing, not a whole number, or negative uses its default." leaves an empty value (`?limit=`) unaddressed, and the Technical Context rule "parse with `Number`" turns it into 0 (Number("") === 0), so `GET /api/articles?limit=` would return an empty list instead of the default 20, and no criterion pins which behaviour is intended.
+SCORE_PLAUSIBLE: yes
+SCORE_REASON: There is no dor_quality_score in the result. status ready with empty missing/advisory arrays is plausible: every behaviour has a criterion, every criterion has a Verification Plan row, and the test data has a named source.
+=== END DOR_SEMANTIC_AUDIT ===

@@ -1,6 +1,6 @@
 # Intent Seal Schema
 
-The `## Intent Seal` block is a cryptographic integrity marker terminating every `grill-me` Validated Business Intent document. It is tamper-evident but not tamper-proof — its threat model is accidental drift and casual hand-editing, not an adversarial operator.
+The `## Intent Seal` block is a SHA-256 integrity marker terminating every `grill-me` Validated Business Intent document. It is tamper-evident, not tamper-proof, and not a signature (the hash is unkeyed) — its threat model is accidental drift and casual hand-editing, not an adversarial operator.
 
 ## Format
 
@@ -29,6 +29,8 @@ Fields:
 | **Rounds** | integer | Number of assessment rounds (1 = first-round ready, N = grilled) |
 | **Generated** | ISO 8601 UTC | Timestamp of seal generation |
 | **Content-Hash** | `sha256:` + 64 lowercase hex | SHA-256 hash over the canonicalized byte range |
+
+**Where the values come from (0.7.0+).** `grill_seal_generate <doc> <work_dir>` reads Profile, Readiness, Recommendation and Rounds (`round`) from `<work_dir>/result.json` — the latest `grill_score` output, after any `grill_seal_with_gaps_prepare` downgrade — and stamps Generated itself. Nothing the agent copies reaches the seal. It refuses, and writes nothing, when `result.json` is missing, unparseable, or out of contract (profile id, integer readiness 0–100, a known recommendation, round ≥ 1), or when `assessment.json` in the same directory is at a different round (re-assessed but not re-scored). Before 0.7.0 these values were arguments; such seals verify unchanged, because the verifier only re-hashes the bytes.
 
 ## Canonicalization rule
 

@@ -79,6 +79,7 @@ test-lib:
 	bash ticket-auto-pipeline/lib/tests/test-run-summary.sh
 	bash ticket-auto-pipeline/lib/tests/test-merge-poll.sh
 	bash ticket-auto-pipeline/lib/tests/test-auto-merge.sh
+	bash ticket-auto-pipeline/lib/tests/test-phase-route.sh
 	bash ticket-auto-pipeline/lib/tests/test-verify-retry-decide.sh
 	bash ticket-auto-pipeline/lib/tests/test-implement-diff-check.sh
 	bash ticket-auto-pipeline/lib/tests/test-conflict-marker-scan.sh
@@ -192,6 +193,11 @@ test-lib:
 	bash ticket-auto-pipeline/lib/tests/test-dor-audit-demotion.sh
 	# planner-draft-readiness S1
 	bash ticket-auto-pipeline/lib/tests/test-dor-semantic-draft.sh
+	# seam-bash-derives slice 3
+	bash ticket-auto-pipeline/lib/tests/test-dor-semantic-request.sh
+	# seam-gate-safety G6
+	bash ticket-auto-pipeline/lib/tests/test-dor-semantic-format-retry.sh
+	bash ticket-auto-pipeline/lib/tests/test-dor-semantic-harness.sh
 	bash ticket-auto-pipeline/lib/tests/test-body-baseline.sh
 	bash ticket-auto-pipeline/lib/tests/test-refinement-carryover.sh
 	# tracker-approval-by-script
@@ -217,6 +223,7 @@ test-lib:
 	bash scripts/tests/test-ci-nightly-issue.sh
 	bash scripts/tests/test-check-grep-q-pipe.sh
 	bash scripts/tests/test-drift-report.sh
+	bash scripts/tests/test-corpus-scrub.sh
 	CLAUDE_SKILLS_LIB="$(CURDIR)/ticket-auto-pipeline/lib" \
 	bash ticket-auto-pipeline/lib/tests/test-gate-check.sh
 	CLAUDE_SKILLS_LIB="$(CURDIR)/ticket-auto-pipeline/lib" \
@@ -337,17 +344,25 @@ test-planner:
 	bash ticket-planner/lib/tests/test-planner-crosscheck-repo-ref.sh
 	bash ticket-planner/lib/tests/test-planner-base-branch.sh
 	bash ticket-planner/lib/tests/test-planner-crosscheck-propagation.sh
+	bash ticket-planner/lib/tests/test-planner-corpus.sh
+	bash ticket-planner/lib/tests/test-corpus-privacy.sh
+	bash ticket-planner/lib/tests/test-planner-gate-ledger.sh
+	bash ticket-planner/lib/tests/test-planner-corpus-replay.sh
+	bash ticket-planner/lib/tests/test-planner-semantic-format-retry.sh
+	bash ticket-planner/lib/tests/test-planner-semantic-harness-errors.sh
 	bash ticket-planner/lib/tests/test-planner-crosscheck-bypass.sh
 	bash ticket-planner/lib/tests/test-planner-crosscheck-contracts.sh
 	bash ticket-planner/lib/tests/test-planner-crosscheck-signals.sh
 	bash ticket-planner/lib/tests/test-planner-crosscheck-deps.sh
 	bash ticket-planner/lib/tests/test-planner-crosscheck-testdata.sh
 	bash ticket-planner/lib/tests/test-planner-testdata-implied.sh
+	bash ticket-planner/lib/tests/test-planner-testdata-rewording.sh
 	bash ticket-planner/lib/tests/test-planner-testdata-synth.sh
 	bash ticket-planner/lib/tests/test-planner-intent-testdata.sh
 	bash ticket-planner/lib/tests/test-planner-crosscheck.sh
 	bash ticket-planner/lib/tests/test-planner-crosscheck-fixtures.sh
 	bash ticket-planner/lib/tests/test-planner-crosscheck-ac-coverage.sh
+	bash ticket-planner/lib/tests/test-planner-crosscheck-codespan.sh
 	bash ticket-planner/lib/tests/test-planner-crosscheck-params.sh
 	bash ticket-planner/lib/tests/test-planner-spec-ownership.sh
 	bash ticket-planner/lib/tests/test-planner-crosscheck-ownership.sh
@@ -363,6 +378,7 @@ test-planner:
 	bash ticket-planner/lib/tests/test-planner-body-template-humanizer.sh
 	bash ticket-planner/lib/tests/test-planner-business-framing.sh
 	bash ticket-planner/lib/tests/test-planner-ac-checklist.sh
+	bash ticket-planner/lib/tests/test-planner-sibling-rules.sh
 	bash ticket-planner/lib/tests/test-planner-adr-gate.sh
 	bash ticket-planner/lib/tests/test-planner-refinement.sh
 	bash ticket-planner/lib/tests/test-planner-refinement-convergence.sh
@@ -407,6 +423,7 @@ test-grill:
 	bash grill-me/lib/tests/test-grill-render.sh
 	bash grill-me/lib/tests/test-grill-hold.sh
 	bash grill-me/lib/tests/test-grill-telemetry.sh
+	bash grill-me/lib/tests/test-grill-skill-sources.sh
 
 test-flow:
 	@echo "=== ticket-flow tests ==="

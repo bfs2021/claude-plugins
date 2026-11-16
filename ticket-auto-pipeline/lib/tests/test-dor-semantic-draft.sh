@@ -219,8 +219,11 @@ for max in "" 1; do
 done
 _check "lineage_from: the convergence fixture is round 2 with a carried finding" \
   [ "$(echo "$p" | jq -r '.lineage.round')" = "2" ]
-_check "lineage_from: MAX_ROUNDS=1 demotes the non-structural finding round-limit" \
-  [ "$(echo "$p" | jq -r '[.findings[] | select(.demoted == "round-limit")] | length')" = "2" ]
+# The edited criterion leaves AC_NOT_TESTABLE's quote unverified: since
+# seam-gate-safety G5 (review C1) the round limit never demotes an unverified
+# finding, so only the verified EDGE_CASE_GAP is demoted.
+_check "lineage_from: MAX_ROUNDS=1 demotes the verified non-structural finding round-limit, never the unverified one" \
+  [ "$(echo "$p" | jq -r '[.findings[] | select(.demoted == "round-limit") | .code] | join(",")'),$(echo "$p" | jq -r '[.findings[] | select(.verified == false) | .severity] | join(",")')" = "EDGE_CASE_GAP,blocking" ]
 p0=$(dor_semantic_lineage_from null "$body2" "$h2" "$fj" '[]')
 _check "lineage_from: a null prior gives round 1, every finding new" \
   [ "$(echo "$p0" | jq -r '"\(.lineage.round) \([.findings[].lineage] | unique | join(","))"')" = "1 new" ]

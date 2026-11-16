@@ -11,8 +11,14 @@
 # Trailing whitespace after the hash line is ignored by verification.
 #
 # Exports:
-#   grill_seal_generate  <doc-path> <profile-id> <readiness> <recommendation> <rounds> <generated-iso>
-#     Appends an ## Intent Seal block. Refuses to seal an already-sealed file.
+#   grill_seal_generate  <doc-path> <work-dir>
+#     Appends an ## Intent Seal block whose Profile, Readiness, Recommendation
+#     and Rounds come from <work-dir>/result.json, never from arguments.
+#     Refuses, writing nothing, when result.json is missing, unparseable, out
+#     of contract or behind assessment.json's round, or the file is sealed.
+#
+# The seal is tamper-evident, not cryptographically signed: the hash is plain
+# unkeyed SHA-256, so anyone can re-seal an edited file.
 #
 #   grill_seal_verify  <doc-path>
 #     Exit 0 VALID, 2 missing/unreadable, 3 NO_SEAL, 4 MISMATCH.
@@ -33,13 +39,20 @@ _grill_telemetry_call() {
 }
 
 # ── grill_seal_generate ───────────────────────────────────────────────────────
+# grill_seal_generate <doc-path> <work-dir>
+# Seal values are read from <work-dir>/result.json (grill_score's output, after
+# any grill_seal_with_gaps_prepare downgrade), never passed in: the agent copies
+# nothing into the seal. Generated is stamped here (UTC). Every check runs
+# before the document is touched, so a refusal leaves it byte for byte as it
+# was. Exit 1 refused (bad call, already sealed, result.json unusable or
+# behind assessment.json's round), 2 document not found.
 grill_seal_generate() {
-  local doc_path="$1"
-  local profile="$2"
-  local readiness="$3"
-  local recommendation="$4"
-  local rounds="$5"
-  local generated="$6"
+  if [ "$#" -ne 2 ]; then
+    echo "grill-seal: usage: grill_seal_generate <doc-path> <work-dir> — readiness, recommendation, round and profile come from <work-dir>/result.json, never from arguments; nothing sealed" >&2
+    return 1
+  fi
+  local doc_path="$1" work_dir="$2"
+  local result="${work_dir}/result.json"
 
   if [ ! -f "$doc_path" ]; then
     echo "grill-seal: document not found: ${doc_path}" >&2
@@ -51,6 +64,43 @@ grill_seal_generate() {
     echo "grill-seal: document already contains an Intent Seal — refusing to double-seal" >&2
     return 1
   fi
+
+  if ! command -v jq >/dev/null 2>&1; then
+    echo "grill-seal: jq not available — cannot read ${result}; nothing sealed" >&2
+    return 1
+  fi
+  if [ ! -f "$result" ]; then
+    echo "grill-seal: no score: ${result} not found — run grill_score first; nothing sealed" >&2
+    return 1
+  fi
+  local fields=""
+  # shellcheck disable=SC2016 # jq program, not shell
+  fields=$(jq -r '
+      if type == "object"
+        and (.profile | type == "string") and (.profile | test("^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"))
+        and (.readiness | type == "number") and (.readiness | floor == .) and .readiness >= 0 and .readiness <= 100
+        and (.recommendation | IN("ready", "proceed-with-warnings", "do-not-proceed"))
+        and (.round | type == "number") and (.round | floor == .) and .round >= 1
+      then [.profile, (.readiness | tostring), .recommendation, (.round | tostring)] | join(" ")
+      else empty end' "$result" 2>/dev/null) || fields=""
+  if [ -z "$fields" ]; then
+    echo "grill-seal: ${result} is unparseable or out of contract (profile id, integer readiness 0-100, known recommendation, round >= 1); nothing sealed" >&2
+    return 1
+  fi
+  local profile readiness recommendation rounds generated
+  read -r profile readiness recommendation rounds <<<"$fields"
+
+  # A result.json from an earlier round than the assessment is stale: the
+  # agent re-assessed but did not re-score.
+  local assessment="${work_dir}/assessment.json" a_round=""
+  if [ -f "$assessment" ]; then
+    a_round=$(jq -r '.round // 1' "$assessment" 2>/dev/null) || a_round=""
+    if [ "$a_round" != "$rounds" ]; then
+      echo "grill-seal: ${result} is from round ${rounds} but assessment.json is at round ${a_round:-?} — re-score before sealing; nothing sealed" >&2
+      return 1
+    fi
+  fi
+  generated=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
   # Ensure file ends with exactly one newline
   sed -i -e :a -e '/^\n*$/{$d;N;ba' -e '}' "$doc_path" 2>/dev/null || true
@@ -183,7 +233,7 @@ grill_seal_verify() {
 if [ "${BASH_SOURCE[0]}" = "$0" ]; then
   if [ $# -lt 2 ]; then
     echo "Usage:" >&2
-    echo "  grill-seal.sh generate <doc> <profile> <readiness> <rec> <rounds> <generated>" >&2
+    echo "  grill-seal.sh generate <doc> <work-dir>" >&2
     echo "  grill-seal.sh verify <doc>" >&2
     exit 1
   fi

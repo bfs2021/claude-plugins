@@ -1,0 +1,14 @@
+=== DOR_SEMANTIC_SCAN ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-backend-scaffold
+BODY_HASH: sha256:c8ac1cdfce636908c4dd85f97946be6083bd0a676608bf200cc38192431fdec2
+PARAPHRASE: Scaffold the backend/ Express project in app (app factory, server on PORT or 3000, seeded in-memory store, error-envelope helpers, node:test smoke tests behind npm test, .gitignore) and document how to start it in the CLAUDE.md Build & Test table.
+GAP_REQUIREMENT_COMPLETENESS: clear
+GAP_REQUIREMENT_COMPLETENESS_REASON: The edited criteria cover npm test, both port paths, the 404 handler, seed users and articles, store lookup casing, bcrypt cost, error envelopes, .gitignore and both CLAUDE.md row edits.
+GAP_CONTRADICTORY_REQUIREMENTS: clear
+GAP_CONTRADICTORY_REQUIREMENTS_REASON: The edited criteria and Verification Plan rows agree with Proposed Changes, Technical Context and the seed data, row for row.
+GAP_DEEP_SCOPE_AMBIGUITY: clear
+GAP_DEEP_SCOPE_AMBIGUITY_REASON: The edited sections stay inside the Scope table's files and the two named CLAUDE.md rows.
+GAP_EDGE_CASE_SUFFICIENCY: clear
+GAP_EDGE_CASE_SUFFICIENCY_REASON: The plausible edge cases are covered by the edited criteria: email case-insensitivity, exact username case, PORT override vs default, and a run with no server up.
+=== END DOR_SEMANTIC_SCAN ===

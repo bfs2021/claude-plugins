@@ -17,12 +17,15 @@
 # are relative to the current directory, as spawn_capture's are.
 #
 # post-spawn — runs after the agent's return is written to --result-file and
-# BEFORE spawn_agent_post (the router still picks RESULT=/VERDICT=):
+# BEFORE spawn_agent_post (VERIFY/PR-REVIEW RESULT=/VERDICT= come from 3b):
 #   1. spawn_capture TICKET_ID PHASE RESULT_FILE [ATTEMPT=--attempt]
 #      → ./logs/<TID>-<phase>-agent.log (append per attempt when ATTEMPT is set)
 #   2. IMPLEMENT | VERIFY | PR-REVIEW: phase-result-parse.sh on that capture
 #      (advisory, writes META|phase-result|info|{json}; || true)
-#   3. VERIFY: verdict-recompute.sh --ticket-dir D (advisory, META|claim-delta)
+#   3. VERIFY: verdict-recompute.sh --ticket-dir D (META|claim-delta)
+#   3b. VERIFY | PR-REVIEW: phase-route.sh over the log → prints
+#      ROUTE_RESULT= / ROUTE_VERDICT= / ROUTE_SOURCE= (seam audit Track 0.2).
+#      The router passes them to spawn_agent_post, which enforces them.
 #   4. IMPLEMENT: return-completeness-check.sh --repos-root R; when the status
 #      is not `complete`, writes
 #        META|gate-warn|info|RETURN_INCOMPLETE — <REASON> (unchecked=U/T, artifact=A)
@@ -165,8 +168,16 @@ _rs_post_spawn() {
   local _capture="./logs/${_rs_tid}-${_rs_phase_lower}-agent.log"
   case "$_rs_phase" in
   IMPLEMENT | VERIFY | PR-REVIEW)
-    # Advisory, observe-only: exit 1 (absent/malformed block →
-    # claimed_verdict=UNKNOWN) is normal and nothing routes on it.
+    # VERIFY / PR-REVIEW route on the parser's record (phase-route.sh). The
+    # agent has returned and can no longer write the log, so this anchor
+    # marks where bash's own lines begin: phase-route.sh reads only the
+    # first record after the last anchor, never a line the agent wrote.
+    case "$_rs_phase" in
+    VERIFY | PR-REVIEW) _rs_plog META phase-route-anchor info "$_rs_phase attempt=${_rs_attempt:-1}" ;;
+    esac
+    # Exit 1 (absent/malformed block → claimed_verdict=UNKNOWN) is normal.
+    # IMPLEMENT: advisory. VERIFY / PR-REVIEW: routed by phase-route.sh; an
+    # exit 2 (nothing logged) leaves no record after the anchor → no verdict.
     bash "$_RS_DIR/phase-result-parse.sh" --phase "$_rs_phase" \
       --return-file "$_capture" \
       --log-file "$_rs_log_file" >/dev/null 2>&1 || true
@@ -174,12 +185,29 @@ _rs_post_spawn() {
   esac
 
   if [ "$_rs_phase" = VERIFY ]; then
-    # Advisory, observe-only: never gates, never halts on a mismatch.
+    # Never halts; an optimistic delta on fresh evidence fails the route.
     bash "$_RS_DIR/verdict-recompute.sh" --phase VERIFY \
       --return-file "$_capture" \
       --ticket-dir "$_rs_ticket_dir" \
       --log-file "$_rs_log_file" >/dev/null 2>&1 || true
   fi
+
+  case "$_rs_phase" in
+  VERIFY | PR-REVIEW)
+    # The routing decision (seam audit Track 0.2): the router passes these
+    # to spawn_agent_post as RESULT=/VERDICT=, and spawn_agent_post enforces
+    # them anyway. Missing/invalid PHASE_RESULT → VERIFY fail, PR-REVIEW BLOCK.
+    local _route=""
+    _route=$(bash "$_RS_DIR/phase-route.sh" "$_rs_phase" "$_rs_log_file" 2>/dev/null) || _route=""
+    if [ -n "$_route" ]; then
+      printf '%s\n' "$_route"
+    elif [ "$_rs_phase" = VERIFY ]; then
+      printf 'ROUTE_RESULT=fail\nROUTE_VERDICT=FAIL\nROUTE_SOURCE=route-unavailable\n'
+    else
+      printf 'ROUTE_RESULT=done\nROUTE_VERDICT=BLOCK\nROUTE_SOURCE=route-unavailable\n'
+    fi
+    ;;
+  esac
 
   if [ "$_rs_phase" = IMPLEMENT ]; then
     local _rcc_out="" RETURN_COMPLETENESS_STATUS="" REASON="" UNCHECKED_COUNT="" TOTAL_COUNT="" ARTIFACT_TYPE=""

@@ -639,7 +639,7 @@ OWN_SPECIFY_HEADINGS=', `## Writes`, `## Reads`'
 # The prompts as they were before planner-ac-code-precondition, i.e. as
 # planner-crosscheck-ownership PR B left them (intermediate pins, design D12),
 # and the lines that change inserted (task 5.4).
-SPECIFY_PRE_ACPRE_SHA="93bbc0bb60710543ba7928ade772f06a57e6f82574e997f41d9bfd4a59fee06a"
+SPECIFY_PRE_ACPRE_SHA="c0ba2fa706aae662e817941b045c83a85b4588841f31b25de8dfe63b633c0a7a"
 CONSENSUS_PRE_ACPRE_SHA="5273988daab593aa79d78e700c9ac45ca52467ccd1f25fc908be24f9b9abf570"
 ACPRE_SPECIFY_BULLET='8. **## Preconditions** — the stored starting state each acceptance criterion needs (rules below)'
 ACPRE_SPECIFY_HEADINGS=', `## Preconditions`'
@@ -686,6 +686,52 @@ _strip_inserted_blocks() {
 
 _sha() { printf '%s' "$1" | sha256sum | cut -d' ' -f1; }
 
+# seam-bash-derives replaced the count placeholders in the agents' status
+# lines (rehearsal F67/F70) after every capture below. Put the old wording
+# back before hashing, so the earlier pins keep their values.
+_seam_revert() {
+  local p="$1"
+  p="${p//\"Synthesizing proposal and writing ticket specs\"/\"Synthesizing proposal and writing specs for N tickets\"}"
+  p="${p//\"Proposal and ticket specs written to artifacts\/specs\/, self-lint clean\"/\"Proposal written, N ticket specs in artifacts\/specs\/, self-lint clean\"}"
+  p="${p//\"Resolving review findings\"/\"Resolving N review findings\"}"
+  p="${p//\"Consensus written to artifacts\/consensus.md\"/\"Consensus: X accepted, Y rejected, Z deferred\"}"
+  # Slice 2: the disposition heading shape, and bash (not the agent) writing
+  # the CITED_ARTIFACT lines.
+  local new old
+  new='   - **Findings Addressed** — one `### <id> — <severity> — <title> — <disposition>`
+     heading per review finding, its disposition last and exactly one of accepted,
+     rejected or deferred (bash counts these headings), and what changed (if anything),
+     naming the acceptance criterion you added or changed for it (see below)'
+  old='   - **Findings Addressed** — each review finding, its disposition (accepted/rejected/deferred),
+     and what changed (if anything), naming the acceptance criterion you added or
+     changed for it (see below)'
+  p="${p//"$new"/"$old"}"
+  new='asked at this gate: "is it coming, or should it be synthesised?". Bash writes
+one `CITED_ARTIFACT:` line per such artifact into consensus.md'"'"'s
+`## Open Questions` section after this phase ends, and rewrites any line of
+yours that names one — do not write those lines yourself. To see them:'
+  old='asked at this gate: "is it coming, or should it be synthesised?". Bash renders
+the questions — copy its output verbatim into consensus.md'"'"'s
+`## Open Questions` section, do not paraphrase it:'
+  p="${p//"$new"/"$old"}"
+  new='Each line ends `Answer: PENDING`. You cannot answer for the operator.
+Crosscheck blocks'
+  old='Each line ends `Answer: PENDING`. Leave it PENDING — you cannot answer for the
+operator. Crosscheck blocks'
+  p="${p//"$new"/"$old"}"
+  new='   - **Open Questions** — questions only the operator can answer (bash adds one
+     line per cited artifact Discovery could not retrieve — see below)'
+  old='   - **Open Questions** — questions only the operator can answer, including one
+     line per cited artifact Discovery could not retrieve (see below)'
+  p="${p//"$new"/"$old"}"
+  new='- Every behaviour sentence you added or changed'
+  old='- Every NOT FOUND cited artifact has its `CITED_ARTIFACT:` line in `## Open Questions`,
+  copied verbatim from `planner_cited_artifacts_questions`.
+- Every behaviour sentence you added or changed'
+  p="${p//"$new"/"$old"}"
+  printf '%s' "$p"
+}
+
 # The ownership blocks of each prompt, in strip order.
 own_specify_blocks() {
   OWN_BLOCKS=("$(planner_ownership_prompt_rules)" "$OWN_SPECIFY_BULLET" "inline:${OWN_SPECIFY_HEADINGS}")
@@ -704,6 +750,15 @@ if need "$name" planner_params_prompt_rules planner_ownership_prompt_rules plann
   source "${LIB_DIR}/planner-phase-prompts.sh"
   sp=$(planner_prompt_specify "INIT-TEST" "an idea" "/repos/.ticket-auto/initiatives/INIT-TEST")
   sp="${sp//$REPOS_ROOT/<REPOS_ROOT>}"
+  sp=$(_seam_revert "$sp")
+  # The sibling rules (rehearsal F38/F43, test-planner-sibling-rules.sh) came
+  # after every capture below: strip them first so the earlier pins hold.
+  sp=$(_strip_inserted_blocks "$sp" "inline:"$'\n\n'"$(planner_sibling_blocker_rule)" "$(planner_sibling_citation_rule)")
+  # The code-span self-lint (rehearsal F53) came after the sibling rules:
+  # strip its two command lines and its note the same way.
+  sp=$(_strip_inserted_blocks "$sp" \
+    "inline:"$'source "${CLAUDE_PLUGIN_ROOT}/lib/planner-crosscheck-codespan.sh"\nplanner_crosscheck_codespan "INIT-TEST"\n' \
+    "inline:"$'\nA `CODE_SPAN_EDGE_SPACE` line means an inline code value starts and ends\nwith a space, which markdown drops: quote the value inside the span\n(`"  a b "`) so the spaces a test depends on survive.\n')
   own_specify_blocks
   acpre_specify_blocks
   st=$(_strip_inserted_blocks "$sp" "$(planner_params_prompt_rules)" "$SPECIFY_BULLET" "${ACPRE_BLOCKS[@]}" "${OWN_BLOCKS[@]}")
@@ -747,6 +802,10 @@ name="Consensus prompt is the pre-change prompt plus the rule blocks"
 if need "$name" planner_params_consensus_rule planner_ownership_consensus_rule planner_acpre_consensus_rule planner_goldfish_consensus_rule planner_prompt_consensus; then
   cp=$(planner_prompt_consensus "INIT-TEST" "an idea" "/repos/.ticket-auto/initiatives/INIT-TEST")
   cp="${cp//$REPOS_ROOT/<REPOS_ROOT>}"
+  cp=$(_seam_revert "$cp")
+  # Sibling rules: stripped first, as for Specify above.
+  _sib_sec=$(planner_sibling_citation_consensus_section "INIT-TEST")
+  cp=$(_strip_inserted_blocks "$cp" "$(planner_sibling_blocker_rule)" "inline:${_sib_sec//$REPOS_ROOT/<REPOS_ROOT>}"$'\n\n')
   GOLDFISH_BLOCKS=("$(planner_goldfish_consensus_rule)")
   ct=$(_strip_inserted_blocks "$cp" "${GOLDFISH_BLOCKS[@]}" "$(planner_params_consensus_rule)" "$(planner_acpre_consensus_rule)" "$(planner_ownership_consensus_rule)")
   got=$(_sha "$ct")

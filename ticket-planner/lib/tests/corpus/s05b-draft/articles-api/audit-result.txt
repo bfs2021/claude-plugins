@@ -1,0 +1,7 @@
+=== DOR_SEMANTIC_AUDIT ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-articles-api
+BODY_HASH: sha256:9c4f9e37d70bcd5025fc76a977cf542aec3b8ade451b79eb9e7488bf92660c3f
+SCORE_PLAUSIBLE: yes
+SCORE_REASON: No dor_quality_score is present in the deterministic result; its status "ready" with empty missing and advisory arrays is plausible, since every behaviour in Proposed Behaviour has a concrete criterion, the seeded data is listed with its source, and both blocking tickets are named.
+=== END DOR_SEMANTIC_AUDIT ===

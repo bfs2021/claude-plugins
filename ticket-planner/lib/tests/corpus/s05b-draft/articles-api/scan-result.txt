@@ -1,0 +1,14 @@
+=== DOR_SEMANTIC_SCAN ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-articles-api
+BODY_HASH: sha256:9c4f9e37d70bcd5025fc76a977cf542aec3b8ade451b79eb9e7488bf92660c3f
+PARAPHRASE: Add three article endpoints to the backend (token-protected create with a lower-case a-z0-9 slug rule and numeric collision suffixes, public read-by-slug, public list with author filter, newest-first ordering and limit/offset paging), with blank-field 422, 401 and 404 error bodies, plus unit and API tests covering each case.
+GAP_REQUIREMENT_COMPLETENESS: clear
+GAP_REQUIREMENT_COMPLETENESS_REASON: Every behaviour in Proposed Behaviour (create, slug rule and collisions, blank rules incl. non-string and missing wrapper, token-before-body, read, 404, list ordering, tie order, author filter, count, paging defaults and invalid paging) has at least one acceptance criterion and a matching Verification Plan row.
+GAP_CONTRADICTORY_REQUIREMENTS: clear
+GAP_CONTRADICTORY_REQUIREMENTS_REASON: The changed criteria, test data list and Verification Plan rows agree with each other and with Proposed Behaviour, the decided parameters and the seeded data in Technical Context; no two requirements disagree.
+GAP_DEEP_SCOPE_AMBIGUITY: clear
+GAP_DEEP_SCOPE_AMBIGUITY_REASON: Scope names four concrete files in one service, Out of Scope excludes edit/delete, tags, comments, favorites, feed, extra filters and a limit cap, and both blocking tickets are named.
+GAP_EDGE_CASE_SUFFICIENCY: clear
+GAP_EDGE_CASE_SUFFICIENCY_REASON: Empty-slug titles, accented and non-Latin titles, seeded-slug collisions, repeated collisions, non-string and whitespace-only fields, wrong auth scheme, invalid/negative/fractional/zero paging, offset past the end, unknown and case-mismatched author, the 21-record default limit and equal-createdAt ordering are all covered by criteria.
+=== END DOR_SEMANTIC_SCAN ===

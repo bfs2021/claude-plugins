@@ -1,0 +1,14 @@
+=== DOR_SEMANTIC_SCAN ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-auth-pages
+BODY_HASH: sha256:6ee671bc9a3a4db9db01fb1f933785166bfc776eccc2f3dbbb44092d064cc2ea
+PARAPHRASE: Replace the placeholder sign-in and sign-up page modules with working forms that post to the existing users API, store the returned token under jwt in localStorage, re-render the header as signed in and go to the home page, and on an API rejection show the API's error lines above the form while keeping the field contents and leaving the token untouched.
+GAP_REQUIREMENT_COMPLETENESS: clear
+GAP_REQUIREMENT_COMPLETENESS_REASON: Every described behaviour (both forms, token storage, header change, redirect home, reload persistence, each error line, field retention, unchanged localStorage) has a matching acceptance criterion and Verification Plan row.
+GAP_CONTRADICTORY_REQUIREMENTS: clear
+GAP_CONTRADICTORY_REQUIREMENTS_REASON: Summary, Proposed Behaviour, Technical Context, parameters and criteria agree on paths, status codes, error texts and the jwt key; no two requirements disagree.
+GAP_DEEP_SCOPE_AMBIGUITY: clear
+GAP_DEEP_SCOPE_AMBIGUITY_REASON: Scope names the two page modules, the router is stated unchanged, the only edit outside them (correcting errors.js if a line renders wrongly) is explicitly authorised and bounded, and Out of Scope lists the adjacent features.
+GAP_EDGE_CASE_SUFFICIENCY: clear
+GAP_EDGE_CASE_SUFFICIENCY_REASON: Wrong password, unknown email, blank fields, taken email and taken username are covered, the re-run state of newauthor is addressed by the backend-restart note, and the seeded user jake is listed with its source.
+=== END DOR_SEMANTIC_SCAN ===

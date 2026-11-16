@@ -14,12 +14,12 @@ Take one idea through grill-me → ticket-planner → `--create` → fleet dry-r
 
 - [ ] **Work root.** Pick a dedicated work root and export it:
   - `export WORK=<dir> REPOS_ROOT=<dir>`, where both are the same directory.
-  - Only the target repo clone may live under it, because fleet dry-run enumerates every git repo under `REPOS_ROOT` and runs `git fetch` in each.
-- [ ] **Target repo.** The clone needs an `origin` remote, because the epic branch step fetches it. Record the clean starting commit in `rehearsal/base.sha`; section 6 resets to it before every full run. Its `CLAUDE.md` carries `REPOS_ROOT`, `LOCAL_URL`/`UAT_URL` and the test users. The env checks read `REPOS_ROOT` from that file, not the environment, so point it at the work root and run `git update-index --skip-worktree CLAUDE.md`. Agents otherwise see an uncommitted change and plan around it (F7, F35). The rehearsal stops at dry-run, so nothing needs to commit that file; undo with `--no-skip-worktree` before any real dispatch.
+  - Only the target repo clone may live under it. Fleet dry-run enumerates every git repo under `REPOS_ROOT` and runs `git fetch` in each, and every planner phase agent can read any file under it.
+- [ ] **Target repo.** The clone needs an `origin` remote, because the epic branch step fetches it. Record the clean starting commit in `$REHEARSAL/base.sha` (the rehearsal folder, below); section 6 resets to it before every full run. Its `CLAUDE.md` carries `REPOS_ROOT`, `LOCAL_URL`/`UAT_URL` and the test users. The env checks read `REPOS_ROOT` from that file, not the environment, so point it at the work root and run `git update-index --skip-worktree CLAUDE.md`. Agents otherwise see an uncommitted change and plan around it (F7, F35). The rehearsal stops at dry-run, so nothing needs to commit that file; undo with `--no-skip-worktree` before any real dispatch.
 - [ ] **Environment checks.** Run `/fleet-controller:fleet-env-check` and `/ticket-auto-pipeline:ticket-env-check`. Fix every problem before iteration 1, so environment issues never count as findings.
-- [ ] **Rehearsal folder.** Create `$WORK/rehearsal/`, then:
-  - Write the brief to `idea.md`.
-  - Record `sha256sum idea.md` in `rehearsal/brief.sha`.
+- [ ] **Rehearsal folder.** Create it **outside** the work root and export it: `export REHEARSAL=<dir>`, for example a sibling `<work>-rehearsal/`. It holds the findings and every earlier run's specs and reports. Under `REPOS_ROOT` a phase agent reads them and shapes its specs to the known findings, which makes the run invalid (F46). Then:
+  - Write the brief to `$REHEARSAL/idea.md`.
+  - Record `sha256sum idea.md` in `$REHEARSAL/brief.sha`.
 - [ ] **Tracker target.** Decide the team, the project and a tracker label (e.g. `rehearsal`). Every created issue gets that label and an `[R<n>]` title prefix.
 - [ ] **Holdout.** Choose a second, unseen idea now. It runs once after the main idea converges.
 
@@ -33,16 +33,17 @@ Without these rules, the loop converges by making the input easier or the gates 
   - add a fixture for the false positive;
   - keep `ticket-auto-pipeline/lib/tests/fixtures/dor/20-28` failing with the same codes;
   - be reviewed by a separate reviewer agent before commit.
+  These rules also cover the seam plan's gate-policy work (next.md Step 19, G4–G6): demotions, Refinement parity and the DoR-evaluator retry.
 - **Negative control, every iteration.** Copy a passing child body and remove one `Source:` line or the Test User credentials. Then confirm `check_ticket_ready` or `check_planned_body` fails on the copy.
 - **The clean counter resets to 0** on any code or gate commit.
 - **Never** hand-edit a generated ticket, `body.md` or manifest. Never waive a code to get a pass.
 
 ## 3. Iteration checklist
 
-Put each iteration's output in `$WORK/rehearsal/iter-NN/`.
+Put each iteration's output in `$REHEARSAL/iter-NN/`. Paths below that start with `iter-NN/` are relative to `$REHEARSAL`.
 
-- [ ] **grill-me** (full runs only). Set `GRILL_WORK_DIR=$WORK/rehearsal/iter-NN/grill` first: grill-me needs `GRILL_WORK_DIR` or `REPOS_ROOT` in every mode and has no default output path (F37). Run `/grill-me --file idea.md --emit-questions <dir>`. Answer each round with an `--answers` file as the product owner, and archive the round files. Target: verdict `ready`, score ≥ 80.
-- [ ] **Plan.** Run `/ticket-planner plan <intent.md>`, then `/ticket-planner resume <INIT> --create --team <T> --project "<P>"`. Any halt is a finding.
+- [ ] **grill-me** (full runs only). Set `GRILL_WORK_DIR=$REHEARSAL/iter-NN/grill` first: grill-me needs `GRILL_WORK_DIR` or `REPOS_ROOT` in every mode and has no default output path (F37). Run `/grill-me --file $REHEARSAL/idea.md --emit-questions <dir>`. Answer each round with an `--answers` file as the product owner, and archive the round files. Target: verdict `ready`, score ≥ 80.
+- [ ] **Plan.** Run `/ticket-planner plan <intent.md>`, then `/ticket-planner resume <INIT> --create --team <T> --project "<P>"`. Any halt is a finding. A run in which an agent read the rehearsal folder or an earlier initiative's artifacts is invalid: discard it and record why (F46).
 - [ ] **Collect.** Copy the following into the iteration folder:
   - `state.log`;
   - the Crosscheck output and `testdata-synth.json`;
@@ -67,8 +68,15 @@ Put each iteration's output in `$WORK/rehearsal/iter-NN/`.
     `UNMEASURED` stays `UNMEASURED`. Never estimate.
   - **Human input:** each answer file and each manual edit, with the phase it unblocked.
   - **Findings:** the IDs added to `findings.md` by this run.
+  - **Blocks:** every blocking finding (Crosscheck, draft gate, Refinement), one row each, labelled
+    `true` (a real plan defect), `false` (the gate misread a good plan), `checker bug`, `format`
+    (the model's output broke a format rule) or `env`; plus the warnings the gate raised instead
+    of blocking (`TEST_DATA_IMPLIED_WEAK`, `META|draft-readiness|warn|`), each labelled the same way,
+    and the number of revisions applied. Same labels as `$REHEARSAL/block-audit.md`, so runs
+    compare by halts and false-positive rate, not only pass or fail.
   The run is not finished until this file exists. Without it, runs cannot be compared later.
 - [ ] **Classify** every non-zero row of `preflight.tsv` and every planner halt into `findings.md`, one class each (section 4).
+- [ ] **Corpus case first.** Every halt becomes a corpus case before its fix. Copy the halted artifacts (only the sections a check reads) into a local tree outside REPOS_ROOT, run `scripts/corpus-scrub.sh <raw> ticket-planner/lib/tests/corpus/<snap>` (with the sandbox's private names, owner, tracker key and path prefix in the uncommitted `~/.config/claude-plugins/corpus-private-names`), read the output, add its `MANIFEST.tsv` and `labels.tsv` rows (`expected` is the verdict you decided on, not what the code said), and commit the replay case red, in the same PR as the fix. `test-corpus-privacy.sh` must pass. Never put a corpus, or a checkout that holds one, under REPOS_ROOT: `/ticket-planner doctor` refuses it (F46).
 - [ ] **Fix.** Make one commit per fix, each with a regression test. A new `lib/tests` file also needs its Makefile line.
 - [ ] **Re-run from the cheapest step** the fix affects (section 4).
 
@@ -80,6 +88,8 @@ Put each iteration's output in `$WORK/rehearsal/iter-NN/`.
 | **B** | The planner emitted a wrong or missing section, Source, credential or Verification Plan row | `ticket-planner/lib/*` or the phase prompts. Use openspec if the change alters what the planner emits | `/ticket-planner replan <INIT>` on the same intent |
 | **C** | A gate rejected a correct body | `dor-check.sh`, `gate-check.sh` or critique, following the freeze rules | preflight only, on the same tickets |
 | **D** | Environment or harness | setup, or `scripts/e2e-preflight.sh` | the step that failed |
+
+A same-intent rerun for class B is `/ticket-planner replan <INIT>` only when the run got past `--create`: `replan` regenerates existing tickets. For a run that halted earlier, abandon its initiative (section 6) and run `/ticket-planner plan` again on the same sealed intent. Neither counts toward the cap.
 
 ## 5. Exit criteria
 
@@ -94,9 +104,18 @@ The idea passes after **two fresh full runs in a row**, after the last code chan
   - `blocked-edges` is clean;
 - the negative control failed as expected.
 
+Warnings count too (added 2026-11-15, seam plan G7):
+
+- Every warning a gate raised is listed in `run-record.md` with a label: `true` (a real plan gap), `false` (the check was wrong) or `debatable`.
+- An independent reviewer agent, which did not run the iteration, checks the labels.
+- A run is not clean if it has a `debatable` label, an unlabelled warning, or a warning labelled `true` on a code of a blocking class. The last two are leaks: a gate let a real problem through.
+- A ticket the semantic evaluator did not evaluate never counts toward a clean run.
+- Report the run's total warnings and unevaluated tickets in `run-record.md`.
+- Any change to a gate's policy (block, warn, demote) resets the clean-run counter, the same as a code change.
+
 Then run the holdout idea once. A class B or C failure there means the fixes overfit to the main idea. Report it; don't loop on it.
 
-**Cap:** 10 full runs per idea (raised from 6 on 2026-11-07, because a late failure at 6 would have left no room for the two consecutive clean runs above). Preflight-only and `replan` reruns don't count toward the cap. At the cap, stop and report what remains.
+**Cap:** 15 full runs per idea (raised from 6 on 2026-11-07 and from 10 on 2026-11-15, because a late failure would have left no room for the two consecutive clean runs above). Preflight-only and `replan` reruns don't count toward the cap. At the cap, stop and report what remains.
 
 ## 6. Cleanup
 

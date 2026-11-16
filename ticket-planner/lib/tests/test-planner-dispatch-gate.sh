@@ -13,6 +13,9 @@
 set -o pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# These scenarios exercise TEST_DATA_IMPLIED in its blocking mode. Since the
+# rehearsal block audit it warns by default; opt back in here.
+export PLANNER_TESTDATA_IMPLIED_BLOCKS=true
 LIB_DIR="${SCRIPT_DIR}/.."
 GOLDEN_DIR="${SCRIPT_DIR}/fixtures/halt-goldens"
 
@@ -88,7 +91,7 @@ fresh_root proceed
 planner_state_init "$INIT" "an idea" >/dev/null
 _halt_done "$INIT" Appraisal Discovery Architecture Specify Review Consensus Crosscheck
 for args in "pre Appraisal" "pre Crosscheck" "pre Review" "create TicketGen" "adr Architecture" \
-  "adr Specify" "stop Review" "consensus Crosscheck" "specify Review"; do
+  "adr Specify" "post Architecture" "post Specify" "stop Review" "consensus Crosscheck" "specify Review"; do
   # shellcheck disable=SC2086
   set -- $args
   [ "$1" = create ] && planner_authorize_create "$INIT" "test" >/dev/null && planner_stop_after_set "$INIT" ""
@@ -99,6 +102,15 @@ for args in "pre Appraisal" "pre Crosscheck" "pre Review" "create TicketGen" "ad
     fail "planner_dispatch_gate ${args}" "rc=$RC out='$OUT' err='$ERR'"
   fi
 done
+
+# The post gate after Specify records the spec list bash read from disk
+# (seam-bash-derives); `pre Review` rewrites it only for a newer Specify done.
+if jq -e '.phase == "Specify" and .derived_by == "bash" and (.specs | type == "array")' \
+  "$(planner_initiative_dir "$INIT")/artifacts/phase-results/specify.json" >/dev/null 2>&1; then
+  pass "post Specify writes artifacts/phase-results/specify.json"
+else
+  fail "post Specify writes specify.json" "missing or malformed"
+fi
 
 # A consensus.md marked ready does not halt Crosscheck.
 mkdir -p "$(planner_initiative_dir "$INIT")/artifacts"

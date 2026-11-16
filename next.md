@@ -1561,7 +1561,7 @@ This is the live check of Step 12 item 0, and it will likely re-hit Step 12 item
       fix), blocker classes A-D, exit criteria. Reusable per idea; not openspec.
 - [ ] 3. Loop on Conduit-lite (RealWorld subset: auth + articles; tags at first clean) in
       dexter-sandbox, WIL / "Dexter Sandbox", `rehearsal` label. Exit: two clean fresh full runs
-      after the last code change, ending at fleet dry-run (user, 2026-11-07: no real `ticket-auto` dispatch for now). Cap ~~4~~ ~~6~~ 10 full runs (raised 2026-11-07). Holdout: comments + favorites slice, run once.
+      after the last code change, ending at fleet dry-run (user, 2026-11-07: no real `ticket-auto` dispatch for now). Cap ~~4~~ ~~6~~ ~~10~~ 15 full runs (raised 2026-11-07; to 15 on 2026-11-15). Holdout: comments + favorites slice, run once.
       Fixes: class C/D as commit + test; class B or grill-me profile changes get their own openspec.
       - **Iter 01 (2026-10-24): FAIL**, full run 1 of 4. Work root
         `/home/mortal/workspace/workbench/e2e-conduit`. Grill-me sealed `ready` (54 → 100, 2 rounds).
@@ -1668,8 +1668,106 @@ This is the live check of Step 12 item 0, and it will likely re-hit Step 12 item
         - [ ] Before iter 05: the grill-me + planner self-assessment prompt is at
               `~/.claude/plans/grill-planner-self-assessment-prompt.md` (runs 05/06 rows are `<FILL IN>`). Every
               rehearsal run now writes `iter-NN/run-record.md` (runbook §3).
-        - [ ] Watch in iter 05 (F34): no revision has yet been evaluated after applying, so the loop's second half is
-              unproven live.
+        - [x] Watch in iter 05 (F34): closed. Iter 05 applied 7 revisions over 2 rounds and the 4 re-evaluated
+              specs all came back `ready`.
+      - **Iter 05 (2026-11-13): FAIL**, full run 5 of 10. Grill-me 0.6.0 sealed `ready` (80, 1 round, no
+        questions). `INIT-1794584184-3869` (9 specs: 7 + 2 synthesized test-data) halted first at Crosscheck
+        (F38 citation marker, F39 `TEST_DATA_IMPLIED` false positive; both hand-patched), then at the draft
+        gate: `DRAFT_NOT_READY` 3/9 after 2 revise rounds, 34/72 spawns. No Linear writes. F36 held (empty repo
+        recorded correctly); F33 fix held (in-loop Crosscheck clean on every apply). Record:
+        `e2e-conduit/rehearsal/iter-05/run-record.md`, findings F38–F45 in `rehearsal/findings.md`.
+        - [ ] F42 (C, main): `planner-testdata-synth.sh:763,799` puts a foreign-key criterion in every
+              synthesized test-data spec; for file or worktree data the audit raises structural
+              `INTENT_AC_MISMATCH`, which no revise can clear. Blocked 2/9.
+        - [ ] F43 (C): frontend-editor `UNSTATED_DEPENDENCY` on a blocker that exists transitively
+              (via frontend-auth-pages). Structural, so never revised. Blocked 1/9.
+        - [ ] F38 (B): prompts lack a marker rule for "file created by an earlier ticket in this initiative".
+        - [ ] F39 (C): `TEST_DATA_IMPLIED` matches a backtick-quoted literal.
+        - [ ] F40 (B, warn): params rule vs ownership rule (`OWN_UNDECLARED_REF` ×7). F44 (B, minor): revise of
+              a synthesized spec adds Verification rows with test-data needs and is reverted. F45 (advisory).
+        - [x] F42, F39, F43 + F38 fixed on branch `fix/planner-iter05-findings` (worktree
+              `claude-plugins-worktrees/iter05-fixes`, planner 0.43.2, `make test` green, **not pushed**).
+              `INIT-1794584184-3869` abandoned.
+      - **Same-intent rerun (2026-11-13, "iter 05b", not a full run):** `replan` needs created tickets and
+        the Regenerate flag, so this was a fresh `plan` on the iter 05 intent with the worktree libs.
+        `INIT-1794594411-9961`, 7 specs: Crosscheck clean on the first attempt (0 warn); draft gate 6/7 ready
+        after 1 revise round; halted `DRAFT_NOT_READY` 1/7. F43 and F38 fixes held; F39 and F42 were not
+        exercised (unit tests only). Record: `rehearsal/iter-05b/run-record.md`.
+        - [x] F47 (C): fixed in PR #726 (tap 0.117.2). The scan prompt lists the codes that back each
+              `GAP_*` line; the evidence check is unchanged. Not yet exercised by a live run.
+        - [x] F46 (D): fixed in PR #726 (runbook uses `$REHEARSAL`, outside `REPOS_ROOT`). The folder
+              moved to `workbench/e2e-conduit-rehearsal/`; earlier `e2e-conduit/rehearsal/…` paths in
+              this step now mean that folder.
+        - [x] Before iter 06: PR #726 merged (098b2de), `INIT-1794594411-9961` abandoned, plugins
+              updated (planner 0.43.2, tap 0.117.2).
+      - [x] **Iter 06 (2026-11-14, full run 6 of 10): FAIL at the draft gate, 1/6.**
+        `INIT-1794651384-4164`, 6 specs. Grill ready 84 (2 rounds). First Crosscheck 1 blocking
+        (F48), 7 warn. Gate: 1 revise round, 5/6 ready, halt on project-scaffold. No Linear writes.
+        Record: `workbench/e2e-conduit-rehearsal/iter-06/run-record.md`. F43, F38, F46 held; F47 not
+        triggered; F42 not exercised.
+        - [ ] F49 (C, main): scan PARAPHRASE over 400 characters (403) makes the scan invalid; two
+              in a row give `SEMANTIC_UNAVAILABLE`, not revisable. Truncate in the parser or loosen
+              the cap.
+        - [ ] F51 (B): a no-page chore spec has no `## Navigation Path`, so `NAV_PATH_MISSING`
+              blocks and the revise agent cannot add the section.
+        - [ ] F48 (B/C): `TEST_DATA_IMPLIED` on "search of README.md for `calculator` returns 0
+              matches" (F39 variant the fix missed). Unblocked by hand.
+        - [ ] F50 (C/D): the gate hides the parse error (`2>/dev/null`) and deletes the rejected
+              result files; log the reason and keep the file.
+        - [ ] Before iter 07: fix F49, F51, F48, F50 (done on `fix/planner-iter06-findings`,
+              uncommitted); abandon `INIT-1794651384-4164`; update plugins and restart. 4 full runs
+              left; exit needs two clean runs in a row.
+        - [ ] **Change of approach (decided 2026-11-14, user).** Iterations were improving but circling
+              on gate false positives (F28 → F39 → F48 same family; F47, F49 format strictness). Order:
+              1. [x] **Block audit** (2026-11-14, `$REHEARSAL/block-audit.md`): 13 halts, 3 from real
+                 plan defects, none since iter 04. Changes on `fix/planner-iter06-findings`:
+                 TEST_DATA_IMPLIED strong → warn (`PLANNER_TESTDATA_IMPLIED_BLOCKS=true` restores);
+                 draft gate SEMANTIC_UNAVAILABLE/UNVERIFIED → warn (`PLANNER_DRAFT_WARN_CODES`);
+                 state-log repair keeps accepted/info/step/warn lines; run record labels every block.
+              2. [~] **Gate rewording tests**: `test-planner-testdata-rewording.sh` (30 wordings, 0/21
+                 false positives, 0/8 misses, 1 known: `caps \`limit\``). DoR nav/test-user rewordings
+                 still to write (only the chore/security type matrix so far).
+              3. **Iterations 07–09** with those changes; track blocks per run and false-positive rate,
+                 not only pass/fail.
+                 - [x] **Iter 07 (2026-11-14, full run 7 of 10): FAIL at Crosscheck** on F52 (checker
+                       bug, `DEPENDENCY_CYCLE` from an `append` writer's derived edge). Fixed, PR #728
+                       merged (planner 0.43.4). Diagnostic resume on the fix: Crosscheck clean, draft gate
+                       **8/8** (first ever), `--create` → epic + 8 tickets, Refinement 8/8, critique 8/8
+                       CLEAR, `PREFLIGHT PASS rows=43 failed=0`, negative control failed as expected. Not a
+                       clean run (code changed mid-run). Issues cancelled. Record:
+                       `workbench/e2e-conduit-rehearsal/iter-07/run-record.md`.
+                       - [x] F54 (D): `scripts/e2e-preflight.sh` not executable. PR #729 merged.
+                       - [x] F53 (B): Linear's description re-render is normalised; the one real change was
+                         CommonMark dropping code-span edge spaces from a test value. Warn-level Crosscheck
+                         `CODE_SPAN_EDGE_SPACE` + Specify self-lint, PR #730 merged (planner 0.43.5).
+                       - F55, F56: observations, no fix.
+                 - [x] **Iter 08 (2026-11-15, full run 8 of 10): PASS, ruled CLEAN** (1st of 2). Grill
+                       85, Crosscheck clean, draft gate 7/7, epic WIL-145 + 7 tickets, Refinement 7/7,
+                       critique 7/7 CLEAR, `PREFLIGHT PASS rows=38 failed=0`, negative control failed as
+                       expected. Harness deviation F57 (`next` called extra times, restored by hand).
+                       WIL-145..152 cancelled, INIT abandoned. Findings F57–F61 (F57 orchestration guard,
+                       F58 revise-guard reused assumption, F59 Requires grammar, F60 round-limit demotion,
+                       F61 Linear autolinks) — unfixed, classes in findings.md.
+                 - [x] **Iter 09 (2026-11-15, full run 9 of 15): FAIL at draft gate** 1/7, nothing in
+                       Linear, INIT abandoned. Same code as iter 08. 5 specs revised and cleared (6
+                       revisions, 0 reverted). Blocker F62 (C): frontend-editor round-0
+                       `INTENT_AC_MISMATCH` on a "0 `img` elements" criterion, speculative (no spec
+                       renders images) → false positive; the code is in the gate's structural list, so
+                       it halts with no revise round. F63–F66 observations. Record:
+                       `workbench/e2e-conduit-rehearsal/iter-09/run-record.md`.
+                       - [ ] F62 fix: let the draft gate revise an `INTENT_AC_MISMATCH` that names one
+                         criterion (user approved continuing, cap raised to 15).
+                 - [ ] **Iter 10+**: two consecutive clean runs on the F62 fix.
+                 - [x] **Iter 10** (2026-11-15, INIT-1794744986-6851, planner 0.43.6): FAIL at Crosscheck,
+                   `CARVE_SCOPE_LOST` (F67, checker bug: count read from the Specify `start` log line, a guess).
+                   Nothing in Linear; draft gate never reached. New F67–F70. Run 10 of 15.
+                 - **PAUSED 2026-11-15** for Step 19 (LLM ↔ script seam): halts keep coming from a
+                   recurring class, not one-off bugs. Iter 11 waits for Step 19's G1–G7.
+              4. **If 07–09 show no improvement → reverse engineering**: hand-corrected ideal tickets
+                 for the hardest specs (no-page scaffold, editor page), used as gate fixtures and to
+                 compare planner output by property, not text.
+              Later, user's call: dispatch 1–2 tickets in the sandbox to test that "ready" means
+              ticket-auto can build it.
 - [ ] 4. Follow-up, start once item 3 converges (it supplies the baseline): **chain consistency
       check**. Bash steps (dor/gate/body checks, dispatch) are already repeatable and unit-tested;
       grill-me, the planner and critique are LLM steps, so "similar results" means invariants, not
@@ -1869,6 +1967,40 @@ removed from the marketplace (#687); every kc item in this file is void. Next in
 item 6, `fleetd-shared-router-steps`, started 2026-11-11; its code merged the same day as #689, and its live run and port removal are open.
 
 ---
+
+## Step 19 — LLM ↔ script seam: "the model judges; bash knows" — planned 2026-11-15, IN PROGRESS
+
+Decided 2026-11-15 (user): Track 0 runs now, in parallel with G1–G2; G7 runbook amendment approved
+(cap 15, warning labels in the exit criterion; applied to docs/runbooks/dispatch-rehearsal.md);
+three openspec changes (seam-bash-derives, seam-gate-safety, seam-fail-closed); Track 0 and
+G1–G7 go before the other open steps, because the rehearsal (Step 16) is blocked on them.
+Done 2026-11-15: Track 0 merged — #733 (planner replan parser, 0.43.7), #734 (fleet, 0.54.0),
+#736 (ticket-auto, 0.118.0); seam-bash-derives slice 1 merged — #735 (planner 0.44.0, F67/F70).
+Next: seam-bash-derives slices 2–5 (Consensus counts + CITED_ARTIFACT; ticket-auto TICKET/BODY_HASH;
+grill seal reads result.json; full corpus), then G3–G6. Follow-ups: fleetd phase dispatch should call
+auto-merge.sh before going live; reconcile scripts read only `- [needs-human]`.
+
+Why: every rehearsal run halted on a new instance of the same few mechanisms — scripts reading
+facts out of model prose, format slips treated as plan defects, checks meeting untested plan
+shapes, prompt/check drift, no repair route, fail-open parsing, late validation. 5 code audits,
+2 web reports, 5 design deep dives and 3 plan reviews are in the untracked folder
+`seam-audit-2026-11-15/` at the repo root; the plan is `seam-audit-2026-11-15/PLAN.md` (v2).
+
+- [ ] **Track 0 — live fail-opens** (bug-fix PRs, one per plugin, parallel): merge safety
+      (PR branch check, outcome label can only withhold merge), router routes on parsed
+      PHASE_RESULT, entry-gate critique/complexity/readiness/`[needs-human]`, fleet feedback grep +
+      replan parser. fleetd `classify_phase` fail-closed goes on the phase-dispatch flag checklist.
+- [ ] **G1–G7 — gate for rehearsal iter 11:** bash derives facts (F67/F70), minimal corpus of real
+      rehearsal output, ledger seed, narrow demotions with sunsets, Refinement parity + unevaluated
+      cap, validator-only DoR retry, runbook amendment (cap 15, stricter exit criterion — user sign-off).
+- [ ] **H1–H6 — hardening after iter 11:** fail-closed planner parsers (shadow run first), full
+      Specify self-lint, bash-owned phase done markers, decision-parser lint, block-after-revise
+      with guards, closed-token glossary constants + drift test.
+- Deferred unless two more halts need them: JSON result channel, AC ids, contract/policy
+  generators, k=2 judge, SubagentStop hook.
+- Delivery: openspec changes (a) seam-bash-derives, (b) seam-gate-safety, (c) seam-fail-closed;
+  planner PRs one at a time, one version bump each.
+- Open: user to confirm Track 0 now, G7 runbook amendment, 3 changes vs 1 umbrella; order vs Steps 1–18.
 
 ## Ordering rationale
 

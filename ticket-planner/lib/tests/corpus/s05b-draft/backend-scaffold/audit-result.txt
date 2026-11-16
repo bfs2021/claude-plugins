@@ -1,0 +1,7 @@
+=== DOR_SEMANTIC_AUDIT ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-backend-scaffold
+BODY_HASH: sha256:52a6889d85cfc3bd097b822a9c769de28b8458e5bfd3e061f4733a663f5237c1
+SCORE_PLAUSIBLE: yes
+SCORE_REASON: The deterministic result carries no dor_quality_score; its status "ready" with empty missing and advisory arrays is consistent with the body, whose 22 criteria are each command-verifiable and matched by a Verification Plan row and covered seed data.
+=== END DOR_SEMANTIC_AUDIT ===

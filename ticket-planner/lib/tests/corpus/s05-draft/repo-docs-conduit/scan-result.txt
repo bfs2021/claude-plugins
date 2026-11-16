@@ -1,0 +1,14 @@
+=== DOR_SEMANTIC_SCAN ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-repo-docs-conduit
+BODY_HASH: sha256:aca789a6349053ac62f52cffec750bc7143a00507692a45309be5a4d039b6155
+PARAPHRASE: Rewrite the stale calculator wording in app/CLAUDE.md and README.md so both describe Conduit-lite, drop the "repo is empty" claims, add a BE server (npm start) row to the Build & Test table, and add README instructions for installing and starting the backend and frontend, running backend tests, the frontend address and a JWT_SECRET note. Documentation only.
+GAP_REQUIREMENT_COMPLETENESS: clear
+GAP_REQUIREMENT_COMPLETENESS_REASON: Every proposed change (Purpose wording, Codebase Projects row, removed Conventions line, BE server row, preserved rows, README description and run commands, address, JWT_SECRET) has a matching criterion and Verification Plan row.
+GAP_CONTRADICTORY_REQUIREMENTS: clear
+GAP_CONTRADICTORY_REQUIREMENTS_REASON: The criteria and the Verification Plan rows match one to one and agree with Proposed Changes, Technical Context and Out of Scope.
+GAP_DEEP_SCOPE_AMBIGUITY: clear
+GAP_DEEP_SCOPE_AMBIGUITY_REASON: Scope is bounded to named lines and sections of two files, with code and the other CLAUDE.md sections explicitly excluded.
+GAP_EDGE_CASE_SUFFICIENCY: not-applicable
+GAP_EDGE_CASE_SUFFICIENCY_REASON: A non-branching documentation text edit has no runtime edge cases; the criteria are static text checks.
+=== END DOR_SEMANTIC_SCAN ===

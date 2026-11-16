@@ -1,0 +1,5 @@
+# Cases today's code gets wrong. A row is a check and a bash glob over case
+# ids (<snap>/<unit>@<operator>). Every case a row matches must still fail;
+# when a fix makes one pass, test-planner-corpus-replay.sh fails until the row
+# is removed or narrowed, and the case is then expected. Rows may only go.
+# check	case-glob	reason	source

@@ -1,0 +1,7 @@
+=== DOR_SEMANTIC_AUDIT ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-read-pages
+BODY_HASH: sha256:fe85db4ef9247d21191fc29f06ff4d9e9695e63142fd8718de5f4655843b10a4
+SCORE_PLAUSIBLE: yes
+SCORE_REASON: No dor_quality_score is present in the deterministic result; its status "ready" with empty missing/advisory arrays is plausible, since every proposed behaviour has a concrete, browser-verifiable criterion and the seeded data and its source are listed.
+=== END DOR_SEMANTIC_AUDIT ===

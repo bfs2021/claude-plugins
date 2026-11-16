@@ -188,12 +188,29 @@ _get_artifact_path() {
     # ticket directory.
     local artifact_type td
     artifact_type=$(grep '^[^|]*|EXEC|create-artifact|done|' "$LOG_FILE" 2>/dev/null | tail -1 | cut -d'|' -f5- || true)
+    # The type is the line's first word ("simple-fix (…)" → simple-fix).
+    artifact_type=$(printf '%s' "$artifact_type" | tr '[:upper:]' '[:lower:]' | sed -E 's/^[^a-z]*//; s/[^a-z-].*$//')
     if [ -n "$artifact_type" ] && command -v resolve_ticket_dir &>/dev/null; then
       td=$(resolve_ticket_dir "$TICKET_ID" "." 2>/dev/null || true)
       [ -n "$td" ] && artifact_path="$td/${artifact_type}.md"
     fi
   fi
   echo "$artifact_path"
+}
+
+# _gate_critique_field <file> <KEY> — the trimmed value of KEY: inside the
+# (closed) === CRITIQUE_RESULT === block critique-status.sh writes. Empty
+# when the block is missing, unclosed, or has no such field.
+_gate_critique_field() {
+  awk -v k="$2" '
+    { sub(/\r$/, "") }
+    $0 == "=== CRITIQUE_RESULT ===" { inb = 1; next }
+    inb && $0 == "=== END CRITIQUE_RESULT ===" { closed = 1; exit }
+    inb && index($0, k ":") == 1 && v == "" {
+      v = substr($0, length(k) + 2); gsub(/^[ \t]+|[ \t]+$/, "", v)
+    }
+    END { if (closed) print v }
+  ' "$1" 2>/dev/null || true
 }
 
 # Extract AUTONOMY from pipeline log (defaults to manual)
@@ -215,21 +232,35 @@ _get_complexity() {
     td="."
   fi
   complexity=$(get_complexity "$td" 2>/dev/null || true)
-  echo "${complexity:-simple}"
+  # Seam audit Track 0.3: never default to `simple` — an unreadable
+  # ## Complexity block prints empty and the entry gate stops on it
+  # (COMPLEXITY_MISSING) instead of auto-approving.
+  echo "$complexity"
 }
 
-# Determine artifact type from the pipeline log EXEC|create-artifact|done| line
+# Determine the artifact type: the first word of the last
+# EXEC|create-artifact|done| line, case-folded ("OpenSpec (planner proposal
+# reused)" → openspec, "simple-fix (openspec not needed)" → simple-fix); else
+# the plan artifact on disk (<artifact_path>: an openspec change directory →
+# openspec, a simple-fix.md file → simple-fix). Prints empty when neither
+# names a type — the entry gate stops on that (ARTIFACT_TYPE_MISSING) rather
+# than defaulting to simple-fix (seam audit Track 0.3).
 _get_artifact_type() {
-  local artifact_line atype
-  artifact_line=$(grep '^[^|]*|EXEC|create-artifact|done|' "$LOG_FILE" 2>/dev/null | tail -1 || true)
-  if grep -q 'openspec' <<<"$artifact_line"; then
-    atype="openspec"
-  elif grep -q 'simple-fix' <<<"$artifact_line"; then
-    atype="simple-fix"
-  else
-    atype="simple-fix"
+  local artifact_path="${1:-}" msg word
+  msg=$(grep '^[^|]*|EXEC|create-artifact|done|' "$LOG_FILE" 2>/dev/null | tail -1 | cut -d'|' -f5- || true)
+  word=$(printf '%s' "$msg" | tr '[:upper:]' '[:lower:]' | sed -E 's/^[^a-z]*//; s/[^a-z-].*$//')
+  case "$word" in
+  openspec | simple-fix)
+    echo "$word"
+    return 0
+    ;;
+  esac
+  if [ -n "$artifact_path" ] && [ -d "$artifact_path" ]; then
+    echo "openspec"
+  elif [ -n "$artifact_path" ] && [ -f "$artifact_path" ] && [ "$(basename "$artifact_path")" = "simple-fix.md" ]; then
+    echo "simple-fix"
   fi
-  echo "$atype"
+  return 0
 }
 
 # Fetch an issue for gate/label evaluation and fail closed on an unreadable
@@ -494,7 +525,21 @@ _gate_entry() {
   artifact_path=$(_get_artifact_path)
   complexity=$(_get_complexity)
   autonomy=$(_get_autonomy)
-  artifact_type=$(_get_artifact_type)
+  artifact_type=$(_get_artifact_type "$artifact_path")
+
+  # Seam audit Track 0.3: complexity and artifact type gate the auto-approve
+  # path, so a missing value stops the gate — it is never read as `simple` /
+  # `simple-fix` (which agree by default and auto-approved).
+  if [ -z "$complexity" ]; then
+    _plog "$LOG_FILE" "META" "gate-stop" "fail" "COMPLEXITY_MISSING — notes.md ## Complexity has no readable **Score:** (simple|complex)"
+    hb_gate "entry-gate" "fail" "complexity missing" "{}"
+    return 2
+  fi
+  if [ -z "$artifact_type" ]; then
+    _plog "$LOG_FILE" "META" "gate-stop" "fail" "ARTIFACT_TYPE_MISSING — no EXEC|create-artifact|done| type and no plan artifact on disk"
+    hb_gate "entry-gate" "fail" "artifact type missing" "{\"path\":\"$artifact_path\"}"
+    return 2
+  fi
 
   # Commercial Evidence MVP (Branch B): single canonical writer for
   # META|complexity, guarded to fire once per ticket — present on both the
@@ -563,6 +608,53 @@ _gate_entry() {
     return 2
   fi
 
+  # Seam audit Track 0.3: ticket-critique's status is computed by
+  # critique-status.sh, which also writes it (with the score and BLOCKER
+  # count it was given) as a CRITIQUE_RESULT block in the ticket dir. An
+  # unparseable block, or one for another ticket, stops the gate. A valid one
+  # is combined with the notes.md values strictly — never a replacement, so a
+  # stale file can only make the gate stricter: the stricter status
+  # (BLOCKED > WARNINGS > CLEAR), the lower score and the higher BLOCKER count
+  # win. Without a file (a critique from before it existed) the notes.md
+  # values stand, read case-insensitively.
+  local critique_blocker_override=""
+  if [ -f "$td/critique-result.txt" ]; then
+    has_critique="true"
+    local _cr_ticket _cr_status _cr_score _cr_blockers _cr_notes_blockers
+    _cr_ticket=$(_gate_critique_field "$td/critique-result.txt" TICKET)
+    _cr_status=$(_gate_critique_field "$td/critique-result.txt" STATUS)
+    _cr_score=$(_gate_critique_field "$td/critique-result.txt" SCORE)
+    _cr_blockers=$(_gate_critique_field "$td/critique-result.txt" BLOCKERS)
+    case "$_cr_status" in
+    BLOCKED | WARNINGS | CLEAR) ;;
+    *) _cr_status="" ;;
+    esac
+    if [ "$_cr_ticket" != "$TICKET_ID" ] || [ -z "$_cr_status" ] ||
+      ! [[ "$_cr_score" =~ ^[0-9]+$ ]] || ! [[ "$_cr_blockers" =~ ^[0-9]+$ ]]; then
+      _plog "$LOG_FILE" "META" "gate-stop" "fail" "CRITIQUE_STATUS_MISSING — critique-result.txt is not a valid CRITIQUE_RESULT for $TICKET_ID (TICKET/STATUS/SCORE/BLOCKERS); re-run /ticket-critique $TICKET_ID --from-appraise"
+      hb_gate "entry-gate" "fail" "critique status missing" "{\"source\":\"critique-result.txt\"}"
+      return 2
+    fi
+    case "$critique_status/$_cr_status" in
+    BLOCKED/* | */BLOCKED) critique_status="BLOCKED" ;;
+    WARNINGS/* | */WARNINGS) critique_status="WARNINGS" ;;
+    *) critique_status="CLEAR" ;;
+    esac
+    if ! [[ "$critique_score" =~ ^[0-9]+$ ]] || [ "$_cr_score" -lt "$critique_score" ]; then
+      critique_score="$_cr_score"
+    fi
+    _cr_notes_blockers=$(get_critique_blocker_count "$td" 2>/dev/null || echo "0")
+    [[ "$_cr_notes_blockers" =~ ^[0-9]+$ ]] || _cr_notes_blockers=0
+    critique_blocker_override="$_cr_blockers"
+    [ "$_cr_notes_blockers" -le "$_cr_blockers" ] || critique_blocker_override="$_cr_notes_blockers"
+  fi
+
+  if [ "${has_critique}" = "true" ] && [ -n "$critique_score" ] && [ -z "$critique_status" ]; then
+    _plog "$LOG_FILE" "META" "gate-stop" "fail" "CRITIQUE_STATUS_MISSING — ## Readiness Critique **Status:** absent or not BLOCKED|WARNINGS|CLEAR"
+    hb_gate "entry-gate" "fail" "critique status missing" "{\"has_critique\":\"true\"}"
+    return 2
+  fi
+
   if [ "${has_critique}" = "true" ] && [ -z "$critique_score" ]; then
     # Critique ran but produced no score — structural failure, do not proceed
     _plog "$LOG_FILE" "META" "gate-stop" "fail" "CRITIQUE_SCORE_MISSING — ## Readiness Critique exists but **Score:** absent or unparseable"
@@ -580,6 +672,7 @@ _gate_entry() {
     # make the check unreachable for it.
     local critique_blocker_count critique_max_plausible=""
     critique_blocker_count=$(get_critique_blocker_count "$td" 2>/dev/null || echo "0")
+    [ -z "$critique_blocker_override" ] || critique_blocker_count="$critique_blocker_override"
     if [[ "$critique_blocker_count" =~ ^[0-9]+$ ]] && [[ "$critique_score" =~ ^[0-9]+$ ]]; then
       if [ "$critique_blocker_count" -ge 2 ] && [ "$critique_score" -gt 50 ]; then
         critique_max_plausible=50
@@ -672,13 +765,14 @@ _gate_entry() {
     # in the gate's own log line below. The issue fetch this needs for the
     # description tier is hoisted here from Check 2.7 rather than duplicated
     # — a fetch failure surfaces via the same _gate_fetch_issue_fail path.
-    local vplan_section="" vplan_source="none" vplan_rows=0 vplan_verifiable=0
+    local vplan_section="" vplan_source="none" vplan_rows=0 vplan_verifiable=0 vplan_cols="0 0 0 0"
     if declare -f verify_readiness_vplan >/dev/null 2>&1; then
       verify_readiness_vplan "$TICKET_ID" "$gate_td"
       vplan_section="$VR_VPLAN_FOUND"
       vplan_source="$VR_VPLAN_SOURCE"
       vplan_rows="$VR_VPLAN_ROWS"
       vplan_verifiable="$VR_VPLAN_VERIFIABLE"
+      vplan_cols="${VR_VPLAN_COLS:-0 0 0 0}"
     fi
 
     if [ "$vplan_source" = "none" ]; then
@@ -690,14 +784,16 @@ _gate_entry() {
         vplan_source="description"
         vplan_rows="$VPLAN_ROWS"
         vplan_verifiable="$VPLAN_VERIFIABLE"
+        vplan_cols="$VPLAN_V_ROLE $VPLAN_V_NAV $VPLAN_V_DATA $VPLAN_V_EXPECTED"
       fi
     fi
 
     _plog "$LOG_FILE" "GATE" "vplan-source" "done" "source=$vplan_source rows=$vplan_rows verifiable=$vplan_verifiable"
 
-    # Score the plan with the shared scorer (verify-readiness.sh). A
-    # verifiable plan row marks every prerequisite found; otherwise the
-    # artifact is scanned (an openspec change directory: every *.md in it).
+    # Score the plan with the shared scorer (verify-readiness.sh). The table
+    # vouches for a prerequisite only when every verifiable row fills that
+    # column (seam audit Track 0.3); the rest are scanned for in the
+    # artifact (an openspec change directory: every *.md in it).
     # The ticket mode is verify's own classification (verify_mode_classify
     # over the plan + context.md, the text verify Step 1e reads), mapped to a
     # prerequisite profile: live-backend → api-only, build-only → build-only,
@@ -708,7 +804,7 @@ _gate_entry() {
     local _mode_plan="$artifact_path"
     [ -d "$artifact_path" ] && _mode_plan="$gate_td/notes.md"
     if declare -f verify_readiness_score >/dev/null 2>&1; then
-      verify_readiness_score "$artifact_path" "$(verify_mode_text "$_mode_plan" "$gate_td")" "$vplan_section" "$vplan_verifiable"
+      verify_readiness_score "$artifact_path" "$(verify_mode_text "$_mode_plan" "$gate_td")" "$vplan_section" "$vplan_verifiable" "$vplan_cols"
       _ticket_mode="$VR_MODE"
       _required_count="$VR_REQUIRED"
       missing_count="$VR_MISSING"
@@ -902,6 +998,21 @@ _gate_entry() {
 
   # Check 5: Simple + auto/semi-auto → auto-approve via flow.sh
   if [ "$complexity" = "simple" ] && { [ "$autonomy" = "auto" ] || [ "$autonomy" = "semi-auto" ]; }; then
+    # Check 5a (seam audit Track 0.3): a policy approval never goes over an
+    # open [needs-human] question in notes.md ## Open Questions. A human's
+    # /ticket-approve (manifest approval) is not held here — gate-reconcile
+    # (STEP_3_5) decides on the questions after a human approval.
+    local open_human=0
+    if declare -f get_open_needs_human_count >/dev/null 2>&1; then
+      open_human=$(get_open_needs_human_count "$gate_td" 2>/dev/null) || open_human=0
+      [[ "$open_human" =~ ^[0-9]+$ ]] || open_human=0
+    fi
+    if [ "$open_human" -gt 0 ] && [ "$(_gate_manifest_approved "$TICKET_ID" "Ready")" != "pass" ]; then
+      _plog "$LOG_FILE" "GATE" "gate" "fail" "held: open [needs-human] question(s) ($open_human) in notes.md ## Open Questions — answer them, then /ticket-approve"
+      hb_gate "entry-gate" "fail" "held: open needs-human questions" "{\"open\":\"$open_human\"}"
+      _gate_emit_held "open-human-questions"
+      return 1
+    fi
     if [ -n "$FLOW_SH" ] && [ -f "$FLOW_SH" ]; then
       bash "$FLOW_SH" "$TICKET_ID" "human-approve" --provenance policy || true
     fi

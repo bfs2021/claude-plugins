@@ -1,0 +1,7 @@
+=== DOR_SEMANTIC_AUDIT ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-frontend-shell
+BODY_HASH: sha256:76802a18849839038cf8dce6f5b7c2a5e8ed32b99c4dd404fc738fb2ce092d51
+SCORE_PLAUSIBLE: yes
+SCORE_REASON: The deterministic result carries no dor_quality_score; its status "ready" with empty missing and advisory arrays is consistent with the body, whose 30 criteria cover start-up, header, routing, editor guard, proxy and strict port, each with a Verification Plan row.
+=== END DOR_SEMANTIC_AUDIT ===

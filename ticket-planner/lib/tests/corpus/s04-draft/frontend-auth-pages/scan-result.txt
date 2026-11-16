@@ -1,0 +1,16 @@
+=== DOR_SEMANTIC_SCAN ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-frontend-auth-pages
+BODY_HASH: sha256:11df781e57f8663ed4457a18178f87a8041b9594805c6bcf051376e6dc91688c
+FINDING_1_CODE: EDGE_CASE_GAP
+FINDING_1_QUOTE: - [ ] Signing up on `/register` with username `alice`, email `alice@conduit.test`, password `Alice-Pass-123` changes the address bar path to `/`
+FINDING_1_DETAIL: Criteria 23 and 24 (and the Verification Plan rows for 23-26) each describe their own sign-up of alice, but the preconditions require every check in a run to share one backend session. The fresh backend only guarantees that the first alice sign-up in a run returns 201. If a verifier runs criterion 24 as its own sign-up after criterion 23, the API returns 422 "email has already been taken", the page stays on `/register`, and criteria 24-26 fail even though the code is correct. The body never says that criteria 23-26 must be checked against a single alice sign-up.
+GAP_REQUIREMENT_COMPLETENESS: clear
+GAP_REQUIREMENT_COMPLETENESS_REASON: Each described behaviour has at least one criterion: the sign-in and sign-up pages, their success paths, the errors renderer, kept input values, the signed-in header, persistence across a reload, and clearing a rejected token.
+GAP_CONTRADICTORY_REQUIREMENTS: clear
+GAP_CONTRADICTORY_REQUIREMENTS_REASON: Summary, Proposed Behaviour, Technical Context and the criteria agree on routes, the jwt key, the error-line format and the signed-in header.
+GAP_DEEP_SCOPE_AMBIGUITY: clear
+GAP_DEEP_SCOPE_AMBIGUITY_REASON: The scope is bounded to named new files and routes, and Out of Scope excludes sign-out, the editor, profiles and backend changes.
+GAP_EDGE_CASE_SUFFICIENCY: finding
+GAP_EDGE_CASE_SUFFICIENCY_REASON: Repeating the alice sign-up inside one backend session would make the duplicate-email path fire on success criteria 24-26.
+=== END DOR_SEMANTIC_SCAN ===

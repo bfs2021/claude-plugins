@@ -1,0 +1,9 @@
+=== DOR_SEMANTIC_AUDIT ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-frontend-editor
+BODY_HASH: sha256:0e51ce2119b95b29e9a5c43eb69203cd4c20378df174e68786da0df6e2d8714c
+MISSED_1_CODE: UNSTATED_DEPENDENCY
+MISSED_1_REASON: Technical Context says "The router (with its guard hook), `api.js` and the article page come from the reader-pages ticket", and criteria 10-14 need that article page and home feed, but Related Tickets lists only DRAFT-backend-articles and DRAFT-frontend-auth-pages as blockers, so the ticket could be dispatched before the reader-pages ticket merges.
+SCORE_PLAUSIBLE: yes
+SCORE_REASON: The deterministic result has no dor_quality_score, and its "ready" status with empty missing/advisory arrays fits a body whose criteria, verification rows and test data are complete; the only gap is the undeclared reader-pages blocker.
+=== END DOR_SEMANTIC_AUDIT ===

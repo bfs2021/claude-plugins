@@ -1,0 +1,14 @@
+=== DOR_SEMANTIC_SCAN ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-editor-page
+BODY_HASH: sha256:202e25253035faffd3eb742f2de3858e011fe05f914200b84248f9b92b9c7884
+PARAPHRASE: Add a guarded /editor page where a signed-in author fills Title, Description and Body and publishes via POST /api/articles, landing on the new article's page; signed-out or rejected-token visitors are redirected to /login, and API validation, network and 5xx errors are shown on the page.
+GAP_REQUIREMENT_COMPLETENESS: clear
+GAP_REQUIREMENT_COMPLETENESS_REASON: Every described behaviour (signed-out redirect, rejected-token redirect, load-time 5xx/network error, publish and redirect, home-list ordering, slug collision, 422 error lines, submit-time network error) has an acceptance criterion; no human-only decision is open.
+GAP_CONTRADICTORY_REQUIREMENTS: clear
+GAP_CONTRADICTORY_REQUIREMENTS_REASON: Summary, Proposed Behaviour, Technical Context, criteria and Verification Plan agree on routes, error text, error format and redirect targets.
+GAP_DEEP_SCOPE_AMBIGUITY: clear
+GAP_DEEP_SCOPE_AMBIGUITY_REASON: Scope is bounded to frontend/src/pages/editor.js, its route guard and the main.js import, with editing, deleting, tags and sign-out explicitly out of scope.
+GAP_EDGE_CASE_SUFFICIENCY: clear
+GAP_EDGE_CASE_SUFFICIENCY_REASON: The plausible edge cases (no token, invalid token, backend down at load and at submit, blank title, duplicate title slug) are each specified and covered by a criterion.
+=== END DOR_SEMANTIC_SCAN ===

@@ -1161,28 +1161,35 @@ detect_planner_feedback() {
   fb_entries=$(_pipeline_lines "$tid" "$workspace" | command grep '|META|planner-feedback|' 2>/dev/null || true)
   [ -z "$fb_entries" ] && echo "0" && return
 
-  # For each feedback entry, check if this ticket's feedback has already
-  # been collected. Feedback files at REPOS_ROOT/.ticket-auto/initiatives/*/feedback/*.json
-  # carry a "source_tid" field — grep for this ticket's ID across all feedback files.
+  # Has this ticket's feedback already been collected? fleet-feedback.sh
+  # writes REPOS_ROOT/.ticket-auto/initiatives/*/feedback/*.json through
+  # `jq .`, one `.tickets[]` entry per collected line, each carrying
+  # `source_tid`. Read the files as JSON (Track 0.4): the old grep for
+  # `"source_tid":"<tid>"` assumed compact JSON and never matched the
+  # pretty-printed `"source_tid": "<tid>"`, so every planned ticket stayed WARN.
+  # A file jq cannot parse is no proof of collection.
   local repos_root="${REPOS_ROOT:-}"
   local uncollected=0
+  local fb_found=0 fb_file
+  if [ -n "$repos_root" ] && [ -d "$repos_root/.ticket-auto/initiatives" ]; then
+    for fb_file in "$repos_root/.ticket-auto/initiatives"/*/feedback/*.json; do
+      [ -f "$fb_file" ] || continue
+      if jq -e --arg t "$tid" 'any(.tickets[]?; .source_tid == $t)' \
+        "$fb_file" >/dev/null 2>&1; then
+        fb_found=1
+        break
+      fi
+    done
+  fi
 
   while IFS= read -r line; do
     [ -z "$line" ] && continue
     local fb_payload
     fb_payload=$(echo "$line" | awk -F'|' '{for(i=5;i<=NF;i++) printf "%s%s", $i, (i<NF?"|":"")}')
     [ -z "$fb_payload" ] && continue
-
-    # Check whether this ticket's feedback has been collected.
-    # Look for \"source_tid\":\"<tid>\" in any feedback JSON under the initiatives tree.
-    local fb_found=0
-    if [ -n "$repos_root" ] && [ -d "$repos_root/.ticket-auto/initiatives" ]; then
-      if grep -rql "\"source_tid\":\"${tid}\"" "$repos_root/.ticket-auto/initiatives"/*/feedback/ 2>/dev/null; then
-        fb_found=1
-      fi
+    if [ "$fb_found" -eq 0 ]; then
+      uncollected=$((uncollected + 1))
     fi
-
-    [ "$fb_found" -eq 0 ] && uncollected=$((uncollected + 1))
   done <<<"$fb_entries"
 
   if [ "$uncollected" -gt 0 ]; then

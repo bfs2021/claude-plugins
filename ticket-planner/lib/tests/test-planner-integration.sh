@@ -243,12 +243,24 @@ test_state_log_repair() {
   # Append a line with an invalid phase
   echo "2024-01-01T00:00:00Z|PhantomPhase|step|done|msg" >>"$log_file"
 
+  # Lines with the statuses the planner writes besides start/done/fail/skip
+  planner_state_write "$id" "META" "crosscheck" "accepted" "TEST_DATA_IMPLIED operator ok"
+  planner_state_write "$id" "META" "draft-readiness" "warn" "x SEMANTIC_UNAVAILABLE \"r\""
+
   # Repair
   if planner_state_repair "$id"; then
     echo "PASS: state log repair succeeded"
     PASS=$((PASS + 1))
   else
     echo "FAIL: state log repair failed unexpectedly"
+    FAIL=$((FAIL + 1))
+  fi
+
+  if grep -q '|META|crosscheck|accepted|' "$log_file" && grep -q '|META|draft-readiness|warn|' "$log_file"; then
+    echo "PASS: repair keeps accepted and warn lines"
+    PASS=$((PASS + 1))
+  else
+    echo "FAIL: repair dropped an accepted or warn line"
     FAIL=$((FAIL + 1))
   fi
 

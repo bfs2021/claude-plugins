@@ -45,6 +45,7 @@ from fleetd.phase_dispatch import (  # noqa: E402
     apply_verifier_overrides,
     classify_phase,
     missing_phase_result,
+    verifier_overrides,
     phase_terminal_write,
     route_exit_code,
     router_token,
@@ -270,13 +271,41 @@ class TestClassificationPrecedence(unittest.TestCase):
         self.assertEqual(outcome.result, 'done')
 
     def test_exit_zero_is_never_positive_evidence(self):
-        # A SIGINT'd headless `-p` worker exits 0. The classification is only
-        # 'done' here because nothing says otherwise — and the source records
-        # that it rested on nothing, which is what makes the weakness visible
-        # rather than silent.
+        # A SIGINT'd headless `-p` worker exits 0. Track 0.5: for a
+        # loop-bearing phase a clean exit with no verdict is a failure, not a
+        # pass — the source records that it rested on nothing.
         outcome = classify_phase('VERIFY', [], exit_code=0)
+        self.assertEqual(outcome.result, 'fail')
         self.assertEqual(outcome.source, 'exit-code')
         self.assertIn('no authoritative result', outcome.detail)
+
+    def test_every_loop_bearing_phase_fails_closed_on_a_clean_exit(self):
+        for phase in sorted(LOOP_BEARING_PHASES):
+            with self.subTest(phase=phase):
+                outcome = classify_phase(phase, [], exit_code=0)
+                self.assertEqual(outcome.result, 'fail')
+                self.assertEqual(outcome.verdict, '')
+
+    def test_an_unknown_claim_with_a_clean_exit_fails_closed(self):
+        # What router-step.sh post-spawn records when the agent forgot its
+        # PHASE_RESULT block: the record exists, the verdict does not.
+        lines = [_phase_result_line('VERIFY', 'UNKNOWN',
+                                    parse_status='invalid')]
+        outcome = classify_phase('VERIFY', lines, exit_code=0)
+        self.assertEqual(outcome.result, 'fail')
+
+    def test_a_non_loop_phase_still_passes_on_a_clean_exit(self):
+        # APPRAISE/EXEC/... have no verdict vocabulary; their evidence is
+        # checked elsewhere (gate-check.sh), so a clean exit stays 'done'.
+        outcome = classify_phase('APPRAISE', [], exit_code=0)
+        self.assertEqual(outcome.result, 'done')
+
+    def test_a_verify_with_no_verdict_never_routes_to_pr_review(self):
+        table = DispatchTable.load(TABLE_PATH)
+        outcome = classify_phase('VERIFY', [], exit_code=0)
+        decision = next_step(table, 'STEP_4_5', outcome,
+                             {'VERIFY_ATTEMPTS': 1})
+        self.assertNotEqual(decision.step_id, 'STEP_4_6')
 
     def test_non_loop_phase_gets_no_verdict_token(self):
         # APPRAISE has no verdict vocabulary; stamping one on its log line
@@ -309,6 +338,77 @@ class TestVerifierOverrides(unittest.TestCase):
     def test_no_overrides_is_a_no_op(self):
         outcome = PhaseOutcome('done', 'PASS', 'phase-result', 'ok')
         self.assertIs(apply_verifier_overrides(outcome, None), outcome)
+
+    def test_classify_phase_applies_overrides(self):
+        # Rung 5 used to be documented but unreachable: classify_phase took
+        # `overrides` and ignored it.
+        outcome = classify_phase(
+            'VERIFY', [_phase_result_line('VERIFY', 'PASS')],
+            overrides={'verdict_recompute': False})
+        self.assertEqual(outcome.result, 'fail')
+        self.assertEqual(outcome.source, 'verifier-override')
+
+    def test_passing_overrides_leave_a_pass_alone(self):
+        outcome = classify_phase(
+            'VERIFY', [_phase_result_line('VERIFY', 'PASS')],
+            overrides={'verdict_recompute': True})
+        self.assertEqual(outcome.result, 'done')
+
+    def test_a_gate_stop_is_not_relabelled_by_an_override(self):
+        lines = ['2026-09-03T10:01:00Z|META|gate-stop|fail|VERIFY_EXHAUSTED']
+        outcome = classify_phase('VERIFY', lines,
+                                 overrides={'verdict_recompute': False})
+        self.assertEqual(outcome.source, 'gate-stop')
+
+
+def _claim_delta_line(direction, phase='VERIFY'):
+    payload = {'phase': phase, 'claimed_verdict': 'PASS',
+               'verified_verdict': 'FAIL', 'direction': direction}
+    return f'2026-09-03T10:02:00Z|META|claim-delta|info|{json.dumps(payload)}'
+
+
+class TestVerifierOverrideSignals(unittest.TestCase):
+    """The bash-written independent checks router-step.sh post-spawn leaves
+    in the bracket, read back as `classify_phase` overrides."""
+
+    def test_an_optimistic_verify_claim_is_overridden(self):
+        self.assertEqual(
+            verifier_overrides('VERIFY', [_claim_delta_line('optimistic')]),
+            {'verdict_recompute': False})
+
+    def test_an_aligned_verify_claim_is_confirmed(self):
+        self.assertEqual(
+            verifier_overrides('VERIFY', [_claim_delta_line('aligned')]),
+            {'verdict_recompute': True})
+
+    def test_the_last_claim_delta_wins(self):
+        lines = [_claim_delta_line('optimistic'), _claim_delta_line('aligned')]
+        self.assertEqual(verifier_overrides('VERIFY', lines),
+                         {'verdict_recompute': True})
+
+    def test_an_unknown_or_unparseable_delta_says_nothing(self):
+        self.assertEqual(
+            verifier_overrides('VERIFY', [_claim_delta_line('unknown')]), {})
+        self.assertEqual(verifier_overrides(
+            'VERIFY', ['2026-09-03T10:02:00Z|META|claim-delta|info|{nope']), {})
+
+    def test_a_return_incomplete_warning_overrides_implement(self):
+        line = ('2026-09-03T10:02:00Z|META|gate-warn|info|RETURN_INCOMPLETE '
+                '— unchecked boxes (unchecked=2/5, artifact=openspec)')
+        self.assertEqual(verifier_overrides('IMPLEMENT', [line]),
+                         {'return_completeness': False})
+
+    def test_signals_are_scoped_to_their_own_phase(self):
+        line = ('2026-09-03T10:02:00Z|META|gate-warn|info|RETURN_INCOMPLETE '
+                '— x')
+        self.assertEqual(verifier_overrides('VERIFY', [line]), {})
+        self.assertEqual(
+            verifier_overrides('IMPLEMENT', [_claim_delta_line('optimistic')]),
+            {})
+
+    def test_no_signal_is_no_override(self):
+        self.assertEqual(verifier_overrides('VERIFY', []), {})
+        self.assertEqual(verifier_overrides('APPRAISE', []), {})
 
 
 class TestMissingPhaseResultInstrumentation(unittest.TestCase):

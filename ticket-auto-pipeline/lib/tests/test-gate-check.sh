@@ -580,7 +580,7 @@ test_reapprove_both_wrong_single_gate_stop() {
 # Helper: scaffold notes.md with critique section (unlocks Check 2.6)
 _scaffold_critique() {
   local score="${1:-75}"
-  local status="${2:-PASS}"
+  local status="${2:-CLEAR}"
   local td
   td=$(resolve_ticket_dir "$TICKET_ID" "." 2>/dev/null || echo "$_ws")
   mkdir -p "$td" 2>/dev/null || true
@@ -601,7 +601,7 @@ _scaffold_verify_plan_full() {
   mkdir -p "$td" 2>/dev/null || true
   # Ensure critique section exists first
   if ! grep -q '## Readiness Critique' "${td}/notes.md" 2>/dev/null; then
-    _scaffold_critique 75 PASS
+    _scaffold_critique 75 CLEAR
   fi
   cat >>"${td}/notes.md" <<'PLANEOF'
 
@@ -631,7 +631,7 @@ _scaffold_verify_plan_empty() {
   td=$(resolve_ticket_dir "$TICKET_ID" "." 2>/dev/null || echo "$_ws")
   mkdir -p "$td" 2>/dev/null || true
   if ! grep -q '## Readiness Critique' "${td}/notes.md" 2>/dev/null; then
-    _scaffold_critique 75 PASS
+    _scaffold_critique 75 CLEAR
   fi
   cat >>"${td}/notes.md" <<'PLANEOF'
 
@@ -654,7 +654,7 @@ _scaffold_verify_plan_no_table() {
   td=$(resolve_ticket_dir "$TICKET_ID" "." 2>/dev/null || echo "$_ws")
   mkdir -p "$td" 2>/dev/null || true
   if ! grep -q '## Readiness Critique' "${td}/notes.md" 2>/dev/null; then
-    _scaffold_critique 75 PASS
+    _scaffold_critique 75 CLEAR
   fi
   cat >>"${td}/notes.md" <<'PLANEOF'
 
@@ -708,7 +708,7 @@ ARTEOF
 test_verify_plan_full_table_auto_approves() {
   _setup
   _scaffold_exec_done "simple" "auto" "simple-fix" "${_ws}/simple-fix.md"
-  _scaffold_critique 75 PASS
+  _scaffold_critique 75 CLEAR
   _scaffold_verify_plan_full
 
   _gate_entry
@@ -732,7 +732,7 @@ test_verify_plan_full_table_auto_approves() {
 test_verify_plan_empty_table_falls_back_to_artifact() {
   _setup
   _scaffold_exec_done "simple" "auto" "simple-fix" "${_ws}/simple-fix.md"
-  _scaffold_critique 75 PASS
+  _scaffold_critique 75 CLEAR
   _scaffold_verify_plan_empty
   _scaffold_artifact_with_prereqs "${_ws}/simple-fix.md"
 
@@ -757,7 +757,7 @@ test_verify_plan_empty_table_falls_back_to_artifact() {
 test_verify_plan_empty_table_and_bare_artifact_holds() {
   _setup
   _scaffold_exec_done "simple" "auto" "simple-fix" "${_ws}/simple-fix.md"
-  _scaffold_critique 75 PASS
+  _scaffold_critique 75 CLEAR
   _scaffold_verify_plan_empty
   _scaffold_artifact_bare "${_ws}/simple-fix.md"
 
@@ -782,7 +782,7 @@ test_verify_plan_empty_table_and_bare_artifact_holds() {
 test_no_verify_plan_falls_back_to_artifact() {
   _setup
   _scaffold_exec_done "simple" "auto" "simple-fix" "${_ws}/simple-fix.md"
-  _scaffold_critique 75 PASS
+  _scaffold_critique 75 CLEAR
   # No _scaffold_verify_plan — notes.md has critique but no verification plan
   _scaffold_artifact_with_prereqs "${_ws}/simple-fix.md"
 
@@ -807,7 +807,7 @@ test_no_verify_plan_falls_back_to_artifact() {
 test_verify_plan_heading_without_table_falls_back() {
   _setup
   _scaffold_exec_done "simple" "auto" "simple-fix" "${_ws}/simple-fix.md"
-  _scaffold_critique 75 PASS
+  _scaffold_critique 75 CLEAR
   _scaffold_verify_plan_no_table
   _scaffold_artifact_with_prereqs "${_ws}/simple-fix.md"
 
@@ -834,7 +834,7 @@ test_verify_plan_heading_without_table_falls_back() {
 test_verify_plan_found_in_body_md_names_source() {
   _setup
   _scaffold_exec_done "simple" "auto" "simple-fix" "${_ws}/simple-fix.md"
-  _scaffold_critique 75 PASS
+  _scaffold_critique 75 CLEAR
   # notes.md deliberately has no ## Verification Plan section at all — the
   # source chain must fall through past it to body.md.
   # Bare artifact (touched empty by _scaffold_exec_done) — if the table were
@@ -930,7 +930,7 @@ NOTESEOF
 test_verify_plan_partial_data_falls_back() {
   _setup
   _scaffold_exec_done "simple" "auto" "simple-fix" "${_ws}/simple-fix.md"
-  _scaffold_critique 75 PASS
+  _scaffold_critique 75 CLEAR
 
   # Create a verification plan where only the nav path column has content
   local td
@@ -1014,7 +1014,7 @@ CTXEOF
 # Helper: scaffold critique with specific findings (for cross-validation tests)
 _scaffold_critique_with_findings() {
   local score="${1:-75}"
-  local status="${2:-PASS}"
+  local status="${2:-CLEAR}"
   local findings="${3:-}"
   local td
   td=$(resolve_ticket_dir "$TICKET_ID" "." 2>/dev/null || echo "$_ws")
@@ -1062,7 +1062,7 @@ test_zero_ac_gate_stop() {
   _scaffold_context_md 0 "feature" "true"
   _scaffold_artifact_with_prereqs "${_ws}/simple-fix.md"
   # Even with critique score 90, zero AC should be a hard stop
-  _scaffold_critique 90 PASS
+  _scaffold_critique 90 CLEAR
 
   _gate_entry
   local rc=$?
@@ -1122,7 +1122,7 @@ test_bug_no_repro_gate_stop() {
   _setup
   _scaffold_exec_done "simple" "auto" "simple-fix" "${_ws}/simple-fix.md"
   _scaffold_context_md 2 "bug" "false" # bug label, no repro steps
-  _scaffold_critique 75 PASS
+  _scaffold_critique 75 CLEAR
   _scaffold_artifact_with_prereqs "${_ws}/simple-fix.md"
 
   _gate_entry
@@ -1147,7 +1147,7 @@ test_bug_with_repro_passes() {
   _setup
   _scaffold_exec_done "simple" "auto" "simple-fix" "${_ws}/simple-fix.md"
   _scaffold_context_md 2 "bug" "true" # bug label WITH repro steps
-  _scaffold_critique 75 PASS
+  _scaffold_critique 75 CLEAR
   _scaffold_verify_plan_full
   _scaffold_artifact_with_prereqs "${_ws}/simple-fix.md"
 
@@ -1173,7 +1173,7 @@ test_bug_no_repro_high_score_still_stops() {
   _setup
   _scaffold_exec_done "simple" "auto" "simple-fix" "${_ws}/simple-fix.md"
   _scaffold_context_md 3 "bug" "false" # 3 AC, bug, no repro
-  _scaffold_critique 75 PASS           # score 75 would normally clear
+  _scaffold_critique 75 CLEAR          # score 75 would normally clear
   _scaffold_artifact_with_prereqs "${_ws}/simple-fix.md"
 
   _gate_entry
@@ -1639,7 +1639,7 @@ test_tightened_regex_bare_should_not_counted() {
   _setup
   _scaffold_exec_done "simple" "auto" "simple-fix" "${_ws}/simple-fix.md"
   _scaffold_context_md 2 "feature" "true"
-  _scaffold_critique 75 PASS
+  _scaffold_critique 75 CLEAR
   _scaffold_artifact_false_positives "${_ws}/simple-fix.md"
   # No verification plan → fallback triggers. Artifact has "should" but no AC context.
 
@@ -1666,7 +1666,7 @@ test_tightened_regex_proper_context_counted() {
   _setup
   _scaffold_exec_done "simple" "auto" "simple-fix" "${_ws}/simple-fix.md"
   _scaffold_context_md 2 "feature" "true"
-  _scaffold_critique 75 PASS
+  _scaffold_critique 75 CLEAR
   # This artifact has the proper context for all 4 prereqs per tightened patterns
   _scaffold_artifact_with_prereqs "${_ws}/simple-fix.md"
 
@@ -1717,7 +1717,7 @@ ARTEOF
 test_entry_one_missing_prereq_no_abort() {
   _setup
   _scaffold_exec_done "simple" "auto" "simple-fix" "${_ws}/simple-fix.md"
-  _scaffold_critique 75 PASS
+  _scaffold_critique 75 CLEAR
   # No verification plan → fallback to artifact scan
   _scaffold_artifact_three_prereqs "${_ws}/simple-fix.md"
 
@@ -1947,7 +1947,7 @@ test_browser_mode_unaffected_with_feature_path_and_user() {
   _setup
   _scaffold_exec_done "simple" "auto" "simple-fix" "${_ws}/simple-fix.md"
   _scaffold_context_md 2 "feature" "true"
-  _scaffold_critique 75 PASS
+  _scaffold_critique 75 CLEAR
   cat >"${_ws}/simple-fix.md" <<'ARTEOF'
 # Simple Fix — Test
 
@@ -3031,7 +3031,308 @@ test_planned_mode_fetch_failure_defers_to_entry_gate() {
   }
 }
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# Seam audit Track 0.3 — the entry gate fails closed on text it cannot read
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_t0_td() { resolve_ticket_dir "$TICKET_ID" "." 2>/dev/null || echo "$_ws"; }
+_t0_stop() { grep -q "|META|gate-stop|fail|$1" "$LOG_FILE" 2>/dev/null; }
+# _t0_result STATUS SCORE BLOCKERS — the bash-written CRITIQUE_RESULT block.
+_t0_result() {
+  printf '=== CRITIQUE_RESULT ===\nTICKET: %s\nSTATUS: %s\nSCORE: %s\nBLOCKERS: %s\nWARNINGS: 0\nBLOCK_REASON: none\n=== END CRITIQUE_RESULT ===\n' \
+    "$TICKET_ID" "$1" "$2" "$3" >"$(_t0_td)/critique-result.txt"
+}
+
+# (a) critique status — case and format variants of BLOCKED still stop.
+test_t0_critique_status_mixed_case_blocked_stops() {
+  _setup
+  _scaffold_exec_done "simple" "auto" "simple-fix" "${_ws}/simple-fix.md"
+  _scaffold_critique 75 "Blocked"
+  local rc=0
+  _gate_entry || rc=$?
+  local ok=0
+  [ "$rc" -eq 2 ] && _t0_stop CRITIQUE_BLOCKED || ok=1
+  _teardown
+  return $ok
+}
+test_t0_critique_status_bold_colon_variant_stops() {
+  _setup
+  _scaffold_exec_done "simple" "auto" "simple-fix" "${_ws}/simple-fix.md"
+  printf '## Complexity\n**Score:** simple\n\n## Readiness Critique\n**Score:** 75\n**Status**: BLOCKED\n' >"$(_t0_td)/notes.md"
+  local rc=0
+  _gate_entry || rc=$?
+  local ok=0
+  [ "$rc" -eq 2 ] && _t0_stop CRITIQUE_BLOCKED || ok=1
+  _teardown
+  return $ok
+}
+# Must-fail: a critique section with no readable status never passes.
+test_t0_critique_status_missing_stops() {
+  _setup
+  _scaffold_exec_done "simple" "auto" "simple-fix" "${_ws}/simple-fix.md"
+  printf '## Complexity\n**Score:** simple\n\n## Readiness Critique\n**Score:** 75\n' >"$(_t0_td)/notes.md"
+  local rc=0
+  _gate_entry || rc=$?
+  local ok=0
+  [ "$rc" -eq 2 ] && _t0_stop CRITIQUE_STATUS_MISSING || ok=1
+  _teardown
+  return $ok
+}
+test_t0_critique_status_unknown_value_stops() {
+  _setup
+  _scaffold_exec_done "simple" "auto" "simple-fix" "${_ws}/simple-fix.md"
+  _scaffold_critique 75 "PASS"
+  local rc=0
+  _gate_entry || rc=$?
+  local ok=0
+  [ "$rc" -eq 2 ] && _t0_stop CRITIQUE_STATUS_MISSING || ok=1
+  _teardown
+  return $ok
+}
+# The bash-written CRITIQUE_RESULT wins over the agent's notes.md transcription.
+test_t0_critique_result_file_blocked_wins_over_notes() {
+  _setup
+  _scaffold_exec_done "simple" "auto" "simple-fix" "${_ws}/simple-fix.md"
+  _scaffold_critique 75 CLEAR
+  _t0_result BLOCKED 60 1
+  local rc=0
+  _gate_entry || rc=$?
+  local ok=0
+  [ "$rc" -eq 2 ] && _t0_stop CRITIQUE_BLOCKED || ok=1
+  _teardown
+  return $ok
+}
+test_t0_critique_result_file_malformed_stops() {
+  _setup
+  _scaffold_exec_done "simple" "auto" "simple-fix" "${_ws}/simple-fix.md"
+  _scaffold_critique 75 CLEAR
+  _t0_result "looks fine" 75 0
+  local rc=0
+  _gate_entry || rc=$?
+  local ok=0
+  [ "$rc" -eq 2 ] && _t0_stop CRITIQUE_STATUS_MISSING || ok=1
+  _teardown
+  return $ok
+}
+# Must-pass: a CLEAR result file agreeing with notes.md passes.
+test_t0_critique_result_file_clear_passes() {
+  _setup
+  _scaffold_exec_done "simple" "auto" "simple-fix" "${_ws}/simple-fix.md"
+  _scaffold_critique_with_findings 80 CLEAR "- [WARNING] minor wording"
+  _scaffold_artifact_with_prereqs "${_ws}/simple-fix.md"
+  _t0_result CLEAR 80 0
+  local rc=0
+  _gate_entry || rc=$?
+  local ok=0
+  [ "$rc" -eq 0 ] && ! grep -q 'gate-stop' "$LOG_FILE" || ok=1
+  _teardown
+  return $ok
+}
+
+# Must-fail: a stale CLEAR file never loosens a stricter notes.md critique.
+test_t0_critique_stale_clear_file_never_loosens_blocked_notes() {
+  _setup
+  _scaffold_exec_done "simple" "auto" "simple-fix" "${_ws}/simple-fix.md"
+  _scaffold_critique 75 BLOCKED
+  _scaffold_artifact_with_prereqs "${_ws}/simple-fix.md"
+  _t0_result CLEAR 95 0
+  local rc=0
+  _gate_entry || rc=$?
+  local ok=0
+  [ "$rc" -eq 2 ] && _t0_stop CRITIQUE_BLOCKED || ok=1
+  _teardown
+  return $ok
+}
+test_t0_critique_stale_file_lower_notes_score_wins() {
+  _setup
+  _scaffold_exec_done "simple" "auto" "simple-fix" "${_ws}/simple-fix.md"
+  _scaffold_critique 35 WARNINGS
+  _scaffold_artifact_with_prereqs "${_ws}/simple-fix.md"
+  _t0_result CLEAR 90 0
+  local rc=0
+  _gate_entry || rc=$?
+  local ok=0
+  [ "$rc" -eq 1 ] && grep -q 'held: content quality score 35 < 40' "$LOG_FILE" || ok=1
+  _teardown
+  return $ok
+}
+# Must-fail: a result file written for another ticket stops the gate.
+test_t0_critique_file_for_other_ticket_stops() {
+  _setup
+  _scaffold_exec_done "simple" "auto" "simple-fix" "${_ws}/simple-fix.md"
+  _scaffold_critique 75 CLEAR
+  _scaffold_artifact_with_prereqs "${_ws}/simple-fix.md"
+  _t0_result CLEAR 75 0
+  sed -i 's/^TICKET: .*/TICKET: CRE-999/' "$(_t0_td)/critique-result.txt"
+  local rc=0
+  _gate_entry || rc=$?
+  local ok=0
+  [ "$rc" -eq 2 ] && _t0_stop CRITIQUE_STATUS_MISSING || ok=1
+  _teardown
+  return $ok
+}
+
+# (b) complexity / artifact type — never defaulted to the simple path.
+test_t0_complexity_missing_stops() {
+  _setup
+  _scaffold_exec_done "simple" "auto" "simple-fix" "${_ws}/simple-fix.md"
+  _fake_complexity=""
+  local rc=0
+  _gate_entry || rc=$?
+  local ok=0
+  [ "$rc" -eq 2 ] && _t0_stop COMPLEXITY_MISSING && ! grep -q 'auto-approved' "$LOG_FILE" || ok=1
+  _teardown
+  return $ok
+}
+test_t0_artifact_type_missing_stops() {
+  _setup
+  _scaffold_exec_done "simple" "auto" "simple-fix" "${_ws}/simple-fix.md"
+  grep -v '|EXEC|create-artifact|\|META|artifact|' "$LOG_FILE" >"$LOG_FILE.new" && mv "$LOG_FILE.new" "$LOG_FILE"
+  local rc=0
+  _gate_entry || rc=$?
+  local ok=0
+  [ "$rc" -eq 2 ] && _t0_stop ARTIFACT_TYPE_MISSING && ! grep -q 'auto-approved' "$LOG_FILE" || ok=1
+  _teardown
+  return $ok
+}
+# Must-pass: the type is read as the line's first word, case-insensitively.
+test_t0_artifact_type_first_word_wins() {
+  _setup
+  _scaffold_exec_done "simple" "auto" "simple-fix (openspec not needed)" "${_ws}/simple-fix.md"
+  local rc=0
+  _gate_entry || rc=$?
+  local ok=0
+  [ "$rc" -eq 0 ] && ! grep -q 'COMPLEXITY_ARTIFACT_MISMATCH' "$LOG_FILE" || ok=1
+  _teardown
+  return $ok
+}
+test_t0_artifact_type_capitalised_openspec_is_openspec() {
+  _setup
+  _scaffold_exec_done "complex" "auto" "OpenSpec" "${_ws}/simple-fix.md"
+  local rc=0
+  _gate_entry || rc=$?
+  local ok=0
+  [ "$rc" -eq 1 ] && ! grep -q 'COMPLEXITY_ARTIFACT_MISMATCH' "$LOG_FILE" &&
+    grep -q 'held: complex ticket' "$LOG_FILE" || ok=1
+  _teardown
+  return $ok
+}
+# Must-pass: no create-artifact line, but the plan file on disk names the type.
+test_t0_artifact_type_from_plan_path() {
+  _setup
+  _scaffold_exec_done "simple" "auto" "simple-fix" "${_ws}/simple-fix.md"
+  grep -v '|EXEC|create-artifact|' "$LOG_FILE" >"$LOG_FILE.new" && mv "$LOG_FILE.new" "$LOG_FILE"
+  local rc=0
+  _gate_entry || rc=$?
+  local ok=0
+  [ "$rc" -eq 0 ] && ! grep -q 'gate-stop' "$LOG_FILE" || ok=1
+  _teardown
+  return $ok
+}
+
+# (c) verify-readiness — one self-ticked ✓ no longer vouches for every column.
+test_t0_vplan_tick_with_blank_user_and_nav_holds() {
+  _setup
+  _scaffold_exec_done "simple" "auto" "simple-fix" "${_ws}/simple-fix.md"
+  _scaffold_critique 75 CLEAR
+  cat >>"$(_t0_td)/notes.md" <<'PLANEOF'
+
+## Verification Plan
+
+### Per-Criterion Verification
+
+| # | Criterion | Role scope | Navigation path | Test data needed | Expected behavior | Verifiable |
+|---|----------|-----------|----------------|-----------------|-------------------|-----------|
+| 1 | Clicking Save stores the form |  | tbd | none | Saved banner shows | ✓ |
+PLANEOF
+  _scaffold_artifact_bare "${_ws}/simple-fix.md"
+  printf 'Click the Save button on the form screen.\n' >>"${_ws}/simple-fix.md"
+  local rc=0
+  _gate_entry || rc=$?
+  local ok=0
+  [ "$rc" -eq 1 ] && grep -q 'held: plan missing' "$LOG_FILE" || ok=1
+  _teardown
+  return $ok
+}
+
+# (d) open [needs-human] questions hold an auto-approval.
+_t0_questions() {
+  printf '\n## Open Questions\n%s\n' "$1" >>"$(_t0_td)/notes.md"
+}
+test_t0_open_needs_human_holds_auto_approve() {
+  _setup
+  _scaffold_exec_done "simple" "auto" "simple-fix" "${_ws}/simple-fix.md"
+  _t0_questions "- [needs-human] Should archived handovers be included?"
+  local rc=0
+  _gate_entry || rc=$?
+  local ok=0
+  [ "$rc" -eq 1 ] && grep -q 'held: open \[needs-human\] question' "$LOG_FILE" &&
+    ! grep -q 'flow-sh-called|CRE-47 human-approve' "$_flow_log" || ok=1
+  _teardown
+  return $ok
+}
+test_t0_open_needs_human_variant_bullets_hold() {
+  _setup
+  _scaffold_exec_done "simple" "auto" "simple-fix" "${_ws}/simple-fix.md"
+  printf '\n## Open questions\n\n### From critique\n* **[needs-human]** Which currency?\n' >>"$(_t0_td)/notes.md"
+  local rc=0
+  _gate_entry || rc=$?
+  local ok=0
+  [ "$rc" -eq 1 ] && grep -q 'held: open \[needs-human\]' "$LOG_FILE" || ok=1
+  _teardown
+  return $ok
+}
+# Must-pass: struck and agent-resolvable questions do not hold.
+test_t0_struck_needs_human_does_not_hold() {
+  _setup
+  _scaffold_exec_done "simple" "auto" "simple-fix" "${_ws}/simple-fix.md"
+  _t0_questions "- ~~[needs-human] Should archived handovers be included?~~ Answered: no.
+- [agent-resolvable] Which table holds handovers?"
+  local rc=0
+  _gate_entry || rc=$?
+  local ok=0
+  [ "$rc" -eq 0 ] && grep -q 'auto-approved' "$LOG_FILE" || ok=1
+  _teardown
+  return $ok
+}
+# Must-pass: a human's /ticket-approve is not blocked here — gate-reconcile
+# (STEP_3_5) decides on the open questions after a human approval.
+test_t0_open_needs_human_with_human_approval_passes() {
+  _setup
+  _scaffold_exec_done "simple" "auto" "simple-fix" "${_ws}/simple-fix.md"
+  _t0_questions "- [needs-human] Should archived handovers be included?"
+  local rc=0
+  (
+    _gate_manifest_approved() { echo pass; }
+    _gate_entry
+  ) || rc=$?
+  local ok=0
+  [ "$rc" -eq 0 ] || ok=1
+  _teardown
+  return $ok
+}
+
 for fn in \
+  test_t0_critique_status_mixed_case_blocked_stops \
+  test_t0_critique_status_bold_colon_variant_stops \
+  test_t0_critique_status_missing_stops \
+  test_t0_critique_status_unknown_value_stops \
+  test_t0_critique_result_file_blocked_wins_over_notes \
+  test_t0_critique_result_file_malformed_stops \
+  test_t0_critique_result_file_clear_passes \
+  test_t0_critique_stale_clear_file_never_loosens_blocked_notes \
+  test_t0_critique_stale_file_lower_notes_score_wins \
+  test_t0_critique_file_for_other_ticket_stops \
+  test_t0_complexity_missing_stops \
+  test_t0_artifact_type_missing_stops \
+  test_t0_artifact_type_first_word_wins \
+  test_t0_artifact_type_capitalised_openspec_is_openspec \
+  test_t0_artifact_type_from_plan_path \
+  test_t0_vplan_tick_with_blank_user_and_nav_holds \
+  test_t0_open_needs_human_holds_auto_approve \
+  test_t0_open_needs_human_variant_bullets_hold \
+  test_t0_struck_needs_human_does_not_hold \
+  test_t0_open_needs_human_with_human_approval_passes \
   test_entry_artifact_missing_gate_stop \
   test_entry_complexity_artifact_mismatch \
   test_entry_simple_auto_calls_flow_human_approve \

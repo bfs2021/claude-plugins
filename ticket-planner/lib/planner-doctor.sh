@@ -115,6 +115,15 @@ _planner_doctor_resolve_ticket_auto_lib() {
   return 1
 }
 
+# planner_doctor_corpus_under <dir> — print the first corpus/MANIFEST.tsv
+# (or corpus-raw/MANIFEST.tsv, the local unscrubbed replay) under <dir>, else
+# nothing. Bounded: 10 levels, .git, node_modules and .ticket-auto pruned.
+planner_doctor_corpus_under() {
+  [ -d "${1:-}" ] || return 0
+  find "$1" -maxdepth 10 \( -name .git -o -name node_modules -o -name .ticket-auto \) -prune -o \
+    -type f -name MANIFEST.tsv \( -path '*/corpus/MANIFEST.tsv' -o -path '*/corpus-raw/MANIFEST.tsv' \) -print -quit 2>/dev/null
+}
+
 planner_doctor_run() {
   local initiative_id="" fix_flag="false" arg
   for arg in "$@"; do
@@ -138,6 +147,15 @@ planner_doctor_run() {
     _issues=$((_issues + 1))
   else
     _row "REPOS_ROOT" "ok" "$REPOS_ROOT" "env" ""
+    # F46 class (seam-bash-derives slice 5): a corpus of real planner output
+    # (findings, past verdicts) under REPOS_ROOT is readable by every phase
+    # agent and shapes its output. This checkout's own corpus counts too.
+    local corpus_manifest
+    corpus_manifest=$(planner_doctor_corpus_under "$REPOS_ROOT")
+    if [ -n "$corpus_manifest" ]; then
+      _row "corpus-under-REPOS_ROOT" "error" "$corpus_manifest" "REPOS_ROOT" "a planner test corpus is readable by phase agents (F46) — use a REPOS_ROOT that does not contain this checkout or the corpus; do not start a run"
+      _issues=$((_issues + 1))
+    fi
   fi
 
   # ── 2. Linear team resolution ─────────────────────────────────────────

@@ -456,14 +456,23 @@ test_router_verify_dispatch_uses_verdict_tokens() {
   [ -f "$skill_md" ] || return 1
   local block
   block=$(sed -n '/### STEP_4_5 —/,/### STEP_4_6 —/p' "$skill_md")
-  grep -q 'VERDICT=PASS' <<<"$block" || {
-    echo "STEP_4_5 does not pass VERDICT=PASS on verify success"
+  # Seam audit Track 0.2: the verdict token is bash's (post-spawn ROUTE_*),
+  # never one the router model picks from the agent's prose.
+  grep -q 'RESULT={ROUTE_RESULT} VERDICT={ROUTE_VERDICT}' <<<"$block" || {
+    echo "STEP_4_5 does not pass post-spawn's ROUTE_RESULT/ROUTE_VERDICT"
     return 1
   }
-  grep -q 'VERDICT=FAIL' <<<"$block" || {
-    echo "STEP_4_5 does not pass VERDICT=FAIL on verify failure"
+  grep -qE 'RESULT=(done|fail) VERDICT=(PASS|FAIL)' <<<"$block" && {
+    echo "STEP_4_5 still hard-codes a VERDICT for the router to pick"
     return 1
   }
+  local pr
+  pr=$(sed -n '/### STEP_4_6 —/,/### Auto-merge logic/p' "$skill_md")
+  grep -q 'VERDICT={ROUTE_VERDICT}' <<<"$pr" || {
+    echo "STEP_4_6 does not pass post-spawn's ROUTE_VERDICT"
+    return 1
+  }
+  return 0
 }
 
 test_router_verify_checks_verify_last_before_dispatch() {

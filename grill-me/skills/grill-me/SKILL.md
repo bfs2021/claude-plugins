@@ -3,7 +3,7 @@ name: grill-me
 description: >
   Pre-work readiness gate — assesses an idea or input against a profile-driven
   dimension model, asks ranked clarification questions interactively, scores
-  readiness deterministically, and produces a cryptographically sealed
+  readiness deterministically, and produces a tamper-evident sealed
   Validated Business Intent document downstream consumers can gate on.
 category: Quality Gate
 tags: [readiness, quality-gate, intent, validation, scoring, seal]
@@ -58,19 +58,19 @@ flag, the procedure below is the interactive one and is unchanged.
 
 ### Step W: Resolve the work directory (every mode)
 
-Source `${CLAUDE_PLUGIN_ROOT}/lib/grill-hold.sh` and resolve `work_dir` before
-anything else is written:
+`lib/grill.sh` defines every `grill_*` function below; source it at the top of
+every Bash call. Resolve `work_dir` before anything is written:
 
 ```bash
+source "${CLAUDE_PLUGIN_ROOT}/lib/grill.sh"
 work_dir=$(grill_work_dir ${GRILL_ID:+--id "$GRILL_ID"} "$INPUT") || exit 1
 mkdir -p "$work_dir"
 ```
 
 `GRILL_ID` is the `--id` value, and `INPUT` is the brief from Step 0 (for
 `--answers` without `--id`, pass the same brief as the `--emit-questions` call).
-`grill_work_dir` prints `${GRILL_WORK_DIR}` when set, otherwise
-`${REPOS_ROOT}/.grill/<id>`. With neither variable set it fails, naming both, and
-nothing is written — do not fall back to a temporary directory.
+With neither `GRILL_WORK_DIR` nor `REPOS_ROOT` set it fails and writes nothing —
+never fall back to a temporary directory.
 
 ### Step 0: Resolve input
 
@@ -206,7 +206,7 @@ Run `grill_render "${work_dir}/result.json" "${work_dir}/assessment.json" "${OUT
 
 ### Step 7: Seal
 
-Run `grill_seal_generate "${OUTPUT_PATH}" "${PROFILE_ID}" "${READINESS}" "${RECOMMENDATION}" "${ROUND}" "${GENERATED_ISO}"`.
+Run `grill_seal_generate "${OUTPUT_PATH}" "$work_dir"`. Values come from `result.json`; none, or a stale one, seals nothing.
 
 ### Step 8: Report
 

@@ -1,0 +1,16 @@
+=== DOR_SEMANTIC_SCAN ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-frontend-reader-pages
+BODY_HASH: sha256:3149cea379e16c301ed2996d8b2752f75a08b962b8017f4fc926bc5e812dca61
+FINDING_1_CODE: EDGE_CASE_GAP
+FINDING_1_QUOTE: Routes registered here: `/` and `/article/:slug`.
+FINDING_1_DETAIL: The router intercepts internal link clicks, and this slice's header renders "Sign in" (/login) and "Sign up" (/register) links, but those routes are not registered until later tickets. Nothing says what the router does with an unmatched path, so a reader who clicks either header link, or opens any unknown path, may get a blank #app outlet or an uncaught router error. A not-found fallback should be defined, or the expected behaviour stated.
+GAP_REQUIREMENT_COMPLETENESS: clear
+GAP_REQUIREMENT_COMPLETENESS_REASON: Every described behaviour (header links, home list order and fields, SPA navigation, direct load/reload, 404 text, proxy, build) has a matching AC.
+GAP_CONTRADICTORY_REQUIREMENTS: clear
+GAP_CONTRADICTORY_REQUIREMENTS_REASON: Preconditions, behaviour, ACs, out-of-scope list and verification plan are consistent with each other.
+GAP_DEEP_SCOPE_AMBIGUITY: clear
+GAP_DEEP_SCOPE_AMBIGUITY_REASON: Files, routes and out-of-scope items are listed explicitly, and the deferred pieces (errors.js, signed-in header, other routes) are assigned to named later tickets.
+GAP_EDGE_CASE_SUFFICIENCY: finding
+GAP_EDGE_CASE_SUFFICIENCY_REASON: Nothing says what the router does with an unmatched route, and this slice's own header links lead to unregistered routes.
+=== END DOR_SEMANTIC_SCAN ===

@@ -17,6 +17,10 @@ TMPDIR=$(mktemp -d)
 trap 'rm -rf "$TMPDIR"' EXIT
 REPOS_ROOT="$TMPDIR"
 export REPOS_ROOT
+# No installed plugin cache: ticket-auto-pipeline's libs resolve to this
+# checkout (the unevaluated-tickets warning sources them, seam-gate-safety G5).
+export HOME="$TMPDIR/home"
+mkdir -p "$HOME"
 
 PASS=0
 FAIL=0
@@ -37,7 +41,7 @@ printf '{"flags":[{"name":"FLEET_AUTO_DISPATCH","value":"%s","source":"settings.
 EOF
 export FLEET_FEATURES_SH="$FAKE_FF"
 
-# Fixture: all 11 phases, Specify retried, 3 created + 1 idempotent skip,
+# Fixture: all 11 phases, Specify retried, 3 created + 1 idempotent skip (intent files),
 # one accepted Crosscheck finding, one test-data advisory.
 mk_log() {
   local id="$1" dir
@@ -66,6 +70,25 @@ mk_log() {
   } >"$dir/state.log"
   mkdir -p "$TMPDIR/.ticket-auto/initiatives/WIL-9/epic"
   echo '{"children":["WIL-10","WIL-11","WIL-12","WIL-13"]}' >"$TMPDIR/.ticket-auto/initiatives/WIL-9/epic/manifest.json"
+  # The facts COMPLETED.md reads (seam-bash-derives slice 2): Epic Gen's and
+  # TicketGen's intent files, one spec per ticket. WIL-13 was created by an
+  # earlier TicketGen run (the idempotent skip), so it was created first.
+  mkdir -p "$dir/.intents" "$dir/artifacts/specs"
+  intent "$dir/.intents/epic-${id}.json" "epic-${id}" WIL-9 2026-01-01T00:17:55Z
+  local s n=10 t
+  for s in a b c; do
+    intent "$dir/.intents/ticket-${s}.json" "ticket-${s}" "WIL-${n}" "2026-01-01T00:30:0$((n - 10))Z"
+    n=$((n + 1))
+  done
+  intent "$dir/.intents/ticket-d.json" ticket-d WIL-13 2025-12-31T00:00:00Z
+  for t in a b c d; do printf '# %s\n' "$t" >"$dir/artifacts/specs/${t}.md"; done
+  printf '# Index\n' >"$dir/artifacts/specs/INDEX.md"
+}
+
+# intent <file> <key> <linear_id> <created_at> — a created entity's intent file.
+intent() {
+  jq -nc --arg k "$2" --arg id "$3" --arg at "$4" \
+    '{entity_key: $k, linear_id: $id, created_at: $at, status: "created"}' >"$1"
 }
 
 echo "--- happy path ---"
@@ -101,14 +124,42 @@ doc=$(cat "$TMPDIR/.ticket-auto/initiatives/INIT-B/artifacts/COMPLETED.md")
 grep -A1 '^## Warnings' <<<"$doc" | grep -qx 'None.' && pass "no warnings -> None." || fail "None." "$doc"
 has "$doc" "WARNING:" && fail "dispatch on" "warned anyway" || pass "dispatch on: no warning"
 
-echo "--- failure: no EPIC_ID ---"
+echo "--- facts come from the intent files, not status-line messages ---"
+mk_log INIT-D
+D="$TMPDIR/.ticket-auto/initiatives/INIT-D"
+# Messages that disagree with the intents: they are free text now.
+sed -i 's/EPIC_ID=WIL-9$/EPIC_ID=WIL-99/; s/|3 tickets created, 1 skipped (idempotent), 0 failed$/|9 tickets created, 0 skipped (idempotent), 2 failed/; s/Created WIL-12: C/Created WIL-98: C/' "$D/state.log"
+out=$(FAKE_DISPATCH=true planner_completed_render INIT-D)
+doc=$(cat "$D/artifacts/COMPLETED.md")
+has "$out" "COMPLETED_EPIC=WIL-9" && ! has "$out" "WIL-99" && pass "epic id from the epic intent" || fail "epic intent" "$out"
+has "$out" "COMPLETED_TICKETS=4" && pass "ticket count from the intents" || fail "intent count" "$out"
+has "$doc" "- WIL-12" && ! has "$doc" "WIL-98" && pass "ticket ids from the intents" || fail "intent ids" "$doc"
+! has "$doc" "failed" && pass "a status line's failed count is not a warning" || fail "failed count" "$doc"
+[ "$(sed -n '/^## Tickets Created/,/^$/p' <<<"$doc" | grep '^- ' | tr '\n' ' ')" = "- WIL-13 - WIL-10 - WIL-11 - WIL-12 " ] &&
+  pass "tickets in creation order" || fail "ticket order" "$(sed -n '/^## Tickets Created/,/^$/p' <<<"$doc")"
+
+echo "--- a spec without a created ticket is a warning ---"
+printf '# e\n' >"$D/artifacts/specs/e.md"
+jq -nc '{entity_key: "ticket-e", status: "intent"}' >"$D/.intents/ticket-e.json"
+FAKE_DISPATCH=true planner_completed_render INIT-D >/dev/null
+doc=$(cat "$D/artifacts/COMPLETED.md")
+has "$doc" "- Specs with no created ticket: e" && has "$doc" "4 tickets" &&
+  pass "spec e named, count unchanged" || fail "missing ticket warning" "$doc"
+
+echo "--- failure: no created epic intent ---"
 mk_log INIT-C
-sed -i '/EPIC_ID=/d' "$TMPDIR/.ticket-auto/initiatives/INIT-C/state.log"
+rm -f "$TMPDIR/.ticket-auto/initiatives/INIT-C/.intents/epic-INIT-C.json"
 if FAKE_DISPATCH=true planner_completed_render INIT-C >/dev/null 2>&1; then
-  fail "no EPIC_ID" "rendered"
+  fail "no epic intent" "rendered"
 else
   [ ! -e "$TMPDIR/.ticket-auto/initiatives/INIT-C/artifacts/COMPLETED.md" ] &&
-    pass "no EPIC_ID -> rc 1, nothing written" || fail "no EPIC_ID" "file written"
+    pass "no epic intent -> rc 1, nothing written (the EPIC_ID line is not read)" || fail "no epic intent" "file written"
+fi
+jq -nc '{entity_key: "epic-INIT-C", status: "intent"}' >"$TMPDIR/.ticket-auto/initiatives/INIT-C/.intents/epic-INIT-C.json"
+if FAKE_DISPATCH=true planner_completed_render INIT-C >/dev/null 2>&1; then
+  fail "epic intent not created" "rendered"
+else
+  pass "an epic intent never marked created -> rc 1"
 fi
 
 echo "--- CLI ---"

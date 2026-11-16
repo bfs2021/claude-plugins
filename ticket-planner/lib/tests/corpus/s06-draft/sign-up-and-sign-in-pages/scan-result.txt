@@ -1,0 +1,14 @@
+=== DOR_SEMANTIC_SCAN ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-sign-up-and-sign-in-pages
+BODY_HASH: sha256:39e0d1b17fbec231d08bac1f113fe132a0349164da885713ffeac3d2c4d97bf7
+PARAPHRASE: Add sign-in and sign-up pages to the frontend, with a header that switches between signed-out links and the signed-in username plus New Article link, a session kept in localStorage under jwt that survives a reload, and a guard that sends a signed-out visit to /editor on to /login.
+GAP_REQUIREMENT_COMPLETENESS: clear
+GAP_REQUIREMENT_COMPLETENESS_REASON: Every behaviour in Proposed Behaviour has a criterion (both header states, both forms, sign-in and sign-up success and failure, reload persistence, /editor redirect, header on a path with no page); the sign-up path and post-submit destination are stated as implementer defaults, so no human decision is open.
+GAP_CONTRADICTORY_REQUIREMENTS: clear
+GAP_CONTRADICTORY_REQUIREMENTS_REASON: Summary, Proposed Behaviour, Technical Context, criteria and Verification Plan rows agree on paths, storage key, endpoints, status codes and credentials; no two requirements disagree.
+GAP_DEEP_SCOPE_AMBIGUITY: clear
+GAP_DEEP_SCOPE_AMBIGUITY_REASON: Scope names the concrete files created and extended, Out of Scope excludes home content, article page, editor form, settings and profiles, and the uncovered areas (error display, invalid stored token, sign-out) are listed explicitly as having no criterion.
+GAP_EDGE_CASE_SUFFICIENCY: clear
+GAP_EDGE_CASE_SUFFICIENCY_REASON: Wrong password, already-registered email, signed-out /editor visit and unregistered path each have a criterion; the stale-token and error-display cases are named and deliberately left without a criterion, and the Navigation Path (backend restart plus new browser context per attempt) keeps them from affecting verification.
+=== END DOR_SEMANTIC_SCAN ===

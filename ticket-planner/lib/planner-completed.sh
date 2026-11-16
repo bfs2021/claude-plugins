@@ -1,13 +1,18 @@
 #!/usr/bin/env bash
 # planner-completed.sh — deterministic renderer for the Completed phase's
 # artifacts/COMPLETED.md (DET-PL-4). Everything in the summary is a fact the
-# state log, the epic manifest or fleet-features.sh already holds, so no agent
-# writes it by hand.
+# state log, the intent files, the epic manifest or fleet-features.sh already
+# holds, so no agent writes it by hand.
+#
+# The epic id and the ticket ids and count come from the intent files
+# (.intents/epic-<INIT>.json, .intents/ticket-*.json) and the epic manifest,
+# never from a status line's message (seam-bash-derives slice 2): the
+# META|ticketgen Created/done lines are free text for people.
 #
 # Sourceable (planner_completed_render) or runnable:
 #   planner-completed.sh <INIT>
 # Exit 0: file written (tmp + mv); prints COMPLETED_EPIC= and COMPLETED_TICKETS=.
-# Exit 1: no EPIC_ID in the state log, or the log is unreadable — nothing written.
+# Exit 1: no created epic intent, or the log is unreadable — nothing written.
 #
 # FLEET_AUTO_DISPATCH is read through fleet-features.sh --json --no-env
 # --workspace $REPOS_ROOT (the workspace files fleetd itself starts from), never
@@ -36,6 +41,32 @@ _planner_completed_dispatch() {
   fi
 }
 
+# The id an intent file recorded once its entity was created, or nothing.
+_planner_completed_intent_id() {
+  jq -r 'select(.status == "created") | .linear_id // empty' "$1" 2>/dev/null
+}
+
+# _planner_completed_unevaluated <INIT> — "<n>\t<TID,...>" for the children
+# Refinement left unevaluated, nothing when none or no epic, "unknown" when
+# the manifests cannot be read. Subshell: its sourcing stays out of the caller.
+_planner_completed_unevaluated() {
+  (
+    declare -f planner_refinement_unevaluated >/dev/null 2>&1 ||
+      source "${_PLANNER_COMPLETED_DIR}/planner-refinement.sh" 2>/dev/null || {
+      echo unknown
+      exit 0
+    }
+    planner_epic_id "$1" >/dev/null 2>&1 || exit 0
+    _planner_refinement_source_deps >/dev/null 2>&1 || {
+      echo unknown
+      exit 0
+    }
+    local tids
+    tids=$(planner_refinement_unevaluated "$1" 2>/dev/null | cut -f1 | paste -sd, -)
+    [ -z "$tids" ] || printf '%s\t%s\n' "$(awk -F, '{print NF}' <<<"$tids")" "$tids"
+  )
+}
+
 planner_completed_render() {
   local init="$1" log dir epic
   log=$(planner_state_log "$init" 2>/dev/null) || return 1
@@ -44,29 +75,40 @@ planner_completed_render() {
     return 1
   }
   dir=$(dirname "$log")
-  epic=$(grep -E '^[^|]*\|EpicGen\|[^|]*\|done\|EPIC_ID=[^|]*$' "$log" | tail -1 | sed 's/^.*|EPIC_ID=//')
+  # The epic id from Epic Gen's intent file (seam-bash-derives slice 2), never
+  # from a status line's message.
+  epic=""
+  [ -f "${dir}/.intents/epic-${init}.json" ] &&
+    epic=$(_planner_completed_intent_id "${dir}/.intents/epic-${init}.json")
   [ -n "$epic" ] || {
-    echo "planner-completed: no EPIC_ID in ${log} — cannot summarize" >&2
+    echo "planner-completed: no created epic in ${dir}/.intents/epic-${init}.json — cannot summarize" >&2
     return 1
   }
 
-  local idea tickets manifest counts n_created=0 n_skipped=0 n_failed=0 total
+  local idea tickets manifest f slug id total missing=""
   idea=$(grep '^[^|]*|META|idea|start|' "$log" | head -1 | cut -d'|' -f5-)
-  # Ticket IDs: TicketGen's Created lines in creation order, then any epic
-  # manifest child they miss (an idempotent skip logs no ID).
-  tickets=$(grep '^[^|]*|META|ticketgen|step|Created ' "$log" | cut -d'|' -f5- | sed 's/^Created \([^:]*\):.*/\1/')
+  # Ticket ids: every created ticket intent, in creation order (created_at,
+  # then entity key), then any epic manifest child they miss. Specs with no
+  # created ticket are listed under Warnings.
+  tickets=$(for f in "${dir}"/.intents/ticket-*.json; do
+    [ -f "$f" ] || continue
+    jq -r 'select(.status == "created" and (.linear_id // "") != "")
+      | [(.created_at // ""), (.entity_key // ""), .linear_id] | @tsv' "$f" 2>/dev/null
+  done | LC_ALL=C sort | cut -f3)
   manifest="${REPOS_ROOT}/.ticket-auto/initiatives/${epic}/epic/manifest.json"
   if [ -f "$manifest" ]; then
     tickets=$(printf '%s\n%s\n' "$tickets" "$(jq -r '.children[]? // empty' "$manifest" 2>/dev/null)" |
       awk 'NF && !seen[$0]++')
   fi
-  counts=$(grep '^[^|]*|META|ticketgen|done|' "$log" | tail -1 | cut -d'|' -f5-)
-  if [ -n "$counts" ]; then
-    read -r n_created n_skipped n_failed < <(awk '{ print $1+0, $4+0, $7+0 }' <<<"$counts")
-  else
-    n_created=$(grep -c . <<<"$tickets" || true)
-  fi
-  total=$((n_created + n_skipped))
+  total=$(grep -c . <<<"$tickets" || true)
+  for f in "${dir}"/artifacts/specs/*.md; do
+    [ -f "$f" ] || continue
+    slug=$(basename "$f" .md)
+    [ "$slug" = "INDEX" ] && continue
+    id=""
+    [ -f "${dir}/.intents/ticket-${slug}.json" ] && id=$(_planner_completed_intent_id "${dir}/.intents/ticket-${slug}.json")
+    [ -n "$id" ] || missing="${missing:+${missing}, }${slug}"
+  done
 
   local dispatch dval dsrc dwarn=""
   dispatch=$(_planner_completed_dispatch)
@@ -79,8 +121,7 @@ planner_completed_render() {
   mkdir -p "${dir}/artifacts"
   {
     printf '# Completion summary — %s\n\n## Initiative\n- **ID:** %s\n- **Idea:** %s\n\n' "$init" "$init" "$idea"
-    printf '## Tickets Created\n%s tickets (%s created, %s skipped as already existing, %s failed)\n' \
-      "$total" "$n_created" "$n_skipped" "$n_failed"
+    printf '## Tickets Created\n%s tickets\n' "$total"
     [ -z "$tickets" ] || sed 's/^/- /' <<<"$tickets"
     printf '\n## Epic\n- **Linear ID:** %s\n\n## Execution Status\n' "$epic"
     printf -- '- **FLEET_AUTO_DISPATCH:** %s (source: %s)\n' "$dval" "$dsrc"
@@ -96,8 +137,17 @@ planner_completed_render() {
           printf "| %s | %s | %s |\n", p[i], (p[i] in s ? s[p[i]] : "-"), (p[i] in e ? e[p[i]] : "-") }' "$log"
     printf '\n## Warnings\n'
     {
-      [ "$n_failed" -eq 0 ] || printf -- '- %s ticket(s) failed validation and were skipped (see META|ticketgen|warn)\n' "$n_failed"
+      [ -z "$missing" ] || printf -- '- Specs with no created ticket: %s\n' "$missing"
       [ -z "$dwarn" ] || printf -- '- %s\n' "$dwarn"
+      # Tickets the semantic evaluator could not judge (seam-gate-safety D4):
+      # never dispatched until a resume re-judges them; not a clean run.
+      local unev
+      unev=$(_planner_completed_unevaluated "$init")
+      case "$unev" in
+      "") ;;
+      unknown) printf -- '- Unevaluated tickets: unknown — the ticket manifests could not be read; not a clean run\n' ;;
+      *) printf -- '- Not evaluated by the semantic evaluator (harness error, stay not ready until a resume re-judges them): %s — %s; not a clean run\n' "${unev%%$'\t'*}" "${unev#*$'\t'}" ;;
+      esac
       awk -F'|' '$2 == "META" {
         m = $5; for (i = 6; i <= NF; i++) m = m "|" $i
         if ($3 == "crosscheck" && $4 == "accepted") print "- Crosscheck accepted by operator: " m

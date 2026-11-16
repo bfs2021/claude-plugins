@@ -1,0 +1,55 @@
+2026-11-13T18:26:51Z|META|schema|start|1
+2026-11-13T18:26:51Z|META|initiative-id|start|INIT-0000000000-2294
+2026-11-13T18:26:51Z|META|idea|start|Build the first slice of a blogging app modelled on the RealWorld Conduit spec in the app repo: register, login, current user, create/read/list articles, and five frontend pages, replacing the calculator placeholder. 
+2026-11-13T18:26:51Z|META|contract|start|test-data-source-v1
+2026-11-13T18:26:51Z|META|no-tests-rule|done|false
+2026-11-13T18:27:07Z|Appraisal|scope|start|Interpreting idea: Build the first slice of a blogging app modelled on the RealWorld Conduit spec in the app repo: register, login, current user, create/read/list articles, and five frontend pages, replacing the calculator placeholder.
+2026-11-13T18:28:01Z|Appraisal|scope|done|Scope summary written to artifacts/appraisal.md
+2026-11-13T18:28:20Z|Discovery|explore|start|Exploring affected repositories
+2026-11-13T18:28:41Z|META|discovery|repo-ref|app@main@54d88f7c38c68fe8229b5bd0d135ca9b6e6c78fb
+2026-11-13T18:29:41Z|Discovery|explore|done|Discovery report: 1 services, 4 symbols resolved
+2026-11-13T18:30:00Z|Architecture|design|start|Evaluating technical approaches
+2026-11-13T18:32:03Z|Architecture|design|done|Architecture decision: two npm packages - Express createApp factory with fresh seeded in-memory store, node --test + supertest, Vite SPA with dev proxy and History-API router; 7 sequential steps
+2026-11-13T18:32:09Z|META|contract|start|specify-parameters-v1
+2026-11-13T18:32:09Z|META|contract|start|spec-ownership-v1
+2026-11-13T18:32:09Z|META|contract|start|ac-precondition-v1
+2026-11-13T18:32:28Z|Specify|synthesize|start|Synthesizing proposal and writing specs
+2026-11-13T18:48:42Z|Specify|synthesize|done|Proposal written, 7 ticket specs in artifacts/specs/, self-lint clean
+2026-11-13T18:48:51Z|META|goldfish|skip|c4bce5188157 DISABLED
+2026-11-13T18:49:03Z|Review|critique|start|Critiquing proposal for gaps and risks
+2026-11-13T18:54:04Z|Review|critique|done|Review complete: 0 blockers, 3 major, 10 minor, 5 nit; verdict needs-revision
+2026-11-13T18:56:21Z|META|ac-precondition|done|0 checked, 0 unchecked, 21 planned, 25 input
+2026-11-13T18:57:01Z|Consensus|resolve|start|Resolving 18 review findings
+2026-11-13T18:58:47Z|META|ac-precondition|done|0 checked, 0 unchecked, 21 planned, 25 input
+2026-11-13T18:59:35Z|META|ac-precondition|done|0 checked, 0 unchecked, 21 planned, 25 input
+2026-11-13T19:01:02Z|META|ac-precondition|done|0 checked, 0 unchecked, 21 planned, 25 input
+2026-11-13T19:02:49Z|META|ac-precondition|done|0 checked, 0 unchecked, 21 planned, 25 input
+2026-11-13T19:03:38Z|Consensus|resolve|done|Consensus: 17 accepted, 0 rejected, 1 deferred
+2026-11-13T19:03:47Z|Crosscheck|check|start|running testdata-synth + citation + propagation + bypass + contracts + signals + deps + testdata checks
+2026-11-13T19:03:47Z|Crosscheck|testdata-synth|start|synthesizing test-data specs for unowned needs
+2026-11-13T19:03:50Z|Crosscheck|testdata-synth|done|0 TD spec(s), 0 need(s)
+2026-11-13T19:03:50Z|META|ownership-edges|done|14 edge(s)
+2026-11-13T19:04:38Z|META|ac-precondition|done|0 checked, 0 unchecked, 21 planned, 25 input
+2026-11-13T19:04:38Z|Crosscheck|check|done|clean (0 warn, 0 accepted)
+2026-11-13T19:04:44Z|META|draft-readiness|start|evaluator=dor-semantic-v4
+2026-11-13T19:05:36Z|META|draft-readiness|info|round=0 revise=0 reevaluate=4 spawns=4/56
+2026-11-13T19:06:56Z|META|draft-readiness|info|round=0 revise=0 reevaluate=4 spawns=8/56
+2026-11-13T19:08:11Z|META|draft-readiness|info|round=0 revise=0 reevaluate=3 spawns=11/56
+2026-11-13T19:09:31Z|META|draft-readiness|info|round=0 revise=0 reevaluate=3 spawns=14/56
+2026-11-13T19:10:46Z|META|draft-readiness|info|round=1 revise=2 reevaluate=0 spawns=16/56
+2026-11-13T19:10:46Z|META|draft-revise|start|articles-api round=1 findings=1
+2026-11-13T19:10:46Z|META|draft-revise|start|frontend-shell round=1 findings=1
+2026-11-13T19:13:53Z|META|draft-revise|done|articles-api round=1 status=applied resolved=1 rebutted=0 unaddressed=0 added=3 extended=0
+2026-11-13T19:14:27Z|META|draft-revise|info|frontend-shell ASSUMED EDGE_CASE_GAP f-76cf2da848b3 "When the start-up call fails or answers with any status other than 200 or 401, the stored token is kept, the visitor is shown as signed out for that page load, and the router still starts."
+2026-11-13T19:14:27Z|META|draft-revise|done|frontend-shell round=1 status=applied resolved=0 rebutted=0 unaddressed=0 added=3 extended=0 assumed=1
+2026-11-13T19:14:27Z|Crosscheck|check|start|running testdata-synth + citation + propagation + bypass + contracts + signals + deps + testdata checks
+2026-11-13T19:14:27Z|Crosscheck|testdata-synth|start|synthesizing test-data specs for unowned needs
+2026-11-13T19:14:31Z|Crosscheck|testdata-synth|done|0 TD spec(s), 0 need(s)
+2026-11-13T19:15:24Z|META|ac-precondition|done|0 checked, 0 unchecked, 21 planned, 25 input
+2026-11-13T19:15:24Z|Crosscheck|check|done|clean (0 warn, 0 accepted)
+2026-11-13T19:15:49Z|META|draft-readiness|info|round=1 revise=0 reevaluate=2 spawns=18/56
+2026-11-13T19:17:14Z|META|draft-readiness|info|round=1 revise=0 reevaluate=2 spawns=20/56
+2026-11-13T19:18:50Z|META|draft-readiness|info|frontend-shell DEMOTED MISSING_CORE_AC drift untouched f-23b7ae11a502
+2026-11-13T19:18:50Z|META|draft-readiness|info|frontend-shell DEMOTED EDGE_CASE_GAP drift untouched f-1d3269d24459
+2026-11-13T19:18:51Z|META|draft-readiness|fail|users-api SEMANTIC_UNVERIFIED "gap: requirement_completeness"
+2026-11-13T19:18:51Z|META|draft-readiness|done|blocked 1/7

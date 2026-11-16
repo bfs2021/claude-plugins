@@ -1,0 +1,17 @@
+=== DOR_SEMANTIC_SCAN ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-frontend-editor
+BODY_HASH: sha256:00bda19d114aa6775c363f93a888b8f19f064a33b5fff1298801e8f64e71120e
+PARAPHRASE: Add a browser /editor page where a signed-in author fills Title, Description and Body and publishes via POST /api/articles, landing on the new article's page, showing API validation errors as lines, and guard /editor so visitors without a confirmed session are redirected to /login; published titles render as plain text.
+FINDING_1_CODE: INTENT_AC_MISMATCH
+FINDING_1_QUOTE: After publishing the title `<img src=x onerror=alert(1)>`, the home page article list contains 0 `img` elements
+FINDING_1_DETAIL: The criterion counts every img element in the home page article list, not only ones produced from the title. If home.js (frontend-read-pages) renders author avatar images in article previews, as the standard Conduit preview does, this check fails even when the title is safely rendered as text; it should be scoped to the title element of the new article.
+GAP_REQUIREMENT_COMPLETENESS: clear
+GAP_REQUIREMENT_COMPLETENESS_REASON: Every proposed behaviour (open editor, form fields, publish and redirect, error lines, no browser checks, guard incl. reload and rejected token, safe text) has at least one acceptance criterion.
+GAP_CONTRADICTORY_REQUIREMENTS: clear
+GAP_CONTRADICTORY_REQUIREMENTS_REASON: Guard, validation and check-order statements are mutually consistent, including the newest-first ordering of the two published articles.
+GAP_DEEP_SCOPE_AMBIGUITY: clear
+GAP_DEEP_SCOPE_AMBIGUITY_REASON: Scope is bounded to editor.js and router.js with explicit Out of Scope list and named upstream files it relies on.
+GAP_EDGE_CASE_SUFFICIENCY: clear
+GAP_EDGE_CASE_SUFFICIENCY_REASON: Blank fields, reload, invalid stored token, pending session check, duplicate slug and markup in titles are all addressed for a small non-branching page.
+=== END DOR_SEMANTIC_SCAN ===

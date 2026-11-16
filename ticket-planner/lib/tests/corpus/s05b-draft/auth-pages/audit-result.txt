@@ -1,0 +1,9 @@
+=== DOR_SEMANTIC_AUDIT ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-auth-pages
+BODY_HASH: sha256:6ee671bc9a3a4db9db01fb1f933785166bfc776eccc2f3dbbb44092d064cc2ea
+MISSED_1_CODE: UNSTATED_DEPENDENCY
+MISSED_1_REASON: "The author stays signed in after the page is reloaded." needs app-start code that reads `jwt` from localStorage and restores the current user, but the ticket edits only login.js and register.js and never says that frontend-shell (or any named module) provides that restore; if it does not, the reload criterion fails with no file in scope to fix it.
+SCORE_PLAUSIBLE: yes
+SCORE_REASON: No dor_quality_score is present in the deterministic result; its status "ready" with empty missing/advisory arrays is plausible for a body with concrete, individually testable criteria, a full Verification Plan, named test user, seeded data source and named blocking tickets.
+=== END DOR_SEMANTIC_AUDIT ===

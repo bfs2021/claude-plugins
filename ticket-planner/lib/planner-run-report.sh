@@ -14,10 +14,30 @@
 # table is complete even when the Stop hook never fired; an open run stays
 # open (its summary is written by the hook or the next `begin`).
 # Read-only apart from that sync. Exit 0 printed, 1 no telemetry, 2 usage.
+#
+# Always ends with an `Unevaluated:` line (seam-gate-safety D4), printed even
+# when there is no telemetry: the drafts the latest draft gate run could not
+# judge (n/m), the epic's children carrying ready.harness_error, and the
+# `META|harness-error` lines in the state log. A run with any unevaluated
+# draft or ticket is not a clean run (runbook §5); a count that cannot be
+# read prints `unknown`, which is not clean either.
 
 _PRR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=planner-run-telemetry.sh
 source "${_PRR_DIR}/planner-run-telemetry.sh"
+
+# planner_run_unevaluated <INIT> — the `Unevaluated:` line, formatted from
+# planner_run_unevaluated_json (planner-run-telemetry.sh, which also puts the
+# same object in every planner_run record).
+planner_run_unevaluated() {
+  local u
+  u=$(planner_run_unevaluated_json "$1" 2>/dev/null) || u=""
+  if [ -z "$u" ]; then
+    echo "Unevaluated: unknown — not a clean run"
+    return 0
+  fi
+  jq -r '"Unevaluated: drafts \(.drafts), tickets \(.tickets)\(if (.ticket_ids | length) > 0 then " (\(.ticket_ids | join(",")))" else "" end), harness-error lines \(.harness_lines) — \(if .clean then "nothing unevaluated" else "not a clean run" end)"' <<<"$u"
+}
 
 planner_run_report() {
   local init="$1" sync="${2:-sync}" dir runs
@@ -26,6 +46,7 @@ planner_run_report() {
   runs="$dir/telemetry/runs.jsonl"
   if [ ! -s "$runs" ]; then
     echo "No run telemetry for ${init} (${runs})." >&2
+    planner_run_unevaluated "$init"
     return 1
   fi
   jq -rRs --arg init "$init" --arg bash "$PLANNER_TELEMETRY_BASH_PHASES" '
@@ -61,7 +82,12 @@ planner_run_report() {
         | ([$pt, $ot] | tsum) as $tt
         | [$phases[] | . as $p | select($p.tokens == null and (($bash | split(" ") | index($p.phase)) | not)) | $p.phase] | unique as $um
         | "Cost: \(if $tt == null then "UNMEASURED" else "tokens in \($tt.input) / out \($tt.output) / cache read \($tt.cache_read) / cache write \($tt.cache_create) (phase agents + orchestrator)" end)\(if ($um | length) > 0 then "; UNMEASURED: \($um | join(", "))" else "" end)" )
-  ' "$runs"
+  ' "$runs" || {
+    echo "Run telemetry for ${init} could not be read (${runs})." >&2
+    planner_run_unevaluated "$init"
+    return 1
+  }
+  planner_run_unevaluated "$init"
 }
 
 if [ "${BASH_SOURCE[0]}" = "$0" ]; then

@@ -280,14 +280,13 @@ After all checks complete, count all `[WARNING]` findings across all checks (0-6
 
 ## Determine status
 
-Do not apply the status rules by hand (any BLOCKER, score < 40 or 3+ WARNINGs → BLOCKED; 40-69 →
-WARNINGS; else CLEAR) — run the script, which also gives the action and verifier mapping
-(`--blockers`/`--warnings` are totals across all checks, `--score` is after the BLOCKER ceiling):
+Never apply the status rules by hand; the script also gives the action and verifier mapping
+(`--blockers`/`--warnings`: totals over all checks; `--score`: after the BLOCKER ceiling). It
+writes `critique-result.txt`, which the entry gate reads (`--from-audit`: drop the last 2 flags):
 
 ```bash
-eval "$(bash ~/.claude/skills/lib/critique-status.sh --score {SCORE} --blockers {BLOCKER_COUNT} --warnings {WARNING_COUNT})"
-# → CRITIQUE_STATUS, CRITIQUE_BLOCK_REASON (blocker|low-score|cumulative-warnings|none),
-#   CRITIQUE_ACTION (needs-info|warn|clear), CRITIQUE_VERDICT, CRITIQUE_CRITERIA_MET
+eval "$(bash ~/.claude/skills/lib/critique-status.sh --score {SCORE} --blockers {BLOCKER_COUNT} --warnings {WARNING_COUNT} --ticket {TICKET-ID} --result-file "{TICKET_DIR}/critique-result.txt")"
+# → CRITIQUE_STATUS, _BLOCK_REASON, _ACTION (needs-info|warn|clear), _VERDICT, _CRITERIA_MET
 ```
 
 Write `$CRITIQUE_STATUS` as the `**Status:**` and route "Act on results" on `$CRITIQUE_ACTION`.

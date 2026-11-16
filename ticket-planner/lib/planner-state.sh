@@ -154,6 +154,11 @@ planner_state_read() {
 # Append a line to the state log. Atomic via flock (exclusive lock) with
 # tmp+mv fallback if flock is unavailable.
 # Usage: planner_state_write <initiative_id> <phase> <step> <status> <message>
+# Returns: 0 written, 1 error, 3 a duplicate `done` was suppressed (nothing
+# written; the reason is on stderr). Rc 3 is deliberate (seam-bash-derives,
+# rehearsal F70): an agent that re-writes a corrected `done` must see that the
+# log kept the first one. Bash callers that may legitimately repeat a `done`
+# ignore the rc or list the step in PLANNER_REPEATABLE_META_STEPS.
 planner_state_write() {
   local initiative_id="$1" phase="$2" step="$3" status="$4" message="$5"
   local log_file iso
@@ -174,7 +179,7 @@ planner_state_write() {
 
   # Duplicate entry detection — reject done→done, allow fail→done and start→done
   if ! _planner_check_duplicate "$log_file" "$phase" "$step" "$status"; then
-    return 0
+    return 3
   fi
 
   if command -v flock >/dev/null 2>&1; then
@@ -269,9 +274,12 @@ PLANNER_CONFIG_KEYS="stop-after create-authorized linear-team linear-team-id lin
 # `draft-readiness` is a gate run (start … done), repeatable by design: every
 # run of the draft readiness gate writes its own done line (S2b).
 # `goldfish` (planner-goldfish-review) records one terminal line per proposal
-# version; every version's lines are kept. `panel` (planner-persona-panel)
-# records one terminal line per proposal version and seat.
-PLANNER_REPEATABLE_META_STEPS="refinement-round refinement-converge refinement-dispute refinement-after-completed draft-readiness draft-revise goldfish panel"
+# version; every version's lines are kept. `ownership-edges` is one record per
+# Crosscheck run (planner-crosscheck.sh writes it after every edges step), so a
+# resumed Crosscheck's line is kept rather than suppressed (seam-bash-derives).
+# `panel` (planner-persona-panel) records one terminal line per proposal
+# version and seat.
+PLANNER_REPEATABLE_META_STEPS="refinement-round refinement-converge refinement-dispute refinement-after-completed draft-readiness draft-revise goldfish ownership-edges panel"
 
 # Is <step> a config key rather than a progress marker?
 # Usage: _planner_is_config_key <step>
@@ -650,7 +658,10 @@ planner_state_repair() {
   planner_phase_sequence valid_phases
   valid_phases+=("META")
 
-  local valid_statuses="start done fail skip"
+  # Every status planner_state_write is called with. accepted (an operator
+  # accept), info, step and warn were missing, so a repair dropped them —
+  # an accept silently undone, the draft gate's warn lines lost.
+  local valid_statuses="start done fail skip accepted info step warn"
   local line_count=0 kept=0 dropped=0 trailing=0
   local tmp="${log_file}.repair.tmp.$$"
   local phase status
@@ -757,7 +768,7 @@ _planner_check_duplicate() {
       if [ "$last_status" = "fail" ] || [ "$last_status" = "start" ] || [ "$last_status" = "step" ]; then
         return 0
       fi
-      echo "planner-state: WARNING — duplicate done entry for ${phase}/${step} suppressed" >&2
+      echo "planner-state: duplicate done for ${phase}/${step} not written (rc 3) — the log keeps the earlier done line; write a ${phase}/${step} start line first if this is a new run" >&2
       return 1
     fi
     ;;

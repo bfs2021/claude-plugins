@@ -320,6 +320,13 @@ done
   _pass "large body (${#big} bytes) with an early Verification Plan parses under pipefail" ||
   _fail "large body parsed as no Verification Plan in $_sp_fail/5 runs (SIGPIPE from echo | grep -q)"
 
+# Seam audit Track 0.3: per-column evidence from the verifiable rows only.
+cols=$(printf '## Verification Plan\n\n### Per-Criterion Verification\n\n| # | Criterion | Role scope | Navigation path | Test data needed | Expected behavior | Verifiable |\n|---|---|---|---|---|---|---|\n| 1 | a | global | /handover/ | none | It works | ✓ |\n| 2 | b |  | tbd | not recorded in spec | — | ✓ |\n| 3 | c | admin | /admin/ | seed: 3 rows | Shown | ✗ |\n')
+vplan_parse "$cols"
+[ "$VPLAN_VERIFIABLE $VPLAN_V_ROLE $VPLAN_V_NAV $VPLAN_V_DATA $VPLAN_V_EXPECTED" = "2 1 1 1 1" ] &&
+  _pass "Track 0.3: per-column counts read only filled cells of verifiable rows" ||
+  _fail "Track 0.3: per-column counts should be '2 1 1 1 1' (got '$VPLAN_VERIFIABLE $VPLAN_V_ROLE $VPLAN_V_NAV $VPLAN_V_DATA $VPLAN_V_EXPECTED')"
+
 echo "---"
 echo "$PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ] && exit 0 || exit 1

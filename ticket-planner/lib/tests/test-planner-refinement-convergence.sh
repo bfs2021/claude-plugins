@@ -80,10 +80,13 @@ _edit() {
 }
 
 # _scan <INIT> <TID> [<CODE>|<quote>|<detail> ...] — canned scan result.
-# A gap is marked "finding" when a finding falls in its dimension.
+# A gap is marked "finding" when a finding falls in its dimension. Like a
+# real spawn, the prompt is built first: it writes the spawn request the
+# result is bound to (seam-bash-derives slice 3).
 _scan() {
   local init="$1" tid="$2"
   shift 2
+  planner_refinement_prompt "$init" "$tid" scan >/dev/null || return 1
   local hash out n=0 spec code quote detail dims=""
   hash=$(_hash "$init" "$tid")
   out="=== DOR_SEMANTIC_SCAN ===
@@ -119,6 +122,7 @@ GAP_${gap%%:*}_REASON: canned"
 # _audit <INIT> <TID> [<extra lines>] — canned audit result.
 _audit() {
   local hash
+  planner_refinement_prompt "$1" "$2" audit >/dev/null || return 1
   hash=$(_hash "$1" "$2")
   {
     printf '=== DOR_SEMANTIC_AUDIT ===\nSCHEMA_VERSION: 1\nTICKET: %s\nBODY_HASH: %s\n' "$2" "$hash"

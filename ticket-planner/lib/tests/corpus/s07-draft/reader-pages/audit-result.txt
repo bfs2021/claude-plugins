@@ -1,0 +1,7 @@
+=== DOR_SEMANTIC_AUDIT ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-reader-pages
+BODY_HASH: sha256:d4a7cea7779a3766ea2bb39491667c18b1aa62eaa9797b2e5ed1dba7873ff12f
+SCORE_PLAUSIBLE: yes
+SCORE_REASON: No dor_quality_score is present; the status "ready" with empty missing/advisory is plausible, since every described behaviour (ordered list, previews, navigation without reload, direct load, 404, unknown path, failed request) has a testable criterion backed by named seed data.
+=== END DOR_SEMANTIC_AUDIT ===

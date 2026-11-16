@@ -1,0 +1,14 @@
+=== DOR_SEMANTIC_SCAN ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-backend-scaffold
+BODY_HASH: sha256:52a6889d85cfc3bd097b822a9c769de28b8458e5bfd3e061f4733a663f5237c1
+PARAPHRASE: Scaffold the backend/ ES-module Express package in app (non-listening createApp factory over a fresh in-memory store seeded with two users and two articles, shared error and serializer helpers, empty users/articles routers under /api, server.js on port 3000 with a JWT_SECRET warning, node --test runner) and replace the calculator wording in README.md and CLAUDE.md, adding .gitignore.
+GAP_REQUIREMENT_COMPLETENESS: clear
+GAP_REQUIREMENT_COMPLETENESS_REASON: Each core behavior (seed values, bcrypt cost, per-call store isolation, 404 on unknown path, error bodies, serializer key sets, JWT_SECRET warning, test runner exit, lockfile, gitignore, doc wording) has a named test or command-level criterion; the uncovered store lookup helpers and engines field are internal details with no observable behavior until later tickets add routes.
+GAP_CONTRADICTORY_REQUIREMENTS: clear
+GAP_CONTRADICTORY_REQUIREMENTS_REASON: Summary, Proposed Changes, Technical Context, parameters, criteria and Verification Plan rows agree on port 3000, cost 10, seed values, updatedAt equal to createdAt and the npm start/test commands; no two statements disagree.
+GAP_DEEP_SCOPE_AMBIGUITY: clear
+GAP_DEEP_SCOPE_AMBIGUITY_REASON: Every new file and every edited line is enumerated, Out of Scope excludes working endpoints, token handling, frontend, database, CI and CORS, and the invalid-JSON response is explicitly left unspecified with no criterion depending on it.
+GAP_EDGE_CASE_SUFFICIENCY: clear
+GAP_EDGE_CASE_SUFFICIENCY_REASON: The change is a non-branching scaffold with no working endpoint; the branches it does have (JWT_SECRET set vs unset, unknown path, repeated createApp calls) each have a criterion.
+=== END DOR_SEMANTIC_SCAN ===

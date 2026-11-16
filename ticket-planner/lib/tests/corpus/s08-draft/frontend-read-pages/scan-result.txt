@@ -1,0 +1,14 @@
+=== DOR_SEMANTIC_SCAN ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-frontend-read-pages
+BODY_HASH: sha256:9f11a88d8e0b51e52fd70c7e9536c2e0c66a829b8591262075f9acfed59c5070
+PARAPHRASE: Add two signed-out frontend pages: a home page at / listing published articles newest first (title link, description, author) and an article page at /article/:slug showing title, author and body, with plain-text rendering, a not-found message on 404 and an unreachable-server message when the backend is down or answers 5xx.
+GAP_REQUIREMENT_COMPLETENESS: clear
+GAP_REQUIREMENT_COMPLETENESS_REASON: Every proposed behaviour (list order and fields, title links, article fields, 404 message, unreachable message on both pages, literal HTML rendering) has at least one acceptance criterion; no open human decision.
+GAP_CONTRADICTORY_REQUIREMENTS: clear
+GAP_CONTRADICTORY_REQUIREMENTS_REASON: Summary, proposed behaviour, technical context, criteria and verification rows describe the same change consistently.
+GAP_DEEP_SCOPE_AMBIGUITY: clear
+GAP_DEEP_SCOPE_AMBIGUITY_REASON: Scope is bounded to two named new page files plus router registration, with an explicit out-of-scope list.
+GAP_EDGE_CASE_SUFFICIENCY: clear
+GAP_EDGE_CASE_SUFFICIENCY_REASON: The plausible failure paths for read-only pages (unknown slug, backend down, injected HTML, back navigation, direct URL entry) are each covered by a criterion.
+=== END DOR_SEMANTIC_SCAN ===

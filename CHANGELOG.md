@@ -17,9 +17,9 @@ marketplace. Where a release also moved `ticket-planner`, `fleet-controller`, or
 > - **0.19.0 never existed.** `plugin.json` went 0.18.0 → 0.20.0. The Phase 2
 >   commit message claims `0.19.0→0.20.0`, but no 0.19.0 was ever committed.
 
-## ticket-planner 0.45.0 (2026-11-13) — personas and the review panel wired (off by default)
+## ticket-planner 0.51.0 (2026-11-16) — planner-persona-panel: personas and the review panel (off by default)
 
-planner-persona-panel PR B of 2. ticket-auto-pipeline and fleet-controller unchanged.
+planner-persona-panel, both PRs in one release (first built as 0.44.0/0.45.0 on a branch; those numbers were taken on main meanwhile). ticket-auto-pipeline and fleet-controller unchanged apart from two catalog entries in `features.json`.
 
 ### Changed
 
@@ -31,15 +31,526 @@ planner-persona-panel PR B of 2. ticket-auto-pipeline and fleet-controller uncha
 
 With both flags off (the default), prompts, stdout and halt goldens are unchanged; each proposal version gets one `META|panel|skip … DISABLED` line and no `panel/` directory is written.
 
-## ticket-planner 0.44.0 (2026-11-13) — persona lookups and review panel, dormant
-
-planner-persona-panel PR A of 2. ticket-auto-pipeline and fleet-controller unchanged (two catalog entries in `features.json`).
-
 ### Added (dormant)
 
 - `lib/planner-personas.sh`: finds the persona files of `ticket-auto-pipeline` (`TICKET_AUTO_PLUGIN_ROOT`, then the directory beside the planner, then the installed plugin path), picks the persona of each authoring phase (Appraisal the product owner, Discovery the analyzer, Architecture the architect, Specify the developer for the stack, Epic and Ticket Generation the technical writer) and renders it as a `## Your perspective` block. When no persona directory is found it writes one `META|persona|skip|NOT_AVAILABLE` line and changes nothing.
 - `lib/planner-panel.sh` and `agents/panel-review-agent.md`: a review panel of up to five seats (product owner, architect and QA engineer always; security and one developer when the proposal calls for them), one result per seat and proposal version under `panel/`, at most 6 findings with the seat's id prefix (`PO`, `ARCH`, `QA`, `SEC`, `DEV`). A missing, malformed or contaminated result is retried once and then recorded as `META|panel|fail … NOT_RUN`. `planner_review_lenses_next` / `_apply` hand out the goldfish lens and the panel as one spawn list.
 - Flags `PLANNER_PHASE_PERSONAS` and `PLANNER_PERSONA_PANEL`, both default `false`. Nothing calls the new code yet: prompts, gates and halts are unchanged.
+
+## 0.121.0 / ticket-planner 0.50.0 (2026-11-16) — seam-gate-safety G5: an evaluator that could not judge is a harness error
+
+- **Looser quote re-check (ticket-auto-pipeline).** `dor_semantic_findings` tries a
+  second, looser match before a finding's quote is unverified: the quote is split at
+  every ellipsis (`…`, `...`), each piece loses enclosing quotes, punctuation and
+  whitespace, every piece must occur in the normalised body in order, and the longest
+  must be at least 12 characters (`DOR_SEMANTIC_LOOSE_QUOTE_MIN`), every piece at least
+  4 (`DOR_SEMANTIC_LOOSE_PIECE_MIN`). Case is never folded and no word is dropped. A
+  loose-verified finding is never demoted by the lineage policy (drift, round-limit,
+  draft-passed): before the re-check it would have blocked as unverified, so it keeps
+  blocking. A match is stored as the quote (the agent's text as
+  `quote_raw`, `quote_check: "loose"`), so anchoring and a later import read text the
+  body holds. Still unmatched: `verified: false`, `quote_check: "unverified-quote"`.
+  A verbatim quote takes the strict path unchanged.
+- **An advisory finding's bad quote is its own problem.** Every finding now records
+  `code_class` — its code's class (`_dor_semantic_severity`) when it was judged, never
+  the severity after a demotion. `dor_semantic_blocking_codes` (and the draft gate's
+  finding lines) raise `SEMANTIC_UNVERIFIED` for an unverified finding unless its
+  `code_class` is `advisory` (a finding without `code_class` counts as blocking), and
+  for an unbacked gap. Affected codes: the advisory-only `TEST_DATA_GAP` and
+  `INCOHERENT_CHANGE`, plus any code a host lists in `DOR_SEMANTIC_ADVISORY_CODES`. A
+  blocking-code finding with an unverified quote keeps its own `SEMANTIC_<DIMENSION>`
+  code and still raises `SEMANTIC_UNVERIFIED`; drift and the round limit no longer
+  demote an unverified finding at all (before, a round-limit demotion removed its own
+  code). Only a verified finding backs a gap. `dor/20-28` give the same codes as on
+  0.120.0.
+- **`ready.harness_error` (ticket-auto-pipeline).** New writer
+  `set_ticket_harness_error <TID> <json|null>` (`manifest-write.sh`). It never touches
+  `missing` or `status`: the field explains the codes, it never replaces them.
+  `set_ticket_semantic` drops it; `set_ticket_readiness` carries it only while the
+  semantic verdict is carried unstaled.
+- **Refinement: harness errors do not halt the epic.** `planner_refinement_unavailable`
+  still records `SEMANTIC_UNAVAILABLE` and now also `ready.harness_error` (code, reason,
+  each failed attempt's reason, attempts). A verdict whose only unwaived problem is
+  `SEMANTIC_UNVERIFIED` records one too. A child whose unwaived missing codes are all
+  harness codes and who carries the record is *not evaluated*: it stays not ready (never
+  dispatched), the gate passes (`Refinement|gate|done|<r> of <n> tickets ready, <u> not
+  evaluated (harness error), …` after `META|refinement-gate|warn|…`), and the report and
+  pass output list it under `## Not evaluated (harness error)`. A harness error next to
+  any other missing code halts as before. More than
+  `PLANNER_REFINEMENT_UNEVALUATED_MAX_SHARE` (default `0.25`, checked first in prepare)
+  of the children unevaluated halts the run with
+  `META|refinement-gate|fail|HARNESS_ERROR <u>/<n> unevaluated: <TIDs>`, so a mostly
+  unjudged epic never ends as a clean-looking Completed. A resume re-judges every child
+  with a harness error, also after Completed (`planner_refinement_after_completed_pending`);
+  the `unavailable` verdict carries the body hash it failed on, so a re-scan of the same
+  body keeps the record. Rejected results are kept as
+  `semantic-{scan,audit}-result.rejected.txt`.
+- **`FORMAT_RETRY_EXHAUSTED` is routed (G6's open seam).** The exhausted field goes into
+  the failed attempt's reason: the draft's `unavailable` reason at the draft gate (the
+  draft is then counted unevaluated), `ready.harness_error.reasons` at Refinement.
+- **Draft gate: the unevaluated cap.** A judged draft with `SEMANTIC_UNAVAILABLE` or
+  `SEMANTIC_UNVERIFIED` is unevaluated. More than `PLANNER_DRAFT_UNEVALUATED_MAX_SHARE`
+  (default `0.25`, validated by `planner_draft_readiness_config_check`; an unreadable
+  value counts as exceeded) halts the run before any Linear write:
+  `META|draft-readiness|fail|(run) HARNESS_ERROR <n>/<m> unevaluated`, done
+  `blocked <b>/<m> HARNESS_ERROR`. Fewer write `META|draft-readiness|warn|(run)
+  UNEVALUATED <n>/<m> <slugs>`; the report shows the share. With two drafts one failure
+  already halts (1/2 > 0.25).
+- **`PLANNER_DRAFT_WARN_CODES` reads with `:-`.** Exported empty, it is the default (warn
+  on the two harness codes). `PLANNER_DRAFT_WARN_CODES=none` makes them block — the old
+  "set it empty" no longer does.
+- **Run report, run record, stop describer, COMPLETED.md.** `planner_run_unevaluated_json`
+  (`planner-run-telemetry.sh`) is written into every `planner_run` record as
+  `unevaluated`, and `planner-run-report.sh` ends with `Unevaluated: drafts <n>/<m>,
+  tickets <k> (<TIDs>), harness-error lines <h> — nothing unevaluated | not a clean
+  run`, printed even without telemetry or when the telemetry cannot be read. A draft
+  run passed by an operator accept reads `accepted (last measured n/m)` and is never
+  clean; a count it cannot read is `unknown` and not clean. The stop describer prints
+  `UNEVALUATED=<n>` / `UNEVALUATED_TICKETS=<TIDs>` after `REASON=COMPLETED` when tickets
+  were left unevaluated, and reports the two harness halts as `DRAFT_HARNESS_ERROR`
+  and `REFINEMENT_HARNESS_ERROR`. COMPLETED.md lists unevaluated tickets under
+  Warnings.
+- **Compatibility.** The planner refuses a `manifest-write.sh` without
+  `set_ticket_harness_error` (ticket-auto-pipeline < 0.121.0). Older code ignores
+  `ready.harness_error`.
+
+## 0.120.0 / ticket-planner 0.49.0 (2026-11-16) — seam-gate-safety G6: DoR evaluator format retry (re-serialise only)
+
+- **A format slip is no longer a failed evaluation.** When a DoR semantic scan or audit
+  block fails to parse because of a leading bullet before a KEY, a wrapped value, an
+  enum in the wrong case (`Clear`, `Yes`) or a code in the wrong case,
+  `dor_semantic_format_step` (`lib/dor-semantic-parse.sh`) sends the block back to the
+  agent once per attempt: the original block verbatim, an error record
+  (`<result>.last-failure.json`: `{code: FORMAT_ERROR, field, expected, got, example}`,
+  expected/example taken from the block contract the evaluator prompt prints) and one
+  instruction, "Re-serialise this block in the required format. Do not add, remove or
+  change any finding, code, quote or verdict." The agent never sees the ticket body.
+- **Bash proves nothing was judged again.** Before the retry is used, bash reads both
+  blocks the same tolerant way and compares every value (whitespace collapsed, codes and
+  enums case-folded): schema, paraphrase, every gap verdict and reason, each finding's
+  code, quote, quote_b and detail, every audit and MISSED entry, `SCORE_PLAUSIBLE` and
+  `SCORE_REASON`. Anything added, changed or missing from the original rejects the retry,
+  so a content defect behind a format slip stays a defect. A dropped finding is put back
+  from the original (marked `restored: true` through a bash-written sidecar bound to the
+  file's sha, never a key in the block; its quote still checked against the body) or,
+  when it cannot be rebuilt, rejects the retry. Both blocks must be the only block of
+  their kind, with no marker-shaped line inside; an original replaced while its retry is
+  out is moved aside and never judged.
+  A block that parsed is never retried; a missing, duplicated or out-of-set value, another
+  `SCHEMA_VERSION`, a missing closing marker or an unaudited hard code is content and is
+  not retried either.
+- **Budget and exhaustion.** `DOR_SEMANTIC_FORMAT_RETRIES` (default 1, 0–5) per attempt,
+  outside the attempt count, revise rounds and `DEMOTE_CEILING`; the same `(field, got)`
+  twice stops early. Exhausted, the caller writes
+  `META|harness-error|fail|<ticket> FORMAT_RETRY_EXHAUSTED <field>`, then the attempt
+  fails exactly as before (one more attempt, then `SEMANTIC_UNAVAILABLE`/`unavailable`).
+  Routing that line to a harness-error verdict is slice 3 (D4), not built yet.
+- **Planner.** The draft readiness gate and Refinement run the step before parsing and
+  spawn the retry through the shared spawn list as kind `format` (`format: <id>` in run
+  telemetry). A format spawn that writes nothing is the retry's own failure, not a failed
+  attempt. The format files travel with `PLANNER_DRAFT_RESULT_FILES`; the gate start and
+  Refinement prepare refuse a bad `DOR_SEMANTIC_FORMAT_RETRIES`; the planner refuses a
+  `dor-semantic-parse.sh` without `dor_semantic_format_step` (ticket-auto-pipeline
+  < 0.120.0).
+- **Corpus ratchet.** With a stub agent that writes the unmutated block back, every
+  `bullets`/`casing`/`wrap` case of the rehearsal corpus now reaches `ok` with the same
+  codes: harmless flips 285 → 0, and all 6 `known.tsv` rows are removed. Every harmful
+  case still ends `PARSE_INVALID`. The ratchet self-test now plants its own failing case.
+- **Gate change (runbook §2).** `dor/20-28` give the same codes as on main. A separate
+  reviewer checked the retry and guard for fail-open paths and reproduced seven; all are
+  fixed with must-fail tests (an shfmt-mangled `--spawned` lookup that let an empty retry
+  loop, the two readers seeing different blocks, content invented behind a slip, values
+  past the code/anchor not compared, an original overwritten mid-retry, a forgeable
+  restored key, the wrong duplicate restored). This resets the dispatch rehearsal clean
+  counter.
+- Tests: `test-dor-semantic-format-retry.sh` (ticket-auto),
+  `test-planner-semantic-format-retry.sh` (planner, both callers through the spawn list).
+
+## ticket-planner 0.48.0 (2026-11-16) — seam-gate-safety G4: demotion registry (mechanism only) and the F58 guard fix
+
+- **Revise guard fix (rehearsal F58).** `ASSUMPTION_INVALID` in the draft readiness
+  revise loop (`_pdrv_assumption_check`) counted only the Scope assumption rows a round
+  added, so an `ASSUMED` line that quoted a row an earlier round had added was always
+  reverted ("1 ASSUMED line(s) for 0 new Scope assumption row(s)"). Such a line is now
+  accepted when its text matches a `- Assumption:` row that is in Scope before and after
+  the round and no new row repeats it. It claims no new row; every other rule still
+  applies to it (a new or extended criterion per ASSUMED line, a finding of the round,
+  never a security finding, the per-round cap of 3 ASSUMED lines). Each existing row
+  answers at most one finding per round. Rows and ASSUMED text now go through the same
+  normaliser, so a curly-quoted row matches a straight-quoted line. Fixture: rehearsal iteration 08, users-api, round 2
+  (scrubbed), `lib/tests/fixtures/draft-revise/f58-assumption-reuse/`. The ledger row is
+  now `fixed=yes`, `live=no`, and the code left the G4 candidate list.
+- **`ticket-planner/gates/gate-demotions.tsv`**: the registry of demoted gate codes
+  (`code, gate, scope, ledger_rows, fixture, sunset, reviewer`). It has no rows: no code
+  in the ledger meets the 2-live-false-in-10 threshold, so nothing is demoted. No gate
+  reads the file. `test-planner-gate-ledger.sh` validates any row: a listed ledger fire
+  of that gate and code that is false with `live=yes`, an existing fixture inside the
+  repository, a two-digit sunset later than the ledger's highest iteration, a reviewer,
+  a `code` or `variant:<NAME>` scope (whole-code needs 2 live false fires in 10), and a
+  code not on the protected list (`DEPENDENCY_CYCLE`, `NEEDS_HUMAN_DECISION`, the DoR
+  presence codes). Planted rows in a temp copy prove each rule fails.
+- Unchanged: `EDGE_CASE_GAP` and Refinement `MISSING_CORE_AC` (1 live false fire each,
+  below the threshold); the speculative `INTENT_AC_MISMATCH` warn is deferred until the
+  evidence reaches it. `ticket-auto-pipeline/lib/tests/fixtures/dor/20-28` fail with the
+  same codes as before.
+
+## ticket-planner 0.47.1 (2026-11-15) — seam-gate-safety G3: gate ledger seed (data only)
+
+- **`ticket-planner/gates/gate-ledger.tsv`** records every gate fire seen in dispatch
+  rehearsal iterations 01–10 (and the 05b rerun): 117 rows, 246 fires. Each row names the
+  gate, round, code, class, outcome, spec slug, count, a label (`true`, `false`,
+  `debatable`), the cause, whether that cause is fixed and — for a false fire — whether
+  it is still live on main, the finding id and a `<file>:<line>` pointer into the
+  rehearsal record. It applies deep-dive D's corrections (RESOLUTION_NOT_PROPAGATED, F25,
+  is false; UNSTATED_DEPENDENCY, F43, is debatable). Fire counts: 52 true, 172 false,
+  22 debatable (20 of them had no label recorded at run time). A separate reviewer agent
+  checked the labels against the run records.
+- **`ticket-planner/gates/gate-ledger-summary.sh`** is a read-only count by label, cause
+  and code, plus the codes G4 may consider for demotion: a false fire whose cause is
+  still live and a class today that is not warn (read from the planner libs; it fails
+  closed when it cannot read them). Today: Refinement `MISSING_CORE_AC` (1 live false,
+  8 true), draft `EDGE_CASE_GAP` (1 live false, 15 true), draft `INTENT_AC_MISMATCH`
+  (1 live false, F62) and the revise guard `ASSUMPTION_INVALID` (1 live false, F58).
+  Nothing is demoted.
+- **No gate changes.** Nothing reads the ledger to decide anything.
+- Test: `test-planner-gate-ledger.sh` (shape, label consistency, D's corrections, fixed
+  checker bugs never live, pinned candidate list, fail-closed summary; pointer resolution
+  when `GATE_LEDGER_EVIDENCE_DIR` names the local rehearsal folder).
+  `test-corpus-privacy.sh` now also scans every plugin's `gates/` directory.
+
+## ticket-planner 0.47.0 (2026-11-15) — seam-bash-derives slice 5: corpus scrub, privacy gate, doctor guard
+
+- **`scripts/corpus-scrub.sh <src> <dst>`** copies real planner output into a corpus tree
+  with one deterministic token map, applied to file contents and file names alike:
+  initiative ids, UUIDs and commit shas get a fake derived from a hash of the value (the
+  same value always gets the same fake), e-mails outside `conduit.test` and
+  `example.{com,org,net}` become `redacted@example.com`, token-shaped strings become
+  `REDACTED-TOKEN`, and `linear.app` URLs and home paths are rewritten. Private tokens
+  (names, the sandbox repository and owner, tracker keys, local path prefixes, which become
+  `~/work/`) are never committed: both the scrub and the privacy test read them from a
+  local names file (`$CORPUS_PRIVATE_NAMES_FILE`, default
+  `~/.config/claude-plugins/corpus-private-names`); without it only the generic rules
+  apply. It refuses binary files, symlinks and a non-empty destination. **`scripts/corpus-rehash.sh <dir>`** then recomputes what the
+  rewrite invalidated: `BODY_HASH` (and a spawn request's `body_hash`) with ticket-auto's
+  `_dor_body_hash` over the scrubbed `body.md`, and `revise.r<N>.sha` over the scrubbed
+  revise file. A result with no `body.md` beside it keeps its hash. Test:
+  `scripts/tests/test-corpus-scrub.sh`.
+- **`test-corpus-privacy.sh`** is its own CI test. It scans every `*/lib/tests/corpus/`
+  directory, contents and file names, for tracker ids and URLs, real initiative ids, home
+  paths and home-relative paths outside `~/work/`, token-shaped strings, e-mails outside
+  the allowlist and every token in the local names file, then plants one leak of each kind
+  (private names from a synthetic names file) in a copy and checks each is reported.
+- **`/ticket-planner doctor` refuses a `REPOS_ROOT` that holds a corpus (F46 class).** A
+  `corpus/MANIFEST.tsv` (or the local unscrubbed `corpus-raw/MANIFEST.tsv`) within 10
+  levels of `REPOS_ROOT` is an `error` row and counts as an issue: phase agents would read
+  past findings and verdicts. **For operators:** a `REPOS_ROOT` that contains this
+  checkout now fails doctor; point it at the sandbox repositories only.
+- **Runbook:** every rehearsal halt becomes a scrubbed corpus case, committed red, before
+  its fix (`docs/runbooks/dispatch-rehearsal.md` § 3).
+- **Rehearsal corpus, iterations 01–10 (slice 5b).** `scripts/corpus-harvest.sh` picks,
+  from the rehearsal folder, only what a replay reads: every state log, each spec set at
+  Crosscheck cut to slug, Title and the synth marker, and all 102 draft-readiness
+  scan/audit blocks with their `dor-result.json` (tainted run, prompts, grill work,
+  telemetry, ticket and draft bodies, Crosscheck output and before-fix copies left out).
+  Scrubbed, it adds 18 snapshots (11 runs, 7 draft gates; about 326 KB with the labels) to
+  `ticket-planner/lib/tests/corpus/`;
+  `MANIFEST.tsv` gains `read_against` and `contracts` columns. The unscrubbed copy stays
+  local, outside the repository.
+- **`test-planner-corpus-replay.sh`** replays them through the real readers:
+  `planner_position_derive` + `planner_crosscheck_findings_summary` (11 logs),
+  `planner_specify_result_ensure` + `planner_crosscheck_carve_scope` (10 spec sets) and
+  `parse_dor_semantic` (102 blocks). Each base verdict must equal its `labels.tsv`
+  `expected`. Harmless operators (CRLF, trailing spaces, casing, bullets, wrapping,
+  number words) must keep the verdict, and harmful ones must carry the blocking code:
+  20 `CARVE_SCOPE_LOST`, 50 `CHECK_ERRORED` and 570 `PARSE_INVALID` fixtures. Cases
+  today's code gets wrong are listed in `corpus/known.tsv`: every scan and audit
+  flips to invalid under a bullet, a capitalised enum or a wrapped line (285 cases).
+  The list may only shrink: a known case that starts passing fails the test until its
+  row is removed.
+
+## grill-me 0.7.0 (2026-11-15) — seam-bash-derives slice 4: the seal reads result.json
+
+- **The agent passes no seal value (seam audit, grill row G4).** `grill_seal_generate` took
+  readiness, recommendation, round and profile as arguments the agent copied from
+  `grill_score`'s stdout, so a stale round's numbers, a typo, or `ready` after a
+  `seal-with-gaps` downgrade sealed as VALID. It is now `grill_seal_generate <doc> <work_dir>`
+  and reads all four from `<work_dir>/result.json`; Generated is stamped in bash. A missing,
+  unparseable or out-of-contract `result.json` (profile id, integer readiness 0–100, known
+  recommendation, round ≥ 1), or an `assessment.json` at a different round (re-assessed, not
+  re-scored), refuses with the document untouched. The old six-argument call is refused too.
+- **One entry lib (rehearsal F68).** SKILL.md told the agent to source only
+  `lib/grill-hold.sh`, which defines none of the profile, input, score, render or seal
+  functions: a headless agent hit `grill_profile_load: command not found` and sourced every
+  lib itself. New `lib/grill.sh` sources the six libs from its own directory; SKILL.md
+  sources it in Step W. `test-grill-skill-sources.sh` sources exactly SKILL.md's documented
+  line in a clean shell and checks every `grill_*` name SKILL.md mentions is defined.
+- **Wording.** The seal is called tamper-evident, not "cryptographically sealed", in the
+  skill, manifests, READMEs and CLAUDE.md files: the hash is unkeyed SHA-256.
+- The verifier is unchanged: a seal written by 0.6.0 (`lib/tests/fixtures/sealed-intent-v0.6.0.md`)
+  verifies VALID. ticket-planner's intent-gate test seals through the new call.
+
+## 0.119.0 / ticket-planner 0.46.0 (2026-11-15) — seam-bash-derives slice 3: TICKET and BODY_HASH stamped by bash
+
+- **The DoR semantic evaluator copies no identity field (seam audit, draft gate row 7).**
+  The scan and audit prompts asked the agent to copy `TICKET` and a 64-hex `BODY_HASH`
+  into its block, and a one-character slip threw away a whole valid evaluation (a
+  failed attempt; two make the draft or ticket `SEMANTIC_UNAVAILABLE`).
+  `dor_semantic_prompt` now writes a spawn request beside each result file
+  (`dor_semantic_request_path`: `scan-result.txt` → `scan-result.request.json`,
+  `{version, kind, ticket, body_hash, attempt, result_file}`), takes `--attempt N`, and
+  no longer shows the hash or asks for either line.
+- **The request is the binding.** `dor_semantic_findings` / `dor_semantic_apply` take
+  the two request paths as optional trailing arguments. A request for another ticket,
+  or a body that no longer hashes to the request's `body_hash` (edited since the spawn),
+  is rejected as before. An echoed `TICKET`/`BODY_HASH` that disagrees with the request
+  is a stderr warning and ignored: the agent only copied it, so a mismatch says nothing
+  about which body it read. A missing or unreadable request warns and falls back to the
+  echoed values (checked strictly, as before); no request and no echo is rejected.
+- **Parser.** `TICKET` and `BODY_HASH` are optional (an echo still parses for one
+  release). No other contract change: codes, severities and quote verification are
+  untouched, and the evaluator string stays `dor-semantic-v4`.
+- **Callers (ticket-planner 0.46.0).** The draft readiness gate passes `--attempt` from
+  its `attempts` file and `_pdl_evaluate` passes both requests; the request files are in
+  `PLANNER_DRAFT_RESULT_FILES`, so a body change clears them and a revert restores them
+  with their results. Refinement passes `--attempt` (`semantic-attempts` + 1) and both
+  requests to apply, and clears them with the result files in `prepare`.
+  **For operators:** ticket-planner 0.46.0 needs ticket-auto-pipeline 0.119.0 or later;
+  with an older `dor-semantic.sh` Refinement and the draft gate stop with
+  `dor-semantic.sh is too old`. A result already on disk from an older prompt (no
+  request) is judged on its echo with a warning.
+- **Tests.** `test-dor-semantic-request.sh` (new, 38 cases) over real-shaped fixtures
+  `fixtures/dor/semantic/30-slip-*` (one-character hash slip) and `30-noticket-*` (no
+  `TICKET`); the draft gate harness stubs now write no echo (`DOR_ECHO=slip` scenario
+  7b in `test-planner-draft-readiness-gate-recover.sh`); Refinement's #497 block covers
+  the request, the slip, the attempt and a body edited after the spawn.
+
+## 0.118.0 (2026-11-15) — seam audit Track 0: ticket-auto fails closed on unreadable model text
+
+- **Auto-merge identity (0.1).** `auto-merge.sh` merges only when the `checkout-pr`
+  message is exactly a PR number (`#12` tolerated), the ticket branch is recorded
+  (`META|branch-context` `ticket=`), and the PR's head ref is readable, not the
+  integration branch and equal to that ticket branch. New skip codes
+  `PR_NUMBER_INVALID`, `TICKET_BRANCH_UNRECORDED`, `PR_HEAD_MISMATCH`; the head ref is
+  now read on every merge, not only with an integration branch.
+- **Outcome prose only withholds (0.1).** Without the dedicated
+  `IMPLEMENT|implement-outcome` line, `outcome-label-check.sh` recovers the worst of
+  Hard/Rough from the implement agent's prose and never Smooth, so a self-grade cannot
+  unlock auto-merge.
+- **VERIFY / PR-REVIEW route on the parsed PHASE_RESULT (0.2).** New
+  `lib/phase-route.sh`. `router-step.sh post-spawn` writes a `META|phase-route-anchor`
+  after the agent returns and prints `ROUTE_RESULT`/`ROUTE_VERDICT`/`ROUTE_SOURCE` from
+  the parser's first record after it; an agent-written record never counts. Missing or
+  invalid → VERIFY FAIL, PR-REVIEW BLOCK; an optimistic claim-delta on fresh evidence →
+  FAIL. `spawn_agent_post` enforces the route on every VERIFY/PR-REVIEW verdict terminal
+  (downgrade only, `META|route-override|warn|`), and `auto-merge.sh` re-runs it and needs
+  OK from a parsed record (`PR_REVIEW_NOT_OK`). The PR-REVIEW no-diff exemption needs an
+  absent block, a commit-push skip in the current implement attempt and no recorded PR.
+- **Entry gate (0.3).** ticket-critique now has `critique-status.sh` write
+  `critique-result.txt`; the gate combines it strictly with notes.md (stricter status,
+  lower score, higher BLOCKER count; TICKET must match), reads notes.md
+  case-insensitively, and gate-stops `CRITIQUE_STATUS_MISSING` on an unreadable status.
+  A missing complexity or artifact type gate-stops `COMPLEXITY_MISSING` /
+  `ARTIFACT_TYPE_MISSING` instead of defaulting to `simple`. The Verification Plan
+  table vouches for a prerequisite only when every verifiable row fills that column.
+  A policy auto-approve holds on any open `[needs-human]` question.
+
+## fleet-controller 0.54.0 (2026-11-15) — fail closed where fleet code read model-written text (seam audit Track 0)
+
+- **Auto-merge checks the PR before merging (Track 0.1).** `orchestration.run_auto_merge`
+  took the PR number from the agent-written `PR-REVIEW|checkout-pr|done|` line and merged
+  it. It now refuses unless the number is a bare number and the PR's live `headRefName`
+  equals the ticket's recorded branch (`ticket=` in the last `META|branch-context`). Each
+  refusal skips the merge and logs `META|pr-auto-merge|skip|<CODE>`: `PR_NUMBER_INVALID`,
+  `PR_BRANCH_UNRECORDED`, `PR_HEAD_UNREADABLE`, `PR_HEAD_MISMATCH`. The head is now read for
+  every PR, not only under an epic integration branch. fleetd does not run STEP_4_6's
+  `post_dispatch` yet, so this hardens a path before it goes live.
+- **`detect_planner_feedback` finds collected feedback (Track 0.4).** It grepped for
+  `"source_tid":"<tid>"`, but `fleet-feedback.sh` writes its files through `jq .`
+  (`"source_tid": "<tid>"`), so the grep never matched and every planned ticket with
+  feedback showed `planner-feedback(S1)` until it finished. It now reads `.tickets[].source_tid`
+  with jq; an unparseable file still counts as not collected.
+- **Phase dispatch fails closed on a missing verdict (Track 0.5).** `classify_phase` returned
+  `done` for a loop-bearing phase (IMPLEMENT, VERIFY, PR-REVIEW) that exited 0 with no
+  usable `META|phase-result`, so a VERIFY agent that forgot its block passed. It now
+  returns `fail`. Rung 5 is reachable: `classify_phase` applies its `overrides`, and the
+  supervisor passes `phase_dispatch.verifier_overrides` (VERIFY `META|claim-delta`
+  `direction: optimistic`, IMPLEMENT `RETURN_INCOMPLETE`). Only `router-step.sh post-spawn`
+  writes these records, so fleetd refuses to start with `FLEET_PHASE_DISPATCH_ENABLE=true`
+  and `FLEET_ROUTER_STEP_SHELL` off (`FLEETD_PHASE_DISPATCH_NEEDS_ROUTER_STEP`). Both flags
+  default off, so nothing changes on a host that has not opted in.
+
+## ticket-planner 0.45.0 (2026-11-15) — seam-bash-derives slice 2: Consensus, cited artifacts and COMPLETED.md from bash
+
+- **Consensus dispositions are counted by bash (F70).** Iteration 10's Consensus logged
+  "11 accepted, 0 rejected, 2 deferred"; its own headings said 12/0/1. After Consensus,
+  the router's `post` gate (and `pre` before Crosscheck) reads the
+  `### <id> — <severity> — <title> — <disposition>` headings under
+  `## Findings Addressed` into `artifacts/phase-results/consensus.json` (counts plus each
+  finding's id and disposition). Fail closed: when the headings cannot be read (no
+  section, no id heading, a disposition outside accepted/rejected/deferred such as
+  "partly accepted") there is no file and one WARNING line. Nothing blocks on the file
+  yet. The Consensus prompt now names the heading shape.
+- **Bash writes the `CITED_ARTIFACT:` questions (audit row 19).** The Consensus agent was
+  asked to copy them verbatim; a paraphrase or a dropped line blocked Crosscheck with
+  `CITED_ARTIFACT_UNRAISED`. `planner_cited_questions_sync` now rewrites any line that
+  names a NOT FOUND artifact to the canonical text, keeping its `Answer:`, and appends a
+  missing one at the end of `## Open Questions`. It runs after Consensus and again before
+  each Crosscheck, writes only on a change, and keeps CRLF. The copy instruction is gone
+  from the prompt.
+- **COMPLETED.md reads the intent files.** The epic id comes from
+  `.intents/epic-<INIT>.json` and the ticket ids and count from every created
+  `.intents/ticket-*.json` plus the epic manifest, never from the `EPIC_ID=` or
+  `META|ticketgen` messages, which are now free text. The "Tickets Created" line is
+  `<n> tickets` (the created/skipped/failed split came from a message); a spec with no
+  created ticket is a Warnings line. **For operators:** an initiative with no created
+  epic intent file can no longer render COMPLETED.md (rc 1, as before for a missing
+  `EPIC_ID`).
+- **Status-line lint covers every prompt line.** `test-planner-corpus.sh` now checks all
+  `planner_state_write` lines in the prompts for count placeholders and keeps the list
+  of prompt-written lines a script still reads: `EpicGen|create|done` `EPIC_ID=`,
+  `META|adr-gate|fail` (change `seam-fail-closed`) and `META|discovery|repo-ref`.
+- **Corpus.** Iteration 10's consensus.md headings and a new iteration 02 snapshot
+  (`s02-cited`, two NOT FOUND cited artifacts) with replay cases.
+
+## ticket-planner 0.44.0 (2026-11-15) — seam-bash-derives slice 1: bash derives, the model judges
+
+- **Carve scope compares the specs bash recorded, not a count the agent typed (F67).**
+  Iteration 10 halted at Crosscheck with `CARVE_SCOPE_LOST` "Specify declared 7
+  tickets, 8 spec files exist" on a clean plan: the check read the number from
+  Specify's `synthesize|start` line, which the prompt had the agent write before any
+  spec existed. When that message held no number, the check passed without checking.
+  Now, when Specify finishes, bash lists `artifacts/specs/*.md` (minus `INDEX.md` and
+  synth TD specs) into the new `artifacts/phase-results/specify.json`
+  (`lib/planner-phase-results.sh`). `planner_crosscheck_carve_scope` diffs those slugs
+  against the specs on disk and names any that were lost or added.
+- **Fail closed: `CHECK_ERRORED`.** A missing or unreadable `specify.json` is a new
+  blocking finding, `CHECK_ERRORED carve_scope: …`, never a pass. **An initiative whose
+  Specify ran under an older release halts once at Crosscheck** with it: audit the
+  scope, then `resume <ID> --accept CHECK_ERRORED:"<reason>"`, or re-run Specify.
+- **Post-agent gate.** SKILL.md step 4a now calls `planner_dispatch_gate post`, which
+  records Specify's spec list and then runs the ADR gate as before; `pre` repeats the
+  record before Review, so a router that died in between still writes it.
+- **A dropped duplicate `done` is visible (F70).** Consensus's corrected second `done`
+  line was dropped as a duplicate with rc 0, so the log kept the wrong counts.
+  `planner_state_write` now returns 3 and says on stderr that the line was not written
+  and how to record a new run. Every caller was audited; `META|ownership-edges|done`,
+  which a resumed Crosscheck used to lose, is now a repeatable record.
+- **Status lines carry no counts.** The Discovery, Specify, Review and Consensus prompts'
+  state-log lines are fixed text; no script reads a value out of an agent's message.
+- **Corpus.** `ticket-planner/lib/tests/corpus/` starts with a scrubbed iteration 10
+  snapshot (`MANIFEST.tsv`, `labels.tsv`) and `test-planner-corpus.sh` replays it
+  through the real readers, with a privacy grep. Openspec change `seam-bash-derives`
+  plans the next slices.
+
+## ticket-planner 0.43.7 (2026-11-15) — replan reads real dependency edges
+
+- **`planner_replan_validate_deps` now sees the dependencies specs actually write.**
+  It parsed `blocked-by:{X}` (braces), but Specify writes `blocked-by:<slug>` on the
+  `## Labels` line — no braces, optionally backticked, space- or comma-separated. The
+  sed matched nothing, so the whole Labels line became one "target", the graph was
+  nonsense and the post-replan cycle check could never fire. It also sourced its cycle
+  checker relative to the caller's working directory. The new
+  `planner_replan_deps_json <id>` reads the graph through `planner_ticketgen_deps_json`,
+  the reader TicketGen orders by and Crosscheck's `DEPENDENCY_CYCLE` uses, so replan
+  now gets sibling-prefix resolution, external tracker ids and both sidecars'
+  (test-data synthesis, ownership) edges too. Libraries resolve from the lib's own
+  directory. `planner_replan_validate_deps` has no caller yet, so nothing else changes.
+
+## ticket-planner 0.43.6 (2026-11-15) — dispatch-rehearsal iteration 09 finding
+
+- **Draft gate: an `INTENT_AC_MISMATCH` on one criterion gets a revise round (F62).**
+  Iteration 09 halted `DRAFT_NOT_READY` 1/7 on a round-0 `INTENT_AC_MISMATCH` against
+  a criterion counting every `img` element on the home page; the evaluator's point was
+  that the count should be scoped to the new title. `INTENT_AC_MISMATCH` is a structural
+  code, and structural codes skipped the revise loop, so a one-qualifier fix halted the
+  run. `planner_draft_revise_classify` now treats a code in the new constant
+  `PLANNER_DRAFT_REVISABLE_AC_CODES` (`INTENT_AC_MISMATCH`) as revisable when the
+  finding's unit is a single acceptance criterion; on any other unit it is structural as
+  before. The revise prompt for such a round adds one rule: a rebuttal does not clear it,
+  so narrow the criterion or add one that tests the intended outcome. Every other revise
+  prompt is byte-identical. Demotion is unchanged: the code is still structural there, so
+  one that is rebutted or left unfixed is never demoted and still halts. ticket-auto-pipeline's structural
+  list, and Refinement, are untouched.
+
+## ticket-planner 0.43.5 (2026-11-15) — dispatch-rehearsal iteration 07 finding
+
+- **New warn-level Crosscheck check `CODE_SPAN_EDGE_SPACE` (F53).** A slug test
+  in a spec used the title `` `  Hello,  World!! ` ``. CommonMark drops one space
+  from each end of an inline code span that starts and ends with a space, so
+  readers, and Linear when it stores the ticket, saw `` ` Hello,  World!!` ``. The
+  trailing-space case of the test was lost, and the draft-to-Linear body
+  comparison marked the ticket changed and forced a fresh semantic scan.
+  `lib/planner-crosscheck-codespan.sh` reports every such span (outside fences;
+  INDEX.md and synth-marked test-data specs skipped) with the value readers
+  actually see, and asks for a quoted value instead. Specify's Part 4 self-lint
+  runs it too, so the agent fixes its own specs before Review. Warn only; no
+  existing finding or halt changes. The body normaliser deliberately does not
+  learn this markdown rule, since that would hide the change in meaning.
+
+## ticket-planner 0.43.4 (2026-11-14) — dispatch-rehearsal iteration 07 finding
+
+- **Ownership edges: an `append` writer no longer blocks every reader (F52).**
+  Crosscheck derived a `blocked-by` edge from each `spec` read to every spec with a
+  matching data write, appenders included. A read API that only reads seeded rows
+  was blocked on the create API that appends articles, which closed a
+  `DEPENDENCY_CYCLE` with the plan's own read → create edge and halted Crosscheck.
+  A read now waits for the spec that `create`s the key; an `append` writer
+  gives an edge only when no spec creates it (an `update`-only writer does not
+  hide it). The Specify/Consensus
+  rules text says to put an appending spec in `## Labels` when a criterion needs
+  its rows.
+
+## 0.117.3 (2026-11-14) — dispatch-rehearsal iteration 06 findings (ticket-planner 0.43.3)
+
+- **dor-semantic parser: an over-long scan PARAPHRASE is cut, not rejected (F49).**
+  A paraphrase over 400 characters used to invalidate the whole scan block; two such
+  scans made a draft `SEMANTIC_UNAVAILABLE`, which no revision can clear. The parser
+  now cuts it to 400 characters ending in `...`, warns on stderr, and keeps the
+  findings and gaps.
+- **Draft-readiness gate keeps the reason for a failed attempt (F50).** The gate's
+  `fail|<slug> SEMANTIC_UNAVAILABLE` line now carries the parser's error (or "no scan
+  result written"), the reason is kept in `last-failure`, and the rejected result
+  files are moved to `*-result.rejected.txt` instead of deleted. Refinement no longer
+  discards the parser's stderr.
+- **dor-check: chore and security tickets need no Navigation Path (F51).** Their
+  templates carry no such section and `planned-ticket-body-check.sh` asks only feature
+  and improvement for one, but `NAV_PATH_MISSING` fired on every type whose Scope
+  listed an FE layer. It is now `inapplicable` for chore and security.
+- **Gates that blocked good plans now warn (rehearsal block audit, iterations 01–06).** Of
+  13 halts, 3 came from real plan defects; none since iteration 04 did.
+  - Crosscheck's strong `TEST_DATA_IMPLIED` match is reported as `TEST_DATA_IMPLIED_WEAK`
+    (warn, with the TESTDATA_CONFIRM line to answer) unless `PLANNER_TESTDATA_IMPLIED_BLOCKS=true`.
+    5 blocks, no real data gap among them. Verification Notes, synthesis and Refinement's
+    strict test-data checks are unchanged.
+  - The draft gate warns instead of blocking on `SEMANTIC_UNAVAILABLE` and
+    `SEMANTIC_UNVERIFIED` (`PLANNER_DRAFT_WARN_CODES`; empty restores blocking). The
+    report lists such drafts as not judged; Refinement judges them after create. A draft
+    the loop never judged still blocks.
+- **State log repair keeps `accepted`, `info`, `step` and `warn` lines.** Its status list
+  held only start/done/fail/skip, so a repair dropped an operator's accept and the draft
+  gate's warnings.
+- **Crosscheck test-data tripwire: a search of a named file is document text (F48).**
+  "A search of `README.md` for `calculator` returns 0 matches" no longer reads the
+  searched literal as a record, and a count of matches, hits or occurrences is no
+  longer a weak test-data signal.
+
+## 0.117.2 (2026-11-13) — dispatch-rehearsal iteration 05 findings (ticket-planner 0.43.2)
+
+Six findings from the fifth dispatch-rehearsal run and its same-intent rerun.
+
+- **Scan prompt names each gap's codes (F47).** A scan marked `GAP_REQUIREMENT_COMPLETENESS: finding`
+  and backed it with a `TEST_DATA_GAP` finding. The evidence check accepts only that gap's own codes,
+  so the spec got `SEMANTIC_UNVERIFIED`, which no revision can clear, and the initiative halted. The
+  prompt now lists the codes per gap (`_dor_semantic_gap_rule`, built from `DOR_SEMANTIC_CODES`). The
+  check itself is unchanged and the evaluator stays `dor-semantic-v4`.
+- **ticket-planner 0.43.2.** Synthesized test-data specs get the foreign-key criterion only for
+  record-shaped data (F42). "The file does not contain `<literal>`" is a statement about a document,
+  not implied test data (F39). Specify and Consensus list every sibling a spec builds on as a direct
+  blocker (F43), cite a file a sibling creates as `Name (new in <slug>):path`, and Consensus re-runs
+  the citation linter after its spec edits (F38).
+- **Rehearsal runbook (F46).** The rehearsal folder lives outside `REPOS_ROOT`. Under it, a planner
+  agent read the earlier findings and shaped its specs to them. The runbook also says how to rerun
+  the same intent when the run halted before `--create`.
 
 ## grill-me 0.6.0 (2026-11-13) — starting state, defaults and failure behaviour in the product-idea profile
 

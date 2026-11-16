@@ -239,7 +239,7 @@ _prt_phase_records() {
     # seat (`panel: <INIT>:<seat>`, planner-persona-panel) run before the
     # Review agent and belong to Review.
     def spawn_target($a):
-      ($a.description | capture("^(?<k>scan|audit|revise|lens|panel): (?<id>\\S+)$")) as $m
+      ($a.description | capture("^(?<k>scan|audit|format|revise|lens|panel): (?<id>\\S+)$")) as $m
         | if $m.k == "lens" then (if $m.id == $init then "Review" else null end)
           elif $m.k == "panel" then (if ($m.id | startswith($init + ":")) then "Review" else null end)
           elif ($tids | index($m.id)) then "Refinement"
@@ -389,6 +389,54 @@ planner_telemetry_begin() {
 # Syncs phase records, then writes the run summary and closes the run. Runs on
 # completion and on every halt: whatever stopped the loop, the turn ends and
 # the Stop hook calls this. A no-op when no run is open.
+# planner_run_unevaluated_json <INIT> (seam-gate-safety D4) — what the run
+# could not judge: {drafts, tickets, ticket_ids, harness_lines, clean}.
+# drafts: the latest draft gate run's `(run) UNEVALUATED|HARNESS_ERROR n/m`,
+# else `0/<m>` from its done line; a run passed by an operator accept reads
+# `accepted (last measured n/m)` or `accepted (unmeasured)` and is never
+# clean; no gate run is `0`. tickets: Refinement's own rule
+# (planner_refinement_unevaluated) once an epic exists. A count that cannot
+# be read is `unknown`, and then the run is not clean.
+planner_run_unevaluated_json() {
+  local init="$1" log run drafts="0" tickets=0 tids="" harness="unknown" done_msg last
+  log=$(planner_state_log "$init" 2>/dev/null) || log=""
+  if [ -n "$log" ] && [ -f "$log" ]; then
+    harness=$(grep -c '^[^|]*|META|harness-error|' "$log" 2>/dev/null) || harness=0
+    if grep -q '^[^|]*|META|draft-readiness|start|' "$log"; then
+      run=$(awk '/^[^|]*\|META\|draft-readiness\|start\|/ {buf = ""} {buf = buf $0 "\n"} END {printf "%s", buf}' "$log")
+      done_msg=$(printf '%s' "$run" | grep '^[^|]*|META|draft-readiness|done|' | tail -1 | cut -d'|' -f5-)
+      drafts=$(printf '%s' "$run" | grep -E '^[^|]*\|META\|draft-readiness\|(warn|fail)\|\(run\) (UNEVALUATED|HARNESS_ERROR) ' |
+        tail -1 | cut -d'|' -f5- | awk '{print $3}')
+      if [ "${done_msg%% *}" = "accepted" ]; then
+        last=$(grep -E '^[^|]*\|META\|draft-readiness\|(warn|fail)\|\(run\) (UNEVALUATED|HARNESS_ERROR) ' "$log" |
+          tail -1 | cut -d'|' -f5- | awk '{print $3}')
+        drafts="accepted (${last:+last measured }${last:-unmeasured})"
+      elif [ -z "$drafts" ]; then
+        drafts=$(printf '%s' "$done_msg" | awk '$2 ~ /^[0-9]+\/[0-9]+$/ {split($2, a, "/"); print "0/" a[2]}')
+        [ -n "$drafts" ] || drafts="unknown"
+      fi
+    fi
+    if grep -q '^[^|]*|EpicGen|' "$log"; then
+      if { declare -f planner_refinement_unevaluated >/dev/null 2>&1 ||
+        source "${_PRT_DIR}/planner-refinement.sh" 2>/dev/null; } &&
+        _planner_refinement_source_deps >/dev/null 2>&1; then
+        tids=$(planner_refinement_unevaluated "$init" 2>/dev/null | cut -f1 | paste -sd, -)
+        [ -z "$tids" ] || tickets=$(awk -F, '{print NF}' <<<"$tids")
+      else
+        tickets="unknown"
+      fi
+    fi
+  else
+    drafts="unknown" tickets="unknown"
+  fi
+  jq -nc --arg d "$drafts" --arg t "$tickets" --arg ids "$tids" --arg h "$harness" \
+    '{drafts: $d, tickets: (if $t | test("^[0-9]+$") then ($t | tonumber) else $t end),
+      ticket_ids: ($ids | split(",") | map(select(. != ""))),
+      harness_lines: (if $h | test("^[0-9]+$") then ($h | tonumber) else $h end)}
+     | .clean = ((.drafts == "0" or (.drafts | test("^0/[0-9]+$"))) and .tickets == 0
+                 and (.harness_lines | type) == "number")'
+}
+
 planner_telemetry_finish() {
   local init="$1" closed_by="${2:-manual}" dir tdir open runs now log
   dir=$(planner_initiative_dir "$init" 2>/dev/null) || return 0
@@ -409,6 +457,9 @@ planner_telemetry_finish() {
     [ -n "$ended" ] || ended="$started"
   fi
   reason=$(bash "${_PRT_DIR}/planner-stop-describe.sh" "$init" --json 2>/dev/null | jq -r '.reason // empty' 2>/dev/null)
+  local unev
+  unev=$( (planner_run_unevaluated_json "$init") 2>/dev/null) || unev=""
+  jq -e 'type == "object"' <<<"$unev" >/dev/null 2>&1 || unev='{"drafts":"unknown","tickets":"unknown","ticket_ids":[],"harness_lines":"unknown","clean":false}'
   position=$(planner_position_derive "$init" 2>/dev/null)
   orch=null
   if [ -n "$sid" ]; then
@@ -423,7 +474,7 @@ planner_telemetry_finish() {
   window=$([ -f "$log" ] && awk -F'|' -v s="$started" -v e="$ended" '$1 >= s && $1 <= e' "$log")
   local line
   line=$(jq -nc --slurpfile o "$open" --arg ended "$ended" --arg by "$closed_by" \
-    --arg reason "$reason" --arg pos "$position" --argjson orch "${orch:-null}" \
+    --arg reason "$reason" --arg pos "$position" --argjson orch "${orch:-null}" --argjson unev "$unev" \
     --arg seq "${seq[*]}" --arg window "$window" --argjson schema "$PLANNER_TELEMETRY_SCHEMA" \
     --slurpfile phases <([ -f "$runs" ] && jq -cR 'fromjson? | select(.kind == "planner_phase")' "$runs" 2>/dev/null) '
     def epoch: fromdateiso8601;
@@ -451,6 +502,7 @@ planner_telemetry_finish() {
                               | ((.[4] // "") | capture("round=(?<n>[0-9]+)").n | tonumber)] | max // 0),
        draft_revise_spawns: ([$lines[] | select(.[1] == "META" and .[2] == "draft-revise" and .[3] == "start")] | length),
        human_answer_rounds: ([$lines[] | select(.[1] == "META" and .[2] == "human-hold" and .[3] == "done")] | length),
+       unevaluated: $unev,
        unmeasured_phases: [$mine[] | select(.tokens == null and .agents == 0) | .phase] ,
        tokens: {phases: $ptok, orchestrator: $orch,
                 total: addtok($ptok; (if $orch == null then null else ($orch | {input, output, cache_read, cache_create}) end))},

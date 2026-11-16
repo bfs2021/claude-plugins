@@ -54,15 +54,25 @@ _get_outcome_from_log() {
   # Fallback: agents sometimes report the outcome only inside an
   # IMPLEMENT|implement|done| line and never invoke the flow.sh
   # implement-outcome trigger that writes the dedicated entry above
-  # (WIL-78, 2026-09-10 — required a live router repair). Recover it, but
-  # only as a standalone Smooth/Rough/Hard token so prose like "2 files
-  # changed" still cannot match — the reason this matcher was tightened
-  # away from IMPLEMENT|implement|done| in the first place.
+  # (WIL-78, 2026-09-10 — required a live router repair). That line is the
+  # implement agent's own prose, so it may only WITHHOLD a merge, never
+  # unlock one (seam audit Track 0.1): the worst of Rough/Hard it names is
+  # recovered, and Smooth never is. "not Hard, Smooth" reads Hard; prose that
+  # names only Smooth leaves the outcome unrecorded, and auto-merge.sh
+  # skips an unrecorded outcome.
   if [ -z "$outcome" ]; then
-    outcome=$(grep '^[^|]*|IMPLEMENT|implement|done|' "$LOG_FILE" 2>/dev/null |
-      grep -oE '\b(Smooth|Rough|Hard)\b' | tail -1 || true)
+    local tokens
+    tokens=$(grep '^[^|]*|IMPLEMENT|implement|done|' "$LOG_FILE" 2>/dev/null |
+      cut -d'|' -f5- | grep -oE '\b(Smooth|Rough|Hard)\b' || true)
+    if grep -qx 'Hard' <<<"$tokens"; then
+      outcome="Hard"
+    elif grep -qx 'Rough' <<<"$tokens"; then
+      outcome="Rough"
+    fi
     if [ -n "$outcome" ]; then
-      echo "outcome-label-check: recovered '$outcome' from IMPLEMENT|implement|done| (dedicated line absent)" >&2
+      echo "outcome-label-check: recovered '$outcome' from IMPLEMENT|implement|done| (dedicated line absent; prose may only withhold a merge)" >&2
+    elif [ -n "$tokens" ]; then
+      echo "outcome-label-check: IMPLEMENT|implement|done| prose names only Smooth — a self-grade never unlocks auto-merge; outcome left unrecorded" >&2
     fi
   fi
 

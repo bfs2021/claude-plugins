@@ -1,0 +1,128 @@
+snap_id	check	unit	observed	expected	label	source
+s10-crosscheck	carve_scope	initiative	CARVE_SCOPE_LOST	pass	checker-bug	F67
+s10-crosscheck	state_write_dedupe	Consensus/resolve	silent-drop-rc0	visible-drop-rc3	checker-bug	F70
+s10-crosscheck	consensus_dispositions	consensus.md	log-says-11/0/2	headings-12/0/1	checker-bug	F70
+s02-cited	cited_artifact_questions	consensus.md	UNRAISED-when-paraphrased	canonical-line-restored	format	audit-1-row-19
+s01-run	statelog	state.log	halt:Refinement	position=Refinement xc=0/0/1	true	F16 (UNREFERENCED accepted, F12)
+s02-run	statelog	state.log	halt:Crosscheck	position=Crosscheck xc=43/1/0	mixed	F22 F23 F24 F25
+s03-run	statelog	state.log	halt:Refinement	position=Refinement xc=0/0/0	true	F31
+s04-run	statelog	state.log	halt:draft-gate	position=EpicGen xc=57/2/0	checker-bug	F33
+s05-run	statelog	state.log	halt:draft-gate	position=EpicGen xc=0/8/0	mixed	F42 F43
+s05b-run	statelog	state.log	halt:draft-gate	position=EpicGen xc=0/0/0	format	F47
+s06-run	statelog	state.log	halt:draft-gate	position=EpicGen xc=0/7/0	checker-bug	F51 F49
+s07-run	statelog	state.log	halt:EpicGen-team	position=EpicGen xc=0/8/0	env	run-record 07 (--create diagnostic)
+s08-run	statelog	state.log	completed	position=- xc=0/9/0	pass	run-record 08
+s09-run	statelog	state.log	halt:draft-gate	position=EpicGen xc=0/7/0	false	F62
+s10-run	statelog	state.log	halt:Crosscheck	position=Crosscheck xc=1/7/0	checker-bug	F67
+s01-run	carve_scope	initiative	pass	pass	pass	run-record
+s02-run	carve_scope	initiative	pass	pass	pass	run-record
+s04-run	carve_scope	initiative	pass	pass	pass	run-record
+s05-run	carve_scope	initiative	pass	pass	pass	run-record
+s05b-run	carve_scope	initiative	pass	pass	pass	run-record
+s06-run	carve_scope	initiative	pass	pass	pass	run-record
+s07-run	carve_scope	initiative	pass	pass	pass	run-record
+s08-run	carve_scope	initiative	pass	pass	pass	run-record
+s09-run	carve_scope	initiative	pass	pass	pass	run-record
+s10-run	carve_scope	initiative	CARVE_SCOPE_LOST	pass	checker-bug	F67
+s04-draft	semantic_parse	backend-articles/scan	accepted-at-run	invalid	legacy-schema	dor-semantic-paraphrase (PARAPHRASE now required)
+s04-draft	semantic_parse	backend-articles/audit	ok	ok	pass	run
+s04-draft	semantic_parse	backend-store-and-seed/scan	accepted-at-run	invalid	legacy-schema	dor-semantic-paraphrase (PARAPHRASE now required)
+s04-draft	semantic_parse	backend-store-and-seed/audit	ok	ok	pass	run
+s04-draft	semantic_parse	backend-users-auth/scan	accepted-at-run	invalid	legacy-schema	dor-semantic-paraphrase (PARAPHRASE now required)
+s04-draft	semantic_parse	backend-users-auth/audit	ok	ok	pass	run
+s04-draft	semantic_parse	frontend-auth-pages/scan	accepted-at-run	invalid	legacy-schema	dor-semantic-paraphrase (PARAPHRASE now required)
+s04-draft	semantic_parse	frontend-auth-pages/audit	ok	ok	pass	run
+s04-draft	semantic_parse	frontend-editor/scan	accepted-at-run	invalid	legacy-schema	dor-semantic-paraphrase (PARAPHRASE now required)
+s04-draft	semantic_parse	frontend-editor/audit	ok	ok	pass	run
+s04-draft	semantic_parse	frontend-reader-pages/scan	accepted-at-run	invalid	legacy-schema	dor-semantic-paraphrase (PARAPHRASE now required)
+s04-draft	semantic_parse	frontend-reader-pages/audit	ok	ok	pass	run
+s04-draft	semantic_parse	repo-docs-conduit/scan	accepted-at-run	invalid	legacy-schema	dor-semantic-paraphrase (PARAPHRASE now required)
+s04-draft	semantic_parse	repo-docs-conduit/audit	ok	ok	pass	run
+s05-draft	semantic_parse	backend-articles/scan	ok	ok	pass	run
+s05-draft	semantic_parse	backend-articles/audit	ok	ok	pass	run
+s05-draft	semantic_parse	backend-foundation/scan	ok	ok	pass	run
+s05-draft	semantic_parse	backend-foundation/audit	ok	ok	pass	run
+s05-draft	semantic_parse	backend-foundation-test-data/scan	ok	ok	pass	run
+s05-draft	semantic_parse	backend-foundation-test-data/audit	ok	ok	pass	run
+s05-draft	semantic_parse	backend-users-auth/scan	ok	ok	pass	run
+s05-draft	semantic_parse	backend-users-auth/audit	ok	ok	pass	run
+s05-draft	semantic_parse	frontend-auth-pages/scan	ok	ok	pass	run
+s05-draft	semantic_parse	frontend-auth-pages/audit	ok	ok	pass	run
+s05-draft	semantic_parse	frontend-editor/scan	ok	ok	pass	run
+s05-draft	semantic_parse	frontend-editor/audit	ok	ok	pass	run
+s05-draft	semantic_parse	frontend-reader-pages/scan	ok	ok	pass	run
+s05-draft	semantic_parse	frontend-reader-pages/audit	ok	ok	pass	run
+s05-draft	semantic_parse	init-0000000000-1247-test-data-pack/scan	ok	ok	pass	run
+s05-draft	semantic_parse	init-0000000000-1247-test-data-pack/audit	ok	ok	pass	run
+s05-draft	semantic_parse	repo-docs-conduit/scan	ok	ok	pass	run
+s05-draft	semantic_parse	repo-docs-conduit/audit	ok	ok	pass	run
+s05b-draft	semantic_parse	articles-api/scan	ok	ok	pass	run
+s05b-draft	semantic_parse	articles-api/audit	ok	ok	pass	run
+s05b-draft	semantic_parse	auth-pages/scan	ok	ok	pass	run
+s05b-draft	semantic_parse	auth-pages/audit	ok	ok	pass	run
+s05b-draft	semantic_parse	backend-scaffold/scan	ok	ok	pass	run
+s05b-draft	semantic_parse	backend-scaffold/audit	ok	ok	pass	run
+s05b-draft	semantic_parse	editor-page/scan	ok	ok	pass	run
+s05b-draft	semantic_parse	editor-page/audit	ok	ok	pass	run
+s05b-draft	semantic_parse	frontend-shell/scan	ok	ok	pass	run
+s05b-draft	semantic_parse	frontend-shell/audit	ok	ok	pass	run
+s05b-draft	semantic_parse	read-pages/scan	ok	ok	pass	run
+s05b-draft	semantic_parse	read-pages/audit	ok	ok	pass	run
+s05b-draft	semantic_parse	users-api/scan	ok	ok	pass	run
+s05b-draft	semantic_parse	users-api/audit	ok	ok	pass	run
+s06-draft	semantic_parse	article-editor-page/scan	ok	ok	pass	run
+s06-draft	semantic_parse	article-editor-page/audit	ok	ok	pass	run
+s06-draft	semantic_parse	article-reading-pages/scan	ok	ok	pass	run
+s06-draft	semantic_parse	article-reading-pages/audit	ok	ok	pass	run
+s06-draft	semantic_parse	articles-api/scan	ok	ok	pass	run
+s06-draft	semantic_parse	articles-api/audit	ok	ok	pass	run
+s06-draft	semantic_parse	project-scaffold-diag/scan	invalid (PARAPHRASE 403 > 400)	ok	format	F49
+s06-draft	semantic_parse	project-scaffold-diag/audit	ok	ok	pass	run
+s06-draft	semantic_parse	sign-up-and-sign-in-pages/scan	ok	ok	pass	run
+s06-draft	semantic_parse	sign-up-and-sign-in-pages/audit	ok	ok	pass	run
+s06-draft	semantic_parse	users-api/scan	ok	ok	pass	run
+s06-draft	semantic_parse	users-api/audit	ok	ok	pass	run
+s07-draft	semantic_parse	article-create-api/scan	ok	ok	pass	run
+s07-draft	semantic_parse	article-create-api/audit	ok	ok	pass	run
+s07-draft	semantic_parse	article-read-api/scan	ok	ok	pass	run
+s07-draft	semantic_parse	article-read-api/audit	ok	ok	pass	run
+s07-draft	semantic_parse	auth-api/scan	ok	ok	pass	run
+s07-draft	semantic_parse	auth-api/audit	ok	ok	pass	run
+s07-draft	semantic_parse	auth-pages/scan	ok	ok	pass	run
+s07-draft	semantic_parse	auth-pages/audit	ok	ok	pass	run
+s07-draft	semantic_parse	backend-foundation/scan	ok	ok	pass	run
+s07-draft	semantic_parse	backend-foundation/audit	ok	ok	pass	run
+s07-draft	semantic_parse	editor-page/scan	ok	ok	pass	run
+s07-draft	semantic_parse	editor-page/audit	ok	ok	pass	run
+s07-draft	semantic_parse	frontend-foundation/scan	ok	ok	pass	run
+s07-draft	semantic_parse	frontend-foundation/audit	ok	ok	pass	run
+s07-draft	semantic_parse	reader-pages/scan	ok	ok	pass	run
+s07-draft	semantic_parse	reader-pages/audit	ok	ok	pass	run
+s08-draft	semantic_parse	articles-api/scan	ok	ok	pass	run
+s08-draft	semantic_parse	articles-api/audit	ok	ok	pass	run
+s08-draft	semantic_parse	backend-foundation/scan	ok	ok	pass	run
+s08-draft	semantic_parse	backend-foundation/audit	ok	ok	pass	run
+s08-draft	semantic_parse	frontend-auth-editor/scan	ok	ok	pass	run
+s08-draft	semantic_parse	frontend-auth-editor/audit	ok	ok	pass	run
+s08-draft	semantic_parse	frontend-read-pages/scan	ok	ok	pass	run
+s08-draft	semantic_parse	frontend-read-pages/audit	ok	ok	pass	run
+s08-draft	semantic_parse	frontend-shell/scan	ok	ok	pass	run
+s08-draft	semantic_parse	frontend-shell/audit	ok	ok	pass	run
+s08-draft	semantic_parse	repo-docs/scan	ok	ok	pass	run
+s08-draft	semantic_parse	repo-docs/audit	ok	ok	pass	run
+s08-draft	semantic_parse	users-api/scan	ok	ok	pass	run
+s08-draft	semantic_parse	users-api/audit	ok	ok	pass	run
+s09-draft	semantic_parse	articles-api/scan	ok	ok	pass	run
+s09-draft	semantic_parse	articles-api/audit	ok	ok	pass	run
+s09-draft	semantic_parse	auth-api/scan	ok	ok	pass	run
+s09-draft	semantic_parse	auth-api/audit	ok	ok	pass	run
+s09-draft	semantic_parse	backend-scaffold/scan	ok	ok	pass	run
+s09-draft	semantic_parse	backend-scaffold/audit	ok	ok	pass	run
+s09-draft	semantic_parse	frontend-auth-pages/scan	ok	ok	pass	run
+s09-draft	semantic_parse	frontend-auth-pages/audit	ok	ok	pass	run
+s09-draft	semantic_parse	frontend-editor/scan	ok	ok	pass	run
+s09-draft	semantic_parse	frontend-editor/audit	ok	ok	pass	run
+s09-draft	semantic_parse	frontend-read-pages/scan	ok	ok	pass	run
+s09-draft	semantic_parse	frontend-read-pages/audit	ok	ok	pass	run
+s09-draft	semantic_parse	repo-docs/scan	ok	ok	pass	run
+s09-draft	semantic_parse	repo-docs/audit	ok	ok	pass	run

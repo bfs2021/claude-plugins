@@ -625,21 +625,29 @@ test_paraphrase_multiline_rejected() {
   [ "$ok" = "1" ]
 }
 
-test_paraphrase_too_long_rejected() {
+# Rehearsal F49: an over-long paraphrase is cut to 400 characters, not
+# rejected; the rest of the scan (findings, gaps) is kept.
+test_paraphrase_too_long_cut() {
   _setup
   _canonical_scan
-  local long
-  long=$(printf 'x%.0s' $(seq 1 401))
+  local long p
+  long=$(printf 'x%.0s' $(seq 1 403))
   sed "s/^PARAPHRASE:.*/PARAPHRASE: ${long}/" "$_ws/scan.txt" >"$_ws/scan-pl.txt"
   _parse scan "$_ws/scan-pl.txt"
   local ok=1
-  [ "$_RC" -eq 1 ] || ok=0
-  grep -q 'PARAPHRASE' <<<"$_OUT" || ok=0
-  # exactly 400 characters is accepted
+  [ "$_RC" -eq 0 ] || ok=0
+  grep -q '"parse_status":"ok"' <<<"$_OUT" || ok=0
+  grep -q 'WARN: PARAPHRASE cut from 403 to 400' <<<"$_OUT" || ok=0
+  p=$(grep '^{' <<<"$_OUT" | jq -r '.paraphrase')
+  [ "${#p}" -eq 400 ] || ok=0
+  [ "${p: -3}" = "..." ] || ok=0
+  [ "$(grep '^{' <<<"$_OUT" | jq '.findings | length')" -ge 1 ] || ok=0
+  # exactly 400 characters is kept as written
   long=$(printf 'y%.0s' $(seq 1 400))
   sed "s/^PARAPHRASE:.*/PARAPHRASE: ${long}/" "$_ws/scan.txt" >"$_ws/scan-p4.txt"
   _parse scan "$_ws/scan-p4.txt"
   [ "$_RC" -eq 0 ] || ok=0
+  [ "$(grep '^{' <<<"$_OUT" | jq -r '.paraphrase')" = "$long" ] || ok=0
   _teardown
   [ "$ok" = "1" ]
 }
@@ -687,7 +695,7 @@ for t in test_canonical_scan_valid test_canonical_audit_valid \
   test_schema_doc_enums_match_parser test_audit_quote_parsed \
   test_audit_quote_fixture_pair test_paraphrase_in_output \
   test_paraphrase_missing_rejected test_paraphrase_empty_rejected \
-  test_paraphrase_multiline_rejected test_paraphrase_too_long_rejected \
+  test_paraphrase_multiline_rejected test_paraphrase_too_long_cut \
   test_incoherent_change_parsed test_audit_needs_no_paraphrase; do
   if [ -n "$FILTER" ] && [[ "$t" != *"$FILTER"* ]]; then continue; fi
   _run "$t" "$t"

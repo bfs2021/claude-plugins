@@ -1320,7 +1320,8 @@ class PhaseDispatchAdvanceTest(unittest.TestCase):
             sup._advance_phase_dispatch_locked('CRE-35', entry, 0, 'exit')
 
         # A clean exit with the stale gate-stop excluded from the bracket
-        # classifies 'done' (rung 4, clean exit) and advances normally —
+        # reaches rung 4 (IMPLEMENT with no verdict classifies 'fail' since
+        # Track 0.5, but next_step advances IMPLEMENT either way) —
         # if the offset were ignored, rung 1 would fire on the stale line
         # and this would finalize instead.
         spawn_phase.assert_called_once()

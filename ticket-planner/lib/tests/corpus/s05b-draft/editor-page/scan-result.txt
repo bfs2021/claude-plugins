@@ -1,0 +1,14 @@
+=== DOR_SEMANTIC_SCAN ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-editor-page
+BODY_HASH: sha256:c984da314874f94df2411601b2b299bab063957023d95e9e5446d1e0e4a789cf
+PARAPHRASE: Replace the placeholder editor module with a Title/Description/Body form that posts a new article to the create-article API as the signed-in author, navigates to the returned slug's article page on success, and on a 422 or 401 shows the API's error lines above the form while keeping the typed fields and the stored token.
+GAP_REQUIREMENT_COMPLETENESS: clear
+GAP_REQUIREMENT_COMPLETENESS_REASON: Every described behaviour (form elements, publish and redirect, article and home page content, repeat-title slug, blank-field and no-alphanumeric-title errors, rejected token, field retention, reload after rejected token) has an acceptance criterion; the signed-out redirect is explicitly owned by the app shell ticket.
+GAP_CONTRADICTORY_REQUIREMENTS: clear
+GAP_CONTRADICTORY_REQUIREMENTS_REASON: Proposed Behaviour, Technical Context, the decided parameters, the criteria and the Verification Plan rows agree on slugs, error text, statuses and token handling; the token staying after a 401 and being removed on reload are consistent because only start-up removes it.
+GAP_DEEP_SCOPE_AMBIGUITY: clear
+GAP_DEEP_SCOPE_AMBIGUITY_REASON: Scope is one file, frontend/src/pages/editor.js, with the router, API client, error renderer and endpoints named as coming from the blocking tickets, and editing, deleting, tags, preview and drafts listed as out of scope.
+GAP_EDGE_CASE_SUFFICIENCY: clear
+GAP_EDGE_CASE_SUFFICIENCY_REASON: Empty fields singly and together, a title with no letters or digits, a duplicate title, a rejected token and the reload after it are all specified with expected results, and the fresh-backend precondition for the fixed slug is stated.
+=== END DOR_SEMANTIC_SCAN ===

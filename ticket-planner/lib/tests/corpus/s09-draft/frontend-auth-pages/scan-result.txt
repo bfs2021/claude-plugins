@@ -1,0 +1,14 @@
+=== DOR_SEMANTIC_SCAN ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-frontend-auth-pages
+BODY_HASH: sha256:cc4b983d16389cb3698ec03aec8301087a2a87343e481943fb7ff1efb3ed14db
+PARAPHRASE: Add browser sign-in (/login) and sign-up (/register) pages that call the auth API, store the returned JWT in localStorage, restore the session on page load via GET /api/user (clearing the token on a 401, keeping it on a network failure), and switch the header between signed-out and signed-in states.
+GAP_REQUIREMENT_COMPLETENESS: clear
+GAP_REQUIREMENT_COMPLETENESS_REASON: Sign-in, sign-up, API error display, header states, session persistence, 401 clearing and the network-failure assumption each have acceptance criteria with matching Verification Plan rows.
+GAP_CONTRADICTORY_REQUIREMENTS: clear
+GAP_CONTRADICTORY_REQUIREMENTS_REASON: The Scope assumption (keep the token on a network/server error) agrees with Proposed Behaviour and Technical Context, which clear the token only when the API rejects it with a 401; criteria 20-21 match the assumption.
+GAP_DEEP_SCOPE_AMBIGUITY: clear
+GAP_DEEP_SCOPE_AMBIGUITY_REASON: The Scope table names the exact five frontend files, and Out of Scope excludes the editor, sign-out, settings and profiles.
+GAP_EDGE_CASE_SUFFICIENCY: clear
+GAP_EDGE_CASE_SUFFICIENCY_REASON: Wrong password, blank fields, duplicate username/email, invalid stored token and backend-down start-up are each covered; the duplicate alice sign-up is handled by the backend-restart instruction.
+=== END DOR_SEMANTIC_SCAN ===

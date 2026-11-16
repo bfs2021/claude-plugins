@@ -1,0 +1,7 @@
+=== DOR_SEMANTIC_AUDIT ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-users-api
+BODY_HASH: sha256:e4eaf0792c533af7261eccc19037e075e8af812067627fd104bd41b05abdfb9f
+SCORE_PLAUSIBLE: yes
+SCORE_REASON: No dor_quality_score is present; status "ready" with empty missing/advisory is plausible, since every described behaviour has a concrete criterion, seeded data is listed with its source, and the undefined inputs are explicitly left without criteria. Non-blocking note: the Technical Context sentence "No acceptance criterion covers any of these" is stale for the deleted-user token case, which the last criterion and the Scope assumption do cover.
+=== END DOR_SEMANTIC_AUDIT ===

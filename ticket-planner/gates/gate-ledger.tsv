@@ -1,0 +1,170 @@
+# gate-ledger.tsv — every gate fire observed in dispatch rehearsal iterations 01–10
+# (and the 05b same-intent rerun), labelled. Change seam-gate-safety, slice G3.
+# Data only: nothing reads this file to decide a gate. gate-ledger-summary.sh
+# counts it; test-planner-gate-ledger.sh checks it.
+#
+# Sources: the rehearsal's findings.md, iter-*/run-record.md (Blocks tables) and
+# block-audit.md, with deep-dive D's corrections: RESOLUTION_NOT_PROPAGATED (F25)
+# is false, not true; UNSTATED_DEPENDENCY (F43) is debatable, not true.
+#
+# One row per fire, or per group of identical fires (same iteration, gate, round,
+# code, unit and label: see count). Aggregate halt codes (DRAFT_NOT_READY,
+# CROSSCHECK_BLOCKED, DEMOTE_CEILING) are not rows: the fires under them are.
+# Audit advisories and MISSED entries that never blocked are not rows.
+#
+# Columns (tab-separated):
+#   iter      01..10 or 05b
+#   gate      crosscheck | draft | draft-crosscheck (Crosscheck re-run inside the
+#             draft gate's loop) | draft-guard (a revise guard) | refinement |
+#             dor-check (the per-iteration negative control)
+#   round     draft-gate evaluation round that raised the fire (0 = first scan;
+#             a run-record "Round N" revise row is evaluation round N-1);
+#             a-b when it stood from round a to b; for draft-guard and
+#             draft-crosscheck rows, the revise round they judged; Refinement
+#             round; - otherwise
+#   code      the gate code
+#   class     what the gate did at the time: block | warn | revert
+#   outcome   halted | revised | rebutted | demoted (round limit) | reverted |
+#             accepted | hand-fixed (an operator answer or a mid-run fix) |
+#             logged (warn) | expected (negative control)
+#   unit      spec slug; a file name; (cross-file); (multiple); negative-control;
+#             #N = the Nth ticket TicketGen created, when the spec set was not kept
+#   count     number of identical fires in this row
+#   label     true (a real plan gap) | false (the check was wrong, or its cause
+#             was a bug elsewhere) | debatable (people could disagree, or no label
+#             was recorded at run time: cause unlabelled)
+#   cause     plan-gap | live-logic (the check's own logic, as it still is) |
+#             checker-bug | upstream-bug (a prompt or generator bug fed the check
+#             bad input) | format (model output broke a strict format) | env
+#             (sandbox) | negative-control | unlabelled
+#   fixed     yes | partial | no | - (true rows)
+#   live      false rows: yes when what made the false fire is still on main
+#             today (the same output would fire the same way and nothing on main
+#             prevents it), no when a fix on main removed it. - for other rows
+#   f_id      rehearsal finding id(s), space-separated, or -
+#   evidence  <file>:<line> under the rehearsal folder (findings.md or
+#             iter-NN/run-record.md). That line names the f_id, else the code;
+#             unlabelled rows point at the run's summary line
+#   note      what fired and why (no tracker ids, initiative ids, names or paths)
+#
+# G4 rule (seam-audit PLAN): only a false fire with live=yes counts toward a
+# demotion. Fires from checker bugs already fixed (F12/F24, F22, F33, F52, F67)
+# do not count, and a DEPENDENCY_CYCLE closed only by a derived edge stays BLOCK.
+iter	gate	round	code	class	outcome	unit	count	label	cause	fixed	live	f_id	evidence	note
+01	crosscheck	-	CITED_ARTIFACT_UNRESOLVED	block	accepted	consensus.md	1	false	checker-bug	yes	no	F12	findings.md:16	public openapi.yml listed as a NOT FOUND cited artifact; Discovery prompt excludes public reference contracts since planner 0.26.2 (F24 fix)
+01	crosscheck	-	CITED_ARTIFACT_UNREFERENCED	block	accepted	discovery.md	1	false	checker-bug	yes	no	F12	findings.md:16	same artifact; answered external: and accepted at the headless stop
+01	refinement	1	MISSING_CORE_AC	block	halted	backend-store-and-seed	1	true	plan-gap	-	-	F16	findings.md:20	500 fallback path has no criterion
+01	refinement	1	EDGE_CASE_GAP	block	halted	backend-auth-endpoints	1	true	plan-gap	-	-	F16	findings.md:20	signed token whose user no longer exists
+01	refinement	1	MISSING_CORE_AC	block	halted	backend-article-endpoints	2	true	plan-gap	-	-	F16	findings.md:20	expired token on create; createdAt tie-break
+01	refinement	1	EDGE_CASE_GAP	block	halted	backend-article-endpoints	1	true	plan-gap	-	-	F16	findings.md:20	title with no a-z0-9 character
+01	refinement	1	MISSING_CORE_AC	block	halted	frontend-reader-pages	1	true	plan-gap	-	-	F16	findings.md:20	list entry fields unchecked
+01	refinement	1	MISSING_CORE_AC	block	halted	frontend-sign-up-sign-in	1	true	plan-gap	-	-	F16	findings.md:20	rejected-token reload branch
+01	refinement	1	BODY_DRIFT	block	hand-fixed	(multiple)	6	false	env	partial	no	F17	findings.md:21	no Linear baseline recorded because the installed planner was stale (F11, an environment issue); recovered by recording the baseline by hand, which TicketGen does on main
+01	refinement	1	SCOPE_AMBIGUOUS	block	halted	frontend-article-editor	1	true	plan-gap	-	-	F16	findings.md:20	header link owned by another ticket; findings.md counts 9 (7 MISSING_CORE_AC), iter-01/refinement-report.md lists these 8 blocking lines
+02	crosscheck	-	CONTRACT_MISMATCH	block	halted	articles-api	2	false	checker-bug	yes	no	F22	findings.md:26	compared against a cancelled initiative's specs; abandoned initiatives skipped since planner 0.26.1
+02	crosscheck	-	CONTRACT_MISMATCH	block	halted	auth-api	1	false	checker-bug	yes	no	F22	findings.md:26	as above
+02	crosscheck	-	CONTRACT_MISMATCH	block	halted	backend-foundation	2	false	checker-bug	yes	no	F22	findings.md:26	as above
+02	crosscheck	-	CITED_ARTIFACT_UNRESOLVED	block	halted	consensus.md	1	false	checker-bug	yes	no	F24	findings.md:28	public openapi.yml again (= F12)
+02	crosscheck	-	CITED_ARTIFACT_UNREFERENCED	block	halted	discovery.md	1	false	checker-bug	yes	no	F24	findings.md:28	public openapi.yml again (= F12)
+02	crosscheck	-	CITED_ARTIFACT_UNRESOLVED	block	halted	consensus.md	1	false	upstream-bug	yes	no	F19	findings.md:28	"the brief" listed as NOT FOUND because the grill-me seal dropped the brief; the sealed intent carries it verbatim since grill-me 0.4.0
+02	crosscheck	-	CITED_ARTIFACT_UNREFERENCED	block	halted	discovery.md	1	false	upstream-bug	yes	no	F19	findings.md:28	as above
+02	crosscheck	-	CITATION_UNRESOLVED	block	halted	proposal.md	6	false	env	yes	no	F23	findings.md:27	cited code lived only on diverged remote branches; sandbox reset, and Discovery pins the ref it reads since planner 0.26.3
+02	crosscheck	-	CITATION_UNRESOLVED	block	halted	auth-api	3	false	env	yes	no	F23	findings.md:27	as above
+02	crosscheck	-	CITATION_UNRESOLVED	block	halted	backend-foundation	10	false	env	yes	no	F23	findings.md:27	as above
+02	crosscheck	-	CITATION_UNRESOLVED	block	halted	reader-pages	12	false	env	yes	no	F23	findings.md:27	as above
+02	crosscheck	-	RESOLUTION_NOT_PROPAGATED	block	halted	(cross-file)	3	false	checker-bug	yes	no	F25	findings.md:29	D correction: block-audit.md said true; reclassified as a checker false positive (terms pooled across bullets), per-slug attribution since planner 0.26.2
+02	crosscheck	-	DISCOVERY_GAP_UNRESOLVED	warn	logged	discovery.md	1	debatable	unlabelled	-	-	-	findings.md:26	no label recorded at run time; seen in iter-02/crosscheck-report-1.txt
+03	crosscheck	-	TEST_DATA_IMPLIED	block	hand-fixed	docs-conduit-lite	1	false	checker-bug	yes	no	F28	findings.md:32	backticked literal conduit-dev-secret in a README criterion; pinned in test-planner-testdata-implied.sh; a strong match warns by default since planner 0.43.3
+03	crosscheck	-	TEST_DATA_IMPLIED	block	hand-fixed	frontend-scaffold	1	false	checker-bug	yes	no	F28	findings.md:32	shell command npm run build read as data; fixed by #581
+03	crosscheck	-	TEST_DATA_IMPLIED	block	hand-fixed	frontend-scaffold	1	debatable	live-logic	-	-	F30	findings.md:34	deep link names a seeded slug the criterion does not need; answered TESTDATA_CONFIRM
+03	refinement	1	EDGE_CASE_GAP	block	halted	backend-store-and-seed	1	true	plan-gap	-	-	F31	findings.md:35	empty JWT_SECRET skips the fallback
+03	refinement	1	MISSING_CORE_AC	block	halted	#3	1	true	plan-gap	-	-	F31	findings.md:35	non-string field
+03	refinement	1	MISSING_CORE_AC	block	halted	frontend-scaffold	1	true	plan-gap	-	-	F31	findings.md:35	Back button re-render
+03	refinement	1	MISSING_CORE_AC	block	halted	frontend-scaffold	1	false	live-logic	no	yes	F31	findings.md:35	asks for a criterion on an implementation detail (the api.js status/data return contract); block-audit.md counts it false (~1 impl-detail)
+03	refinement	1	SCOPE_AMBIGUOUS	block	halted	docs-conduit-lite	1	true	plan-gap	-	-	F31	findings.md:35	repo-wide calculator criterion vs a three-line scope
+03	refinement	1	MISSING_CORE_AC	block	halted	#6	1	true	plan-gap	-	-	F31	findings.md:35	masked password field
+03	refinement	1	EDGE_CASE_GAP	block	halted	#6	1	true	plan-gap	-	-	F31	findings.md:35	non-401 failure of the current-user call
+03	refinement	1	EDGE_CASE_GAP	block	halted	#7	1	true	plan-gap	-	-	F31	findings.md:35	text rendered, never as HTML
+04	crosscheck	-	DISCOVERY_GAP_UNRESOLVED	warn	logged	discovery.md	1	debatable	unlabelled	-	-	-	findings.md:39	no label recorded at run time; seen in iter-04/crosscheck-log-lines.txt
+04	crosscheck	-	TEST_DATA_IMPLIED_WEAK	warn	logged	repo-docs-conduit	1	debatable	unlabelled	-	-	-	findings.md:39	match "3 added" (count+noun); no label recorded at run time
+04	draft	0	MISSING_CORE_AC	block	halted	backend-store-and-seed	2	true	plan-gap	-	-	F34	findings.md:41	its revision was undone by F33, so it stood at the halt
+04	draft	0	EDGE_CASE_GAP	block	halted	backend-store-and-seed	1	true	plan-gap	-	-	F34	findings.md:41	as above
+04	draft	0	EDGE_CASE_GAP	block	halted	backend-users-auth	1	true	plan-gap	-	-	F34	findings.md:41	trim before the blank check
+04	draft	0	EDGE_CASE_GAP	block	halted	frontend-auth-pages	1	true	plan-gap	-	-	F34	findings.md:41	as above
+04	draft	0	SCOPE_AMBIGUOUS	block	halted	frontend-editor	1	true	plan-gap	-	-	F34	findings.md:41	as above
+04	draft	0	EDGE_CASE_GAP	block	halted	frontend-editor	1	true	plan-gap	-	-	F34	findings.md:41	as above
+04	draft	0	EDGE_CASE_GAP	block	halted	frontend-reader-pages	1	true	plan-gap	-	-	F34	findings.md:41	as above
+04	draft-crosscheck	1	CITATION_UNRESOLVED	block	halted	(multiple)	57	false	checker-bug	yes	no	F33	findings.md:40	in-loop Crosscheck: an unquoted find prune glob aborted the lookup (fixed planner 0.34.1); reported twice, counted once
+04	draft-guard	1	CROSSCHECK_REGRESSION	revert	reverted	backend-store-and-seed	1	false	checker-bug	yes	no	F33	findings.md:40	a valid revision thrown away by the F33 fires
+04	draft-guard	1	CROSSCHECK_REGRESSION	revert	reverted	backend-users-auth	1	false	checker-bug	yes	no	F33	findings.md:40	as above
+04	draft-guard	1	CROSSCHECK_REGRESSION	revert	reverted	frontend-auth-pages	1	false	checker-bug	yes	no	F33	findings.md:40	as above
+04	draft-guard	1	CROSSCHECK_REGRESSION	revert	reverted	frontend-editor	1	false	checker-bug	yes	no	F33	findings.md:40	as above
+04	draft-guard	1	CROSSCHECK_REGRESSION	revert	reverted	frontend-reader-pages	1	false	checker-bug	yes	no	F33	findings.md:40	as above
+05	crosscheck	-	TEST_DATA_IMPLIED	block	hand-fixed	repo-docs-conduit	1	false	checker-bug	yes	no	F39	findings.md:57	quoted literal in a doc-text criterion; fixed planner 0.43.2
+05	crosscheck	-	CITATION_UNRESOLVED	block	hand-fixed	frontend-reader-pages	1	false	format	yes	no	F38	findings.md:56	file created by a sibling cited with no (new in slug) marker; the Specify fix in planner 0.43.2 held in iters 05b and 06
+05	crosscheck	-	DISCOVERY_GAP_UNRESOLVED	warn	logged	discovery.md	1	debatable	unlabelled	-	-	-	findings.md:55	no label recorded at run time; seen in iter-05/crosscheck-output.txt
+05	crosscheck	-	OWN_UNDECLARED_REF	warn	logged	(multiple)	7	false	format	no	yes	F40	findings.md:58	parameter keys named in Technical Context; the params and ownership rules disagree
+05	draft	0	EDGE_CASE_GAP	block	revised	backend-articles	1	debatable	unlabelled	-	-	-	findings.md:63	no per-finding label recorded; cleared by revision
+05	draft	0	EDGE_CASE_GAP	block	demoted	backend-foundation-test-data	1	debatable	unlabelled	-	-	-	findings.md:66	r1 revision reverted (TESTDATA_REGRESSION), r2 assumed, demoted at the round limit
+05	draft	0	EDGE_CASE_GAP	block	revised	backend-users-auth	1	debatable	unlabelled	-	-	-	findings.md:63	no per-finding label recorded; cleared by revision
+05	draft	0	EDGE_CASE_GAP	block	revised	frontend-auth-pages	1	debatable	unlabelled	-	-	-	findings.md:63	no per-finding label recorded; cleared by revision
+05	draft	0	SCOPE_AMBIGUOUS	block	demoted	init-0000000000-1247-test-data-pack	1	debatable	unlabelled	-	-	-	findings.md:66	synthesized test-data spec; demoted at the round limit
+05	draft	0	EDGE_CASE_GAP	block	demoted	init-0000000000-1247-test-data-pack	1	debatable	unlabelled	-	-	-	findings.md:66	synthesized test-data spec; demoted at the round limit
+05	draft	0	MISSING_CORE_AC	block	revised	repo-docs-conduit	1	debatable	unlabelled	-	-	-	findings.md:63	no per-finding label recorded; cleared by revision
+05	draft	0-2	INTENT_AC_MISMATCH	block	halted	backend-foundation-test-data	1	false	upstream-bug	yes	no	F42	findings.md:64	test-data synthesis wrote a relational criterion into a non-database spec; fixed planner 0.43.2
+05	draft	0-2	INTENT_AC_MISMATCH	block	halted	init-0000000000-1247-test-data-pack	1	false	upstream-bug	yes	no	F42	findings.md:64	as above
+05	draft	0-2	UNSTATED_DEPENDENCY	block	halted	frontend-editor	1	debatable	live-logic	partial	-	F43	findings.md:65	D correction: block-audit.md said true; the edge already held transitively. Specify lists every sibling as a direct blocker since planner 0.43.2
+05	draft-guard	1	TESTDATA_REGRESSION	revert	reverted	backend-foundation-test-data	1	true	plan-gap	-	-	F44	findings.md:66	the revision added 3 Verification rows with no Source; the guard was right (a revise prompt gap)
+05b	draft	0	MISSING_CORE_AC	block	revised	articles-api	1	debatable	unlabelled	-	-	-	findings.md:70	no per-finding label recorded; cleared by revision
+05b	draft	0	EDGE_CASE_GAP	block	revised	frontend-shell	1	debatable	unlabelled	-	-	-	findings.md:70	no per-finding label recorded; cleared by revision
+05b	draft	0	SEMANTIC_UNVERIFIED	block	halted	users-api	1	false	format	partial	yes	F47	findings.md:77	GAP line backed by an advisory code; the scan prompt names each gap's codes since tap 0.117.2 but the evidence check is unchanged; the draft gate warns on it since planner 0.43.3, Refinement still blocks (G5)
+06	crosscheck	-	TEST_DATA_IMPLIED	block	hand-fixed	project-scaffold	1	false	checker-bug	yes	no	F48	findings.md:87	search of a named doc for a literal read as data; fixed planner 0.43.3
+06	crosscheck	-	DISCOVERY_GAP_UNRESOLVED	warn	logged	discovery.md	1	debatable	unlabelled	-	-	-	findings.md:85	no label recorded at run time; seen in iter-06/crosscheck-output.txt
+06	crosscheck	-	OWN_UNDECLARED_REF	warn	logged	(multiple)	6	false	format	no	yes	F40	findings.md:92	findings.md says 7 warnings: 6 are this code, 1 is DISCOVERY_GAP_UNRESOLVED
+06	draft	0	EDGE_CASE_GAP	block	revised	article-editor-page	1	debatable	unlabelled	-	-	-	findings.md:85	no per-finding label recorded; cleared by revision
+06	draft	0	EDGE_CASE_GAP	block	revised	articles-api	1	debatable	unlabelled	-	-	-	findings.md:85	no per-finding label recorded; cleared by revision
+06	draft	0	MISSING_CORE_AC	block	revised	project-scaffold	1	debatable	unlabelled	-	-	-	findings.md:85	no per-finding label recorded; resolved by revision
+06	draft	0	EDGE_CASE_GAP	block	revised	users-api	1	debatable	unlabelled	-	-	-	findings.md:85	no per-finding label recorded; cleared by revision
+06	draft	0-1	NAV_PATH_MISSING	block	halted	project-scaffold	1	false	checker-bug	yes	no	F51	findings.md:90	chore with no page; inapplicable to chore and security since tap 0.117.3
+06	draft	1	SEMANTIC_UNAVAILABLE	block	halted	project-scaffold	1	false	format	yes	no	F49	findings.md:88	PARAPHRASE 403 > 400 characters; the parser truncates since tap 0.117.3
+07	crosscheck	-	DEPENDENCY_CYCLE	block	halted	article-create-api	1	false	checker-bug	yes	no	F52	iter-07/run-record.md:18	cycle closed only by a derived ownership edge to an append writer (fixed planner 0.43.4, #728); one finding reported on both specs
+07	crosscheck	-	DEPENDENCY_CYCLE	block	halted	article-read-api	1	false	checker-bug	yes	no	F52	iter-07/run-record.md:18	as above
+07	crosscheck	-	TEST_DATA_IMPLIED_WEAK	warn	logged	frontend-foundation	1	false	live-logic	no	yes	-	iter-07/run-record.md:24	"header shows no New Article link" needs no data
+07	crosscheck	-	OWN_UNDECLARED_REF	warn	logged	(multiple)	6	false	format	no	yes	F40	iter-07/run-record.md:25	parameter keys and code tokens in Technical Context
+07	crosscheck	-	DISCOVERY_GAP_UNRESOLVED	warn	logged	discovery.md	1	false	live-logic	no	yes	-	iter-07/run-record.md:26	base-branch note, not a gap
+07	draft	0	EDGE_CASE_GAP	block	revised	auth-pages	1	true	plan-gap	-	-	-	iter-07/run-record.md:42	diagnostic resume after the F52 fix; network error or 5xx on the start-up token check
+07	draft	0	MISSING_CORE_AC	block	revised	backend-foundation	1	true	plan-gap	-	-	-	iter-07/run-record.md:43	shared error-body helper
+07	draft	0	MISSING_CORE_AC	block	revised	frontend-foundation	1	true	plan-gap	-	-	-	iter-07/run-record.md:44	router render and fallback
+07	draft	0	MISSING_CORE_AC	block	revised	reader-pages	1	true	plan-gap	-	-	-	iter-07/run-record.md:45	no-reload navigation
+07	draft	1	EDGE_CASE_GAP	block	revised	backend-foundation	1	true	plan-gap	-	-	-	iter-07/run-record.md:46	seed() twice
+07	dor-check	-	TEST_USER_MISSING	block	expected	negative-control	1	true	negative-control	-	-	-	iter-07/run-record.md:59	planted: Test User credentials removed from a copy of a passing body
+07	dor-check	-	TEST_DATA_UNSOURCED	block	expected	negative-control	1	true	negative-control	-	-	-	iter-07/run-record.md:59	planted: one Source: line removed
+08	crosscheck	-	OWN_UNDECLARED_REF	warn	logged	(multiple)	7	false	format	no	yes	F40	iter-08/run-record.md:61	parameter keys in Technical Context
+08	crosscheck	-	TEST_DATA_IMPLIED_WEAK	warn	logged	repo-docs	1	false	live-logic	no	yes	-	iter-08/run-record.md:62	"seeded account" names doc text
+08	crosscheck	-	DISCOVERY_GAP_UNRESOLVED	warn	logged	discovery.md	1	false	live-logic	no	yes	-	iter-08/run-record.md:63	note, not a gap
+08	draft	0	MISSING_CORE_AC	block	revised	articles-api	1	true	plan-gap	-	-	-	iter-08/run-record.md:49	cleared r1
+08	draft	0	MISSING_CORE_AC	block	revised	backend-foundation	1	true	plan-gap	-	-	-	iter-08/run-record.md:50	cleared r1
+08	draft	0	EDGE_CASE_GAP	block	revised	backend-foundation	1	true	plan-gap	-	-	-	iter-08/run-record.md:50	cleared r1
+08	draft	0	MISSING_CORE_AC	block	revised	users-api	1	true	plan-gap	-	-	-	iter-08/run-record.md:52	cleared r1
+08	draft	0	EDGE_CASE_GAP	block	revised	users-api	1	true	plan-gap	-	-	-	iter-08/run-record.md:52	email trim and case, assumed r1
+08	draft	1	EDGE_CASE_GAP	block	revised	articles-api	1	true	plan-gap	-	-	-	iter-08/run-record.md:53	limit=0, resolved r2
+08	draft	0	MISSING_CORE_AC	block	revised	repo-docs	1	true	plan-gap	-	-	-	iter-08/run-record.md:51	ports and working directories, revised r1
+08	draft	1	MISSING_CORE_AC	block	revised	repo-docs	1	true	plan-gap	-	-	-	iter-08/run-record.md:51	build row working directory, revised r2
+08	draft	2	MISSING_CORE_AC	block	demoted	repo-docs	1	true	plan-gap	-	-	F60	iter-08/run-record.md:55	README naming Conduit-lite never got a criterion; shipped as an advisory (a leak)
+08	draft	1-2	EDGE_CASE_GAP	block	demoted	users-api	1	true	plan-gap	-	-	F60	iter-08/run-record.md:55	login with surrounding spaces; its r2 revision was reverted (F58); shipped as an advisory (a leak)
+08	draft	2	EDGE_CASE_GAP	block	demoted	articles-api	1	true	plan-gap	-	-	F60	iter-08/run-record.md:55	fractional limit raised in the last round; shipped as an advisory (a leak)
+08	draft-guard	2	ASSUMPTION_INVALID	revert	reverted	users-api	1	false	checker-bug	yes	no	F58	iter-08/run-record.md:52	the guard counts only assumptions added this round, so an ASSUMED line that reuses round 1's assumption is always rejected; fixed in seam-gate-safety G4 (an ASSUMED line may quote a kept Scope row)
+08	dor-check	-	TEST_USER_MISSING	block	expected	negative-control	1	true	negative-control	-	-	-	iter-08/run-record.md:41	planted: Test User line removed
+08	dor-check	-	TEST_DATA_UNSOURCED	block	expected	negative-control	1	true	negative-control	-	-	-	iter-08/run-record.md:42	planted: one Source: line removed
+09	crosscheck	-	OWN_UNDECLARED_REF	warn	logged	(multiple)	5	false	format	no	yes	F40	iter-09/run-record.md:41	parameter keys and code tokens in Technical Context; the run record says 7, iter-09/state.log holds 5 of this code and 2 DISCOVERY_GAP_UNRESOLVED
+09	crosscheck	-	DISCOVERY_GAP_UNRESOLVED	warn	logged	discovery.md	2	debatable	unlabelled	-	-	-	iter-09/run-record.md:22	no label recorded at run time (the run record counts them as OWN_UNDECLARED_REF); seen in iter-09/state.log
+09	draft	0	INTENT_AC_MISMATCH	block	halted	frontend-editor	1	false	live-logic	partial	yes	F62	iter-09/run-record.md:32	speculative DETAIL ("If home.js renders avatar images"); #732 makes a single-criterion finding revisable, the judge still raises it
+09	draft	0	EDGE_CASE_GAP	block	revised	articles-api	1	true	plan-gap	-	-	-	iter-09/run-record.md:33	assumed r1
+09	draft	0	EDGE_CASE_GAP	block	revised	auth-api	1	true	plan-gap	-	-	-	iter-09/run-record.md:34	resolved r1
+09	draft	0	MISSING_CORE_AC	block	revised	backend-scaffold	2	true	plan-gap	-	-	-	iter-09/run-record.md:35	resolved r1
+09	draft	0	EDGE_CASE_GAP	block	rebutted	backend-scaffold	1	false	live-logic	no	yes	-	iter-09/run-record.md:35	malformed-JSON body that Consensus had deferred; rebutted r1
+09	draft	0	EDGE_CASE_GAP	block	revised	frontend-auth-pages	1	true	plan-gap	-	-	-	iter-09/run-record.md:36	assumed r1
+09	draft	0	MISSING_CORE_AC	block	revised	repo-docs	1	true	plan-gap	-	-	-	iter-09/run-record.md:37	resolved r1
+09	draft	1	MISSING_CORE_AC	block	revised	repo-docs	2	true	plan-gap	-	-	-	iter-09/run-record.md:37	resolved r2
+10	crosscheck	-	CARVE_SCOPE_LOST	block	halted	(cross-file)	1	false	checker-bug	yes	no	F67	iter-10/run-record.md:28	count read from the Specify start line; carve scope diffs bash-recorded slugs since planner 0.44.0 (seam-bash-derives slice 1)
+10	crosscheck	-	OWN_UNDECLARED_REF	warn	logged	(multiple)	7	false	format	no	yes	F40	iter-10/run-record.md:32	parameter keys in Technical Context

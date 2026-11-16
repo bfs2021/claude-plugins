@@ -1,0 +1,7 @@
+=== DOR_SEMANTIC_AUDIT ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-users-api
+BODY_HASH: sha256:97f5caa9ca8ec7fccbb213ab882ba88666fe2f75b8ab805e5be197f2e0a13262
+SCORE_PLAUSIBLE: yes
+SCORE_REASON: No dor_quality_score is present; status "ready" with empty missing/advisory arrays is plausible, since every described register, login, current-user, token and hashing behaviour has a concrete criterion, the seeded jake/jane data is listed with its source, and the backend-scaffold dependency is named.
+=== END DOR_SEMANTIC_AUDIT ===

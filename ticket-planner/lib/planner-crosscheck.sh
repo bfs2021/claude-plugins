@@ -103,6 +103,8 @@ _planner_crosscheck_source_if_missing "planner_crosscheck_testdata" \
   "${_PLANNER_CROSSCHECK_LIB_DIR}/planner-crosscheck-testdata.sh"
 _planner_crosscheck_source_if_missing "planner_crosscheck_ac_coverage" \
   "${_PLANNER_CROSSCHECK_LIB_DIR}/planner-crosscheck-ac-coverage.sh"
+_planner_crosscheck_source_if_missing "planner_crosscheck_codespan" \
+  "${_PLANNER_CROSSCHECK_LIB_DIR}/planner-crosscheck-codespan.sh"
 _planner_crosscheck_source_if_missing "planner_crosscheck_params" \
   "${_PLANNER_CROSSCHECK_LIB_DIR}/planner-crosscheck-params.sh"
 _planner_crosscheck_source_if_missing "planner_crosscheck_ownership" \
@@ -136,8 +138,9 @@ _planner_crosscheck_source_if_missing "planner_state_write" \
 # judgment, not by itself proof of a defect.
 # planner-test-data-derivation: TEST_DATA_INVENTORY_MISSING (no epic-wide
 # inventory), TEST_DATA_IMPLIED_WEAK (weak-tier implied data, or a strong
-# match in a legacy initiative) and VERIFICATION_NOTES_MISSING_LEGACY are
-# warn-level; VERIFICATION_NOTES_MISSING and TEST_DATA_IMPLIED block, as does
+# match in a legacy initiative, or any strong match unless
+# PLANNER_TESTDATA_IMPLIED_BLOCKS=true) and VERIFICATION_NOTES_MISSING_LEGACY
+# are warn-level; VERIFICATION_NOTES_MISSING and TEST_DATA_IMPLIED block, as does
 # TEST_DATA_SYNTH_FAILED (the synthesis sub-step could not write its specs).
 # planner-crosscheck-ownership: OWN_NEAR_MATCH, OWN_UNDECLARED_REF,
 # OWN_EXTERNAL_UNANCHORED and OWN_EDGES_DIVERGED are tripwires, warn-level.
@@ -148,7 +151,7 @@ _planner_crosscheck_source_if_missing "planner_state_write" \
 # planner-persona-panel: PANEL_UNADDRESSED is the same kind of bookkeeping
 # check for the review panel, warn-level. PANEL_STOP_SKIPPED blocks: Consensus
 # settled a security or product-owner blocker that only a person may settle.
-PLANNER_CROSSCHECK_WARN_CODES="DISCOVERY_GAP_UNRESOLVED CONTRACT_UNDEFINED TEST_DATA_UNSOURCED_LEGACY CITED_ARTIFACTS_SECTION_MISSING TEST_DATA_INVENTORY_MISSING TEST_DATA_IMPLIED_WEAK VERIFICATION_NOTES_MISSING_LEGACY OWN_NEAR_MATCH OWN_UNDECLARED_REF OWN_EXTERNAL_UNANCHORED OWN_EDGES_DIVERGED AC_PRECONDITION_PLANNED AC_PRECONDITION_NO_SOURCE GOLDFISH_UNADDRESSED PANEL_UNADDRESSED"
+PLANNER_CROSSCHECK_WARN_CODES="DISCOVERY_GAP_UNRESOLVED CONTRACT_UNDEFINED TEST_DATA_UNSOURCED_LEGACY CITED_ARTIFACTS_SECTION_MISSING TEST_DATA_INVENTORY_MISSING TEST_DATA_IMPLIED_WEAK VERIFICATION_NOTES_MISSING_LEGACY OWN_NEAR_MATCH OWN_UNDECLARED_REF OWN_EXTERNAL_UNANCHORED OWN_EDGES_DIVERGED AC_PRECONDITION_PLANNED AC_PRECONDITION_NO_SOURCE GOLDFISH_UNADDRESSED PANEL_UNADDRESSED CODE_SPAN_EDGE_SPACE"
 
 # Per-instance codes (planner-crosscheck-ownership D10). A listed code is
 # accepted one instance at a time and never code-wide: emit matches each
@@ -544,6 +547,12 @@ planner_crosscheck_run() {
   total_warn=$((total_warn + w))
   total_accepted=$((total_accepted + a))
 
+  # Code-span family (F53): edge spaces markdown drops from inline code.
+  read -r b w a < <(_planner_crosscheck_run_family "$initiative_id" planner_crosscheck_codespan "$initiative_id")
+  total_blocking=$((total_blocking + b))
+  total_warn=$((total_warn + w))
+  total_accepted=$((total_accepted + a))
+
   read -r b w a < <(_planner_crosscheck_run_family "$initiative_id" planner_crosscheck_params "$initiative_id")
   total_blocking=$((total_blocking + b))
   total_warn=$((total_warn + w))
@@ -689,7 +698,7 @@ planner_crosscheck_findings_summary() {
 # Codes whose findings are inherently about a set of artifacts rather than one
 # — grouping them under whichever filename happens to appear first in the
 # message would point the operator at an arbitrary member of the set.
-PLANNER_CROSSCHECK_CROSS_FILE_CODES="RESOLUTION_NOT_PROPAGATED CARVE_SCOPE_LOST SIGNALS_UNIFORM TEST_DATA_UNOWNED TEST_DATA_UNSOURCED_LEGACY OWN_MULTI_WRITER OWN_MULTI_FIRE"
+PLANNER_CROSSCHECK_CROSS_FILE_CODES="RESOLUTION_NOT_PROPAGATED CARVE_SCOPE_LOST CHECK_ERRORED SIGNALS_UNIFORM TEST_DATA_UNOWNED TEST_DATA_UNSOURCED_LEGACY OWN_MULTI_WRITER OWN_MULTI_FIRE"
 
 # One-line remediation hint per finding code. Deliberately canned and code-
 # scoped: it says what shape the fix takes, not what the specific fix is —
@@ -752,7 +761,10 @@ planner_crosscheck_fix_hint() {
     echo "Crosscheck could not write artifacts/ownership-edges.json — check the artifacts directory is writable, then resume"
     ;;
   CARVE_SCOPE_LOST)
-    echo "the spec-file count no longer matches the ticket count Specify declared — record the rescope in consensus.md, or restore the missing spec"
+    echo "the specs on disk differ from the ones Specify wrote (artifacts/phase-results/specify.json) — record the rescope in consensus.md and accept it, or restore the missing spec"
+    ;;
+  CHECK_ERRORED)
+    echo "a check could not read its input and did not run — fix or regenerate the input it names (for carve scope, re-run Specify so bash records specify.json), or audit by hand and accept"
     ;;
   BYPASS_PATH_UNADDRESSED)
     echo "a live code path matching this ticket's terms is covered by no spec — extend the spec's scope, or record the path as out of scope"
@@ -827,7 +839,7 @@ planner_crosscheck_fix_hint() {
     echo "Consensus settled a security or product-owner blocker that only a person may settle — mark the finding accepted (and change the plan), or add its panel.<ID> row to proposal.md ## Parameters with Value NEEDS_HUMAN_DECISION — <question> so the owner is asked; an objection the owner upheld must end as accepted. Override: resume --accept PANEL_STOP_SKIPPED:\"reason\""
     ;;
   TEST_DATA_IMPLIED_WEAK)
-    echo "a criterion may imply test data (weak match) while every row says none — check it; answer TESTDATA_CONFIRM: none in consensus.md to silence it"
+    echo "a criterion may imply test data while every row says none (a pattern match, warn only) — check it; if it does need data, add the Verification Notes row with a Source; else answer TESTDATA_CONFIRM: none in consensus.md to silence it"
     ;;
   *)
     echo "no canned hint for this code — read the finding message"

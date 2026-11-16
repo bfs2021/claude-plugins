@@ -1,0 +1,7 @@
+=== DOR_SEMANTIC_AUDIT ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-frontend-read-pages
+BODY_HASH: sha256:9f11a88d8e0b51e52fd70c7e9536c2e0c66a829b8591262075f9acfed59c5070
+SCORE_PLAUSIBLE: yes
+SCORE_REASON: No dor_quality_score is present; the ready status with empty missing/advisory arrays is plausible, since every behaviour has a criterion, all criteria map to Verification Plan rows, and seeded test data names its source.
+=== END DOR_SEMANTIC_AUDIT ===

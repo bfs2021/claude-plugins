@@ -1,0 +1,14 @@
+=== DOR_SEMANTIC_SCAN ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-auth-pages
+BODY_HASH: sha256:14b4b631061b804b9153a358a75946ff4dd8fc287c58b16d2ea5a35eef04281f
+PARAPHRASE: Add frontend /login and /register pages that store the JWT in localStorage, render API error lines or a generic failure message, switch the header to the signed-in state (username + New Article), and on app load validate a stored token, clearing it only when the API rejects it.
+GAP_REQUIREMENT_COMPLETENESS: clear
+GAP_REQUIREMENT_COMPLETENESS_REASON: Every described behavior (sign-in, sign-up, error lines, 5xx/network message, signed-in header, page-load token check incl. backend-down case) has a matching criterion and Verification Plan row.
+GAP_CONTRADICTORY_REQUIREMENTS: clear
+GAP_CONTRADICTORY_REQUIREMENTS_REASON: The Scope assumption (keep token on network/5xx failure, show signed-out links) agrees with criteria 20-21 and with Technical Context, which clears the token only on API rejection.
+GAP_DEEP_SCOPE_AMBIGUITY: clear
+GAP_DEEP_SCOPE_AMBIGUITY_REASON: Scope names the four files and their roles, and Out of Scope excludes sign-out, settings, profiles and the editor page.
+GAP_EDGE_CASE_SUFFICIENCY: clear
+GAP_EDGE_CASE_SUFFICIENCY_REASON: Wrong password, blank fields, duplicate email and username, invalid stored token and backend-down cases are each covered by criteria with matching verification rows.
+=== END DOR_SEMANTIC_SCAN ===

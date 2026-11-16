@@ -72,6 +72,14 @@
 # header column and a row has extra cells (an unescaped `|` in an earlier
 # cell, e.g. a menu path `Settings | Users`), its last cell is read.
 #
+# Per-column evidence (seam audit Track 0.3): VPLAN_V_ROLE, VPLAN_V_NAV,
+# VPLAN_V_DATA and VPLAN_V_EXPECTED count the verifiable rows whose Role
+# scope / Navigation path / Test data / Expected behavior cell (located by
+# header name) actually states something — not blank, `-`, `—`, `?`, `tbd`,
+# `todo`, `unknown`, `not recorded…`, and (except for Test data, where it
+# means "no data needed") not `none`/`n/a`. verify-readiness.sh vouches for a
+# prerequisite from the table only when every verifiable row fills it.
+#
 # No Verifiable column: a table whose header has no Verifiable cell adds 0
 # to VPLAN_VERIFIABLE (its rows still count toward VPLAN_ROWS). There is no
 # column to read, and guessing from the whole row is exactly the #514 bug.
@@ -95,6 +103,7 @@ vplan_parse() {
 
   VPLAN_ROWS=0
   VPLAN_VERIFIABLE=0
+  VPLAN_V_ROLE=0 VPLAN_V_NAV=0 VPLAN_V_DATA=0 VPLAN_V_EXPECTED=0
 
   # CRLF bodies (pasted from a web editor) would otherwise miss the anchored
   # subsection heading below.
@@ -131,6 +140,14 @@ vplan_parse() {
       v = norm(v)
       return v == "y" || v == "yes" || v == "\342\234\223" || v == "\342\234\224" || v == "\342\234\224\357\270\217" || v == "\342\234\205"
     }
+    # A cell that states nothing. "none"/"n/a" do state something in the
+    # Test data column ("no data needed"), so it passes allow_none=1.
+    function filled(v, allow_none) {
+      v = norm(v)
+      if (v == "" || v == "-" || v == "\342\200\224" || v == "\342\200\223" || v == "?" || v == "tbd" || v == "todo" || v == "unknown" || v ~ /^not recorded/) return 0
+      if (!allow_none && (v == "none" || v == "n/a" || v == "na")) return 0
+      return 1
+    }
     /^[ \t]*```/ { fence = !fence; intable = 0; next }
     fence { next }
     !/^[ \t]*\|/ { intable = 0; next }
@@ -138,8 +155,15 @@ vplan_parse() {
     {
       n = cells($0, c)
       if (!intable) {
-        intable = 1; vcol = 0; hn = n
-        for (i = 1; i <= n; i++) if (index(norm(c[i]), "verifiable") == 1) { vcol = i; break }
+        intable = 1; vcol = 0; hn = n; rcol = 0; ncol = 0; dcol = 0; ecol = 0
+        for (i = 1; i <= n; i++) {
+          h = norm(c[i])
+          if (!vcol && index(h, "verifiable") == 1) vcol = i
+          else if (!rcol && (index(h, "role") == 1 || index(h, "test user") > 0 || h == "user")) rcol = i
+          else if (!ncol && (index(h, "navigation") > 0 || index(h, "nav") == 1)) ncol = i
+          else if (!dcol && (index(h, "test data") > 0 || index(h, "data") == 1)) dcol = i
+          else if (!ecol && index(h, "expected") == 1) ecol = i
+        }
       }
       if ($0 ~ /^[ \t]*\|[ \t]*#[ \t]*\|/) next
       rows++
@@ -147,14 +171,23 @@ vplan_parse() {
       # last header column, the mark is still the last cell of the row.
       vc = vcol
       if (vcol && vcol == hn && n > hn) vc = n
-      if (vc && vc <= n && yes(c[vc])) ver++
+      if (vc && vc <= n && yes(c[vc])) {
+        ver++
+        # Seam audit Track 0.3: per-column evidence from the verifiable rows
+        # themselves — a self-ticked mark never vouches for an empty cell.
+        if (rcol && rcol <= n && filled(c[rcol], 0)) vrole++
+        if (ncol && ncol <= n && filled(c[ncol], 0)) vnav++
+        if (dcol && dcol <= n && filled(c[dcol], 1)) vdata++
+        if (ecol && ecol <= n && filled(c[ecol], 0)) vexp++
+      }
     }
-    END { printf "%d %d\n", rows, ver }
-  ' 2>/dev/null) || counts="0 0"
-  VPLAN_ROWS=${counts% *}
-  VPLAN_VERIFIABLE=${counts#* }
-  [[ "$VPLAN_ROWS" =~ ^[0-9]+$ ]] || VPLAN_ROWS=0
-  [[ "$VPLAN_VERIFIABLE" =~ ^[0-9]+$ ]] || VPLAN_VERIFIABLE=0
+    END { printf "%d %d %d %d %d %d\n", rows, ver, vrole, vnav, vdata, vexp }
+  ' 2>/dev/null) || counts="0 0 0 0 0 0"
+  read -r VPLAN_ROWS VPLAN_VERIFIABLE VPLAN_V_ROLE VPLAN_V_NAV VPLAN_V_DATA VPLAN_V_EXPECTED <<<"$counts"
+  local _v
+  for _v in VPLAN_ROWS VPLAN_VERIFIABLE VPLAN_V_ROLE VPLAN_V_NAV VPLAN_V_DATA VPLAN_V_EXPECTED; do
+    [[ "${!_v}" =~ ^[0-9]+$ ]] || printf -v "$_v" '%s' 0
+  done
 
   return 0
 }

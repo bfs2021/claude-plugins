@@ -84,6 +84,8 @@ assert_eq "rc 1 on a finding" "$rc" "1"
 assert_eq "one finding (TD spec skipped)" "$(grep -c AC_STATUS_UNCOVERED <<<"$out")" "1"
 assert_contains "finding shape" "$out" "planner-crosscheck-ac-coverage: AC_STATUS_UNCOVERED api-errors.md status 500"
 
+# Specify end: bash records the spec list carve scope compares (seam-bash-derives).
+planner_specify_result_write "$INIT" >/dev/null
 planner_crosscheck_run "$INIT" >/dev/null 2>&1
 log=$(planner_state_log "$INIT")
 assert_contains "finding reaches state.log" "$(cat "$log")" "|META|crosscheck|fail|AC_STATUS_UNCOVERED api-errors.md status 500"

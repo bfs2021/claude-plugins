@@ -1,0 +1,14 @@
+=== DOR_SEMANTIC_SCAN ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-frontend-auth-pages
+BODY_HASH: sha256:0c21badc5f217a834b308d20e345f2f30b81ff5e66d435e73615078ae32cc2e9
+PARAPHRASE: Add frontend sign-in (/login) and sign-up (/register) pages that store the API token in localStorage under jwt, show API validation errors as field-message lines, send the token on API calls, check it at start-up (dropping it only on a 401), and render a signed-in header with the username and a New Article link.
+GAP_REQUIREMENT_COMPLETENESS: clear
+GAP_REQUIREMENT_COMPLETENESS_REASON: Each described behaviour (both pages, success and error paths, token storage, Authorization header, reload persistence, rejected-token removal, 5xx and network-error start-up handling, signed-in header) has a criterion and a matching Verification Plan row.
+GAP_CONTRADICTORY_REQUIREMENTS: clear
+GAP_CONTRADICTORY_REQUIREMENTS_REASON: The changed sections agree with Proposed Behaviour and Technical Context; the 401-removes-token rule and the keep-token-on-5xx/network-error assumption cover disjoint cases.
+GAP_DEEP_SCOPE_AMBIGUITY: clear
+GAP_DEEP_SCOPE_AMBIGUITY_REASON: Scope is one frontend service with enumerated areas and named files; Out of Scope excludes sign-out, the editor page, profiles and backend changes, and the New Article link ownership is stated.
+GAP_EDGE_CASE_SUFFICIENCY: clear
+GAP_EDGE_CASE_SUFFICIENCY_REASON: Wrong password, blank fields, duplicate email, duplicate username, an invalid stored token, a 500 and a network error on the start-up check are all covered, with test data sourced from the seeded user and a fresh store.
+=== END DOR_SEMANTIC_SCAN ===

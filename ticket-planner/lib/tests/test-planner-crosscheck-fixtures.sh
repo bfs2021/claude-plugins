@@ -40,6 +40,9 @@
 # Run: bash ticket-planner/lib/tests/test-planner-crosscheck-fixtures.sh
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# These scenarios exercise TEST_DATA_IMPLIED in its blocking mode. Since the
+# rehearsal block audit it warns by default; opt back in here.
+export PLANNER_TESTDATA_IMPLIED_BLOCKS=true
 LIB_DIR="${SCRIPT_DIR}/.."
 FIXTURES_DIR="${SCRIPT_DIR}/fixtures/crosscheck"
 
@@ -158,6 +161,8 @@ for fixture_dir in "$FIXTURES_DIR"/*/; do
     planner_state_write "$init_id" "$ll_phase" "$ll_step" "$ll_status" "$ll_msg" >/dev/null 2>&1
   done < <(jq -r '.log_lines // [] | .[]' "$expected_file")
 
+  # Specify end: bash records the spec list carve scope compares (seam-bash-derives).
+  planner_specify_result_write "$init_id" >/dev/null
   planner_crosscheck_run "$init_id" >/dev/null 2>&1
   rc=$?
 

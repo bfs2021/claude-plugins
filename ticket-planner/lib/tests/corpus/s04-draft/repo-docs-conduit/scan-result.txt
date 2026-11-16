@@ -1,0 +1,13 @@
+=== DOR_SEMANTIC_SCAN ===
+SCHEMA_VERSION: 1
+TICKET: DRAFT-repo-docs-conduit
+BODY_HASH: sha256:f791bd2130b448195fa3c56384cc6294a9f43fd63fc45fb20b5127f65251d0cc
+GAP_REQUIREMENT_COMPLETENESS: clear
+GAP_REQUIREMENT_COMPLETENESS_REASON: Every proposed change (calculator removal, Conduit-lite wording, empty-at-start removal, Running section commands, JWT_SECRET note, unchanged Stack/Build & Test, local-edit preservation) has a matching acceptance criterion.
+GAP_CONTRADICTORY_REQUIREMENTS: clear
+GAP_CONTRADICTORY_REQUIREMENTS_REASON: The edit-only line list, the three-line staging procedure, Out of Scope, and the commit-diff criteria agree on keeping lines 11, 17 and 48 uncommitted.
+GAP_DEEP_SCOPE_AMBIGUITY: clear
+GAP_DEEP_SCOPE_AMBIGUITY_REASON: Scope is bounded to named lines in two docs files, with code changes and a root package.json explicitly out of scope.
+GAP_EDGE_CASE_SUFFICIENCY: clear
+GAP_EDGE_CASE_SUFFICIENCY_REASON: A non-branching docs edit; the one real hazard (committing the host-specific local edit) is addressed by explicit staging rules and two git-level criteria.
+=== END DOR_SEMANTIC_SCAN ===

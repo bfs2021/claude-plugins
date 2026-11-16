@@ -1270,7 +1270,13 @@ check_ticket_ready() {
       _dor_record "TEST_USER_MISSING" "true" "hard" "no Test User section found"
     fi
 
-    if _has_section_nav_path "$body"; then
+    # chore and security have no Navigation Path in their templates, and
+    # planned-ticket-body-check.sh requires one only on feature/improvement
+    # (rehearsal F51: a no-page chore was blocked here with nothing the
+    # planner could add).
+    if [ "$type" = "chore" ] || [ "$type" = "security" ]; then
+      _dor_record "NAV_PATH_MISSING" "null" "inapplicable" "type=$type, no Navigation Path section"
+    elif _has_section_nav_path "$body"; then
       nav_path_present="true"
       _dor_record "NAV_PATH_MISSING" "false" "hard" "Navigation Path present"
     else

@@ -21,6 +21,9 @@ Environment variables (all optional):
                           e.g. "claude-deepseek 2 --bypass"
     FLEET_STARTUP_ENV_CHECK — set "false" to skip the startup env-check gate
                               (default: enabled — see _run_startup_env_check)
+
+fleetd refuses to start with FLEET_PHASE_DISPATCH_ENABLE=true unless
+FLEET_ROUTER_STEP_SHELL=true too (see phase_dispatch_refusal).
 """
 
 import os
@@ -111,6 +114,45 @@ def _run_startup_env_check(state_dir=None):
         sys.exit(1)
 
 
+def phase_dispatch_refusal(environ=None):
+    """Why this environment must not run phase dispatch, or ''.
+
+    Track 0.5: `phase_dispatch.classify_phase` fails a loop-bearing phase
+    (IMPLEMENT, VERIFY, PR-REVIEW) closed when it exits 0 with no verdict. On
+    the phase-dispatch path the verdict record (`META|phase-result`) and the
+    independent checks (`META|claim-delta`, `RETURN_INCOMPLETE`) are written
+    only by `router-step.sh post-spawn`, which runs only under
+    `FLEET_ROUTER_STEP_SHELL=true`. Without it every VERIFY would fail, so the
+    combination is refused outright rather than allowed to fail open or to
+    exhaust every ticket's verify loop.
+    """
+    env = os.environ if environ is None else environ
+    if env.get('FLEET_PHASE_DISPATCH_ENABLE', 'false') != 'true':
+        return ''
+    if env.get('FLEET_ROUTER_STEP_SHELL', 'false') == 'true':
+        return ''
+    return ('FLEET_PHASE_DISPATCH_ENABLE=true needs FLEET_ROUTER_STEP_SHELL='
+            'true: without router-step.sh post-spawn no phase verdict is '
+            'recorded, and a phase with no verdict fails closed')
+
+
+def _run_phase_dispatch_gate(state_dir=None):
+    """Refuse to start when `phase_dispatch_refusal` names a reason.
+
+    Not covered by `FLEET_STARTUP_ENV_CHECK=false`: that opt-out skips an
+    environment probe, while this is a safety coupling between two flags.
+    """
+    reason = phase_dispatch_refusal()
+    if not reason:
+        return
+    print(f'fleetd: {reason} — refusing to start.', file=sys.stderr)
+    resolved_state_dir = Path(state_dir) if state_dir else _resolve_state_dir()
+    _notify_gate_stop(
+        _DEFAULT_FLEET_LIB, resolved_state_dir, _STARTUP_PSEUDO_TID,
+        'FLEETD_PHASE_DISPATCH_NEEDS_ROUTER_STEP', reason)
+    sys.exit(1)
+
+
 def _line_buffer_stdio():
     """Force line-buffered stdout/stderr.
 
@@ -158,6 +200,7 @@ def main():
         i += 1
 
     _run_startup_env_check(state_dir)
+    _run_phase_dispatch_gate(state_dir)
 
     supervisor = Supervisor(
         state_dir=state_dir,
