@@ -153,7 +153,7 @@ iter	gate	round	code	class	outcome	unit	count	label	cause	fixed	live	f_id	eviden
 08	draft	2	MISSING_CORE_AC	block	demoted	repo-docs	1	true	plan-gap	-	-	F60	iter-08/run-record.md:55	README naming Conduit-lite never got a criterion; shipped as an advisory (a leak)
 08	draft	1-2	EDGE_CASE_GAP	block	demoted	users-api	1	true	plan-gap	-	-	F60	iter-08/run-record.md:55	login with surrounding spaces; its r2 revision was reverted (F58); shipped as an advisory (a leak)
 08	draft	2	EDGE_CASE_GAP	block	demoted	articles-api	1	true	plan-gap	-	-	F60	iter-08/run-record.md:55	fractional limit raised in the last round; shipped as an advisory (a leak)
-08	draft-guard	2	ASSUMPTION_INVALID	revert	reverted	users-api	1	false	checker-bug	no	yes	F58	iter-08/run-record.md:52	the guard counts only assumptions added this round, so an ASSUMED line that reuses round 1's assumption is always rejected
+08	draft-guard	2	ASSUMPTION_INVALID	revert	reverted	users-api	1	false	checker-bug	yes	no	F58	iter-08/run-record.md:52	the guard counts only assumptions added this round, so an ASSUMED line that reuses round 1's assumption is always rejected; fixed in seam-gate-safety G4 (an ASSUMED line may quote a kept Scope row)
 08	dor-check	-	TEST_USER_MISSING	block	expected	negative-control	1	true	negative-control	-	-	-	iter-08/run-record.md:41	planted: Test User line removed
 08	dor-check	-	TEST_DATA_UNSOURCED	block	expected	negative-control	1	true	negative-control	-	-	-	iter-08/run-record.md:42	planted: one Source: line removed
 09	crosscheck	-	OWN_UNDECLARED_REF	warn	logged	(multiple)	5	false	format	no	yes	F40	iter-09/run-record.md:41	parameter keys and code tokens in Technical Context; the run record says 7, iter-09/state.log holds 5 of this code and 2 DISCOVERY_GAP_UNRESOLVED
