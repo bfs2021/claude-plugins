@@ -17,6 +17,34 @@ marketplace. Where a release also moved `ticket-planner`, `fleet-controller`, or
 > - **0.19.0 never existed.** `plugin.json` went 0.18.0 → 0.20.0. The Phase 2
 >   commit message claims `0.19.0→0.20.0`, but no 0.19.0 was ever committed.
 
+## ticket-planner 0.48.0 (2026-11-16) — seam-gate-safety G4: demotion registry (mechanism only) and the F58 guard fix
+
+- **Revise guard fix (rehearsal F58).** `ASSUMPTION_INVALID` in the draft readiness
+  revise loop (`_pdrv_assumption_check`) counted only the Scope assumption rows a round
+  added, so an `ASSUMED` line that quoted a row an earlier round had added was always
+  reverted ("1 ASSUMED line(s) for 0 new Scope assumption row(s)"). Such a line is now
+  accepted when its text matches a `- Assumption:` row that is in Scope before and after
+  the round and no new row repeats it. It claims no new row; every other rule still
+  applies to it (a new or extended criterion per ASSUMED line, a finding of the round,
+  never a security finding, the per-round cap of 3 ASSUMED lines). Each existing row
+  answers at most one finding per round. Rows and ASSUMED text now go through the same
+  normaliser, so a curly-quoted row matches a straight-quoted line. Fixture: rehearsal iteration 08, users-api, round 2
+  (scrubbed), `lib/tests/fixtures/draft-revise/f58-assumption-reuse/`. The ledger row is
+  now `fixed=yes`, `live=no`, and the code left the G4 candidate list.
+- **`ticket-planner/gates/gate-demotions.tsv`**: the registry of demoted gate codes
+  (`code, gate, scope, ledger_rows, fixture, sunset, reviewer`). It has no rows: no code
+  in the ledger meets the 2-live-false-in-10 threshold, so nothing is demoted. No gate
+  reads the file. `test-planner-gate-ledger.sh` validates any row: a listed ledger fire
+  of that gate and code that is false with `live=yes`, an existing fixture inside the
+  repository, a two-digit sunset later than the ledger's highest iteration, a reviewer,
+  a `code` or `variant:<NAME>` scope (whole-code needs 2 live false fires in 10), and a
+  code not on the protected list (`DEPENDENCY_CYCLE`, `NEEDS_HUMAN_DECISION`, the DoR
+  presence codes). Planted rows in a temp copy prove each rule fails.
+- Unchanged: `EDGE_CASE_GAP` and Refinement `MISSING_CORE_AC` (1 live false fire each,
+  below the threshold); the speculative `INTENT_AC_MISMATCH` warn is deferred until the
+  evidence reaches it. `ticket-auto-pipeline/lib/tests/fixtures/dor/20-28` fail with the
+  same codes as before.
+
 ## ticket-planner 0.47.1 (2026-11-15) — seam-gate-safety G3: gate ledger seed (data only)
 
 - **`ticket-planner/gates/gate-ledger.tsv`** records every gate fire seen in dispatch
