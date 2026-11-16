@@ -491,13 +491,26 @@ _planner_tb_vplan_json() {
     --arg nav "$nav" \
     --arg spec "$(basename "$spec_file")" '
     def norm: ascii_downcase | gsub("\\s+"; " ") | ltrimstr(" ") | rtrimstr(" ") | rtrimstr(".");
+    # Criterion match key: whitespace and a trailing dot normalised, letter
+    # case kept. Two criteria that differ only in case are different criteria
+    # (a login with `JAKE@CONDUIT.TEST` tests case-insensitive matching; rehearsal
+    # F81). A case-only drift between an AC and its note still matches through
+    # the folded key, but only when that folded key names exactly one AC and
+    # one note.
+    def ckey: gsub("\\s+"; " ") | ltrimstr(" ") | rtrimstr(" ") | rtrimstr(".");
     def present: . != null and (tostring | gsub("\\s"; "") | length) > 0;
     def nr: "not recorded in spec";
-    (reduce $table[] as $r ({}; ($r.criterion // "" | norm) as $k
+    (reduce $table[] as $r ({}; ($r.criterion // "" | ckey) as $k
         | if $k == "" or has($k) then . else .[$k] = $r end)) as $byText
-    | ($acs | map(norm)) as $acKeys
+    | (reduce $table[] as $r ({}; ($r.criterion // "" | norm) as $k
+        | if $k == "" then . else .[$k] += [$r] end)) as $byFold
+    | ($acs | map(ckey)) as $acKeys
+    | ($acs | map(norm)) as $acFold
+    | (reduce $acFold[] as $k ({}; .[$k] += 1)) as $acFoldCount
     | [ range(0; $acs | length) as $i
-        | $byText[$acKeys[$i]] as $n
+        | ($byText[$acKeys[$i]]
+           // (if ($byFold[$acFold[$i]] // [] | length) == 1 and $acFoldCount[$acFold[$i]] == 1
+               then $byFold[$acFold[$i]][0] else null end)) as $n
         | ( if ($n.expected | present) then $n.expected else nr end ) as $exp
         | (if $n != null and $n.cell then $n else null end) as $td
         | {
@@ -524,9 +537,11 @@ _planner_tb_vplan_json() {
              (if $legacy > 0 or ($acs | length) == 0 then []
               else [ "\($spec): no Verification Notes table — every row marked not recorded" ] end)
            else [ $rows[] | select(.mapped | not) | "\($spec): AC \(.i) has no Verification Notes entry — row marked not recorded" ] end)
-          + [ $table | group_by(.criterion // "" | norm)[] | select(length > 1)
+          + [ $table | group_by(.criterion // "" | ckey)[] | select(length > 1)
               | "\($spec): \(length) Verification Notes rows share the criterion \(.[0].criterion // "") — the Verification Plan shows the first; Test Data Prerequisites lists every row" ]
-          + [ $table[] | select((.criterion // "" | norm) as $k | $acKeys | index($k) | not)
+          + [ $table[] | select((.criterion // "" | ckey) as $k | (.criterion // "" | norm) as $f
+                | ($acKeys | index($k)) == null
+                  and (($byFold[$f] // [] | length) != 1 or $acFoldCount[$f] != 1))
               | "\($spec): Verification Notes criterion matches no Acceptance Criteria line: \(.criterion // "")" ]
           + (if ($table | length) == 0 and $legacy > 0
              then [ "\($spec): \($legacy) numbered Verification Notes carry no criterion text — not mapped by position (#499); rewrite them as the Criterion table" ]

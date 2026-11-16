@@ -229,6 +229,22 @@ _planner_testdata_is_none() {
   return 1
 }
 
+# Is <data> built by the test itself, with no stored state behind it (a token
+# the test signs, a payload it builds)? Such a need has nothing to own, so a
+# missing (`—`) or `none` Source is correct for it (rehearsal F80). It must say
+# so — `test-built`, `built in/by the test`, `the test builds …` — and must not
+# also name stored records: a record count (`1 user`), `in state`, `seeded`,
+# `existing` or `registered` keeps it a real need. ticket-auto-pipeline's
+# dor-check.sh `_dor_td_is_test_built` mirrors this rule; keep them in step.
+_planner_testdata_is_test_built() {
+  local d
+  d=$(_planner_testdata_lower "${1//\`/}")
+  [[ "$d" =~ (^|[^a-z])(test-built|test[[:space:]]built|built[[:space:]](in|by|inside|within)[[:space:]]the[[:space:]]test|built[[:space:]]in-test|(created|constructed|signed|generated)[[:space:]](in|by)[[:space:]]the[[:space:]]test|the[[:space:]]test[[:space:]](builds|creates|signs|constructs))([^a-z]|$) ]] || return 1
+  [[ "$d" =~ (^|[^a-z0-9])[0-9]+[[:space:]]+[a-z] ]] && return 1
+  [[ "$d" =~ (^|[^a-z])(in[[:space:]]state|seeded|seed|pre-existing|existing|registered)([^a-z]|$) ]] && return 1
+  return 0
+}
+
 # Normalize one Verification Notes line: drop markdown emphasis, canonicalize
 # the two markers. A marker must not follow a letter (`Resource:` and
 # `Latest data:` are prose, not markers). Usage: _planner_testdata_norm_line <line>
@@ -1042,7 +1058,7 @@ planner_crosscheck_testdata() {
       if [[ "$value" == *"|"* ]]; then
         reason="Source value contains '|'"
       elif [ -z "$kind" ]; then
-        _planner_testdata_is_none "$data" || reason="missing Source"
+        _planner_testdata_is_none "$data" || _planner_testdata_is_test_built "$data" || reason="missing Source"
       else
         case " ${PLANNER_TESTDATA_SOURCE_KINDS} " in
         *" ${kind} "*) ;;
@@ -1050,7 +1066,7 @@ planner_crosscheck_testdata() {
         esac
         if [ -z "$reason" ]; then
           case "$kind" in
-          none) _planner_testdata_is_none "$data" || reason="Source: none for real test data" ;;
+          none) _planner_testdata_is_none "$data" || _planner_testdata_is_test_built "$data" || reason="Source: none for real test data" ;;
           generate)
             skip=false
             for p in "${pending[@]}"; do

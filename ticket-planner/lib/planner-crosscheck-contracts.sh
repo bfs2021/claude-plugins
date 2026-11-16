@@ -712,11 +712,15 @@ PLANNER_CROSSCHECK_CONTRACTS_RETIRE_GAP_WORDS='the|a|an|its|their|this|that|thes
 # participle ("will be", "has now been", "is fully").
 PLANNER_CROSSCHECK_CONTRACTS_RETIRE_AUX_WORDS='both|all|is|are|was|were|will|shall|must|should|would|can|could|may|be|been|being|has|have|had|gets?|got|becomes?|became|now|fully|entirely|completely|also|then|permanently|itself|themselves|eventually|simply|thereby|effectively|formally|officially'
 
-# Escape <s> (a structure-regex-shaped identifier: letters, digits, `_`, `.`,
-# optional trailing `()`) for literal use inside an ERE.
+# Escape <s> for literal use inside an ERE — every ERE metacharacter, not
+# only the `.()` an identifier carries: the consumers check hands this every
+# backtick span of a retire sentence before the structure filter runs, so a
+# `{username, email}` span reached the regex as an interval. GNU grep reads a
+# bad interval as a literal; ugrep (the grep an agent's Bash tool runs)
+# rejects the whole pattern with "invalid repeat" (rehearsal F72).
 # Usage: _planner_crosscheck_contracts_ere_escape <s>
 _planner_crosscheck_contracts_ere_escape() {
-  printf '%s' "$1" | sed -e 's/[.()]/\\&/g'
+  printf '%s' "$1" | sed -e 's/[][\\.(){}*+?^$|]/\\&/g'
 }
 
 # True if <structure> is the grammatical object of a retire phrase in

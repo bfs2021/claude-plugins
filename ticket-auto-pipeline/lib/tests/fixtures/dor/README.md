@@ -41,6 +41,8 @@ all-empty fixtures"), not a frozen contract.
 | 26 | `26-contract-implied-miss.md` | feature | ready (also under `DOR_STRICT_TEST_DATA=true`) | — | — | requirement_completeness, contradictory_requirements, deep_scope_ambiguity, edge_case_sufficiency | 85 |
 | 27 | `27-planned-all-none-miss.md` | feature | ready (also under `DOR_STRICT_TEST_DATA=true`; legacy body, never TEST_DATA_UNSOURCED) | — | — | requirement_completeness, contradictory_requirements, deep_scope_ambiguity, edge_case_sufficiency | 85 |
 | 28 | `28-threshold-only-none.md` | feature | ready (also under `DOR_STRICT_TEST_DATA=true`) | — | — | requirement_completeness, contradictory_requirements, deep_scope_ambiguity | 83 |
+| 31 | `31-test-built-contract.md` | feature | ready | — | — | requirement_completeness, contradictory_requirements, deep_scope_ambiguity, edge_case_sufficiency | 83 |
+| 32 | `32-test-built-seeded-unsourced.md` | feature | not-ready | TEST_DATA_UNSOURCED | — | requirement_completeness, contradictory_requirements, deep_scope_ambiguity | 81 |
 
 ## Scenario mapping
 
@@ -74,6 +76,8 @@ all-empty fixtures"), not a frozen contract.
 - **28** — negative control: criteria built on a threshold, a timeout and an attempt count ("the session expires after 15 minutes", "lock after 5 attempts") with a `none` Test Data line. None of these is data, so `TEST_DATA_GAP` must not fire.
 - **30** — `30-chained-draft.md`: fixture 22 rewritten as a ticket-planner draft (`Epic: DRAFT`, Related Tickets naming `DRAFT-<slug>` blockers). `semantic/30-scan.txt` is a real `dor-semantic-agent` scan of it (planner-draft-readiness task 1.2: no `UNSTATED_DEPENDENCY` in three samples). Used by `test-dor-semantic-draft.sh` for parity and import.
   `semantic/30-slip-{scan,audit}.txt` are that real scan (and its audit) with literal values and a one-character `BODY_HASH` copy slip; `semantic/30-noticket-{scan,audit}.txt` have no `TICKET` line (seam-bash-derives slice 3). `test-dor-semantic-request.sh` shows both are judged on the spawn request, not rejected.
+- **31** — rehearsal F80: a contract body with one seeded row plus two rows whose data the test builds itself — a token signed in the test with no Source (Verification Plan cell and bullet) and one with `Source: none`. Data built by the test has nothing to own, so neither is `TEST_DATA_UNSOURCED` (`_dor_td_is_test_built`, mirrored by ticket-planner's Crosscheck).
+- **32** — negative control for 31: the test-built cell also names stored records (`2 user in state registered`) and has no Source. It stays an unsourced need (vplan#2, tdp#2), so the body is not-ready on `TEST_DATA_UNSOURCED`.
 
 ## Semantic expectation (live golden sweep)
 

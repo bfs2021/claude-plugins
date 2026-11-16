@@ -428,6 +428,22 @@ _dor_td_is_none() {
   return 1
 }
 
+# _dor_td_is_test_built <data> — data the test builds itself with no stored
+# state behind it (a token it signs), which has nothing to own: no Source or
+# `Source: none` is correct for it. Mirrors ticket-planner's
+# `_planner_testdata_is_test_built` (planner-crosscheck-testdata.sh) — keep
+# them in step, so Crosscheck and this check agree on the same row
+# (rehearsal F80). Naming stored records (a count like `1 user`, `in state`,
+# `seeded`, `existing`, `registered`) keeps it a real need.
+_dor_td_is_test_built() {
+  local d
+  d=$(printf '%s' "${1//\`/}" | tr '[:upper:]' '[:lower:]')
+  [[ "$d" =~ (^|[^a-z])(test-built|test[[:space:]]built|built[[:space:]](in|by|inside|within)[[:space:]]the[[:space:]]test|built[[:space:]]in-test|(created|constructed|signed|generated)[[:space:]](in|by)[[:space:]]the[[:space:]]test|the[[:space:]]test[[:space:]](builds|creates|signs|constructs))([^a-z]|$) ]] || return 1
+  [[ "$d" =~ (^|[^a-z0-9])[0-9]+[[:space:]]+[a-z] ]] && return 1
+  [[ "$d" =~ (^|[^a-z])(in[[:space:]]state|seeded|seed|pre-existing|existing|registered)([^a-z]|$) ]] && return 1
+  return 0
+}
+
 # _dor_td_is_not_recorded <data> — the #499 composer's placeholder cell.
 _dor_td_is_not_recorded() {
   local d
@@ -521,6 +537,10 @@ _dor_td_classify() {
   IFS=$'\037' read -r has data kind value < <(_dor_td_parse "$text")
   if _dor_td_is_none "$data"; then
     printf 'na\037test data none\n'
+    return
+  fi
+  if { [ "$has" = "0" ] || [ -z "$kind" ] || [ "$kind" = "none" ]; } && _dor_td_is_test_built "$data"; then
+    printf 'na\037test data built by the test\n'
     return
   fi
   if _dor_td_is_not_recorded "$data" && [ "$has" = "0" ]; then

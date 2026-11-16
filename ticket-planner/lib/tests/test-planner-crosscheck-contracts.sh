@@ -637,6 +637,45 @@ else
   fail "is_deferential: large block under pipefail" "missed in $_sp_fail/5 runs (SIGPIPE from printf | grep -q)"
 fi
 
+# ── F72: a code span holding ERE metacharacters stays literal ───────────────
+# The consumers check hands every backtick span of a retire sentence to
+# _is_retire_object before the structure filter. `{username, email}` reached
+# the ERE as an interval: ugrep (an agent's Bash `grep`) rejected the pattern.
+_f72_esc=$(_planner_crosscheck_contracts_ere_escape '{a+b}|[c].*?^$\')
+if printf '%s\n' '{a+b}|[c].*?^$\' | command grep -qE "^${_f72_esc}\$" &&
+  ! printf '%s\n' 'aab|c' | command grep -qE "^${_f72_esc}\$"; then
+  pass "ere_escape: every ERE metacharacter is matched literally"
+else
+  fail "ere_escape: ERE metacharacters" "escaped=${_f72_esc}"
+fi
+_f72_err=$(_planner_crosscheck_contracts_is_retire_object \
+  'The old `{username, email}` payload is removed.' '{username, email}' 2>&1 >/dev/null)
+if _planner_crosscheck_contracts_is_retire_object \
+  'The old `{username, email}` payload is removed.' '{username, email}' 2>/dev/null &&
+  [ -z "$_f72_err" ]; then
+  pass "is_retire_object: brace span is a literal retire object, no regex error (F72)"
+else
+  fail "is_retire_object: brace span (F72)" "stderr=${_f72_err}"
+fi
+# Run the same call through ugrep when the harness provides it (the agent's
+# grep); GNU grep reads a bad interval as a literal and hides the defect.
+_f72_ugrep=""
+for _c in "$(command -v ugrep 2>/dev/null)" "$HOME"/.local/share/claude/versions/*; do
+  [ -n "$_c" ] && [ -x "$_c" ] && [ -f "$_c" ] && _f72_ugrep="$_c"
+done
+if [ -n "$_f72_ugrep" ]; then
+  _f72_uerr=$(
+    grep() { (exec -a ugrep "$_f72_ugrep" -G "$@"); }
+    _planner_crosscheck_contracts_is_retire_object \
+      'The old `{username, email}` payload is removed.' '{username, email}' 2>&1 >/dev/null
+  )
+  if [ -z "$_f72_uerr" ]; then
+    pass "is_retire_object under ugrep: no regex error (F72)"
+  else
+    fail "is_retire_object under ugrep (F72)" "$_f72_uerr"
+  fi
+fi
+
 echo ""
 echo "=== Results: $PASS passed, $FAIL failed ==="
 [ "$FAIL" -eq 0 ]
