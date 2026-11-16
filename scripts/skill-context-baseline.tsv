@@ -2,7 +2,8 @@
 # allow-growth: ARCH-4 manifest write lock — lib/manifest-write.sh is in the dor-semantic manifest (+46 bytes, 0.115.2)
 # allow-growth: rehearsal F47 — scan prompt lists the codes that back each GAP_* line, or a gap backed by another dimension's finding halts planning as SEMANTIC_UNVERIFIED (+1,599 bytes, 0.117.2)
 # allow-growth: seam-bash-derives slice 3 — spawn request writer, request-bound identity check and its schema-doc table in dor-semantic.sh/dor-semantic-schema.md; the prompt itself lost its TICKET/BODY_HASH lines (+4,975 bytes, 0.119.0)
-dor-semantic	100767
+# allow-growth: seam-gate-safety G6 — format retry section in dor-semantic-schema.md, restored pass-through in dor-semantic.sh, one agent paragraph (+4,661 bytes, 0.120.0)
+dor-semantic	105428
 guidance-extractor	94885
 # allow-growth: ticket-critique BLOCKED message names the needs-info-resolved trigger (+84 bytes, 0.113.2)
 ticket-appraise	154348

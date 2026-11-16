@@ -17,6 +17,58 @@ marketplace. Where a release also moved `ticket-planner`, `fleet-controller`, or
 > - **0.19.0 never existed.** `plugin.json` went 0.18.0 → 0.20.0. The Phase 2
 >   commit message claims `0.19.0→0.20.0`, but no 0.19.0 was ever committed.
 
+## 0.120.0 / ticket-planner 0.48.0 (2026-11-16) — seam-gate-safety G6: DoR evaluator format retry (re-serialise only)
+
+- **A format slip is no longer a failed evaluation.** When a DoR semantic scan or audit
+  block fails to parse because of a leading bullet before a KEY, a wrapped value, an
+  enum in the wrong case (`Clear`, `Yes`) or a code in the wrong case,
+  `dor_semantic_format_step` (`lib/dor-semantic-parse.sh`) sends the block back to the
+  agent once per attempt: the original block verbatim, an error record
+  (`<result>.last-failure.json`: `{code: FORMAT_ERROR, field, expected, got, example}`,
+  expected/example taken from the block contract the evaluator prompt prints) and one
+  instruction, "Re-serialise this block in the required format. Do not add, remove or
+  change any finding, code, quote or verdict." The agent never sees the ticket body.
+- **Bash proves nothing was judged again.** Before the retry is used, bash reads both
+  blocks the same tolerant way and compares every value (whitespace collapsed, codes and
+  enums case-folded): schema, paraphrase, every gap verdict and reason, each finding's
+  code, quote, quote_b and detail, every audit and MISSED entry, `SCORE_PLAUSIBLE` and
+  `SCORE_REASON`. Anything added, changed or missing from the original rejects the retry,
+  so a content defect behind a format slip stays a defect. A dropped finding is put back
+  from the original (marked `restored: true` through a bash-written sidecar bound to the
+  file's sha, never a key in the block; its quote still checked against the body) or,
+  when it cannot be rebuilt, rejects the retry. Both blocks must be the only block of
+  their kind, with no marker-shaped line inside; an original replaced while its retry is
+  out is moved aside and never judged.
+  A block that parsed is never retried; a missing, duplicated or out-of-set value, another
+  `SCHEMA_VERSION`, a missing closing marker or an unaudited hard code is content and is
+  not retried either.
+- **Budget and exhaustion.** `DOR_SEMANTIC_FORMAT_RETRIES` (default 1, 0–5) per attempt,
+  outside the attempt count, revise rounds and `DEMOTE_CEILING`; the same `(field, got)`
+  twice stops early. Exhausted, the caller writes
+  `META|harness-error|fail|<ticket> FORMAT_RETRY_EXHAUSTED <field>`, then the attempt
+  fails exactly as before (one more attempt, then `SEMANTIC_UNAVAILABLE`/`unavailable`).
+  Routing that line to a harness-error verdict is slice 3 (D4), not built yet.
+- **Planner.** The draft readiness gate and Refinement run the step before parsing and
+  spawn the retry through the shared spawn list as kind `format` (`format: <id>` in run
+  telemetry). A format spawn that writes nothing is the retry's own failure, not a failed
+  attempt. The format files travel with `PLANNER_DRAFT_RESULT_FILES`; the gate start and
+  Refinement prepare refuse a bad `DOR_SEMANTIC_FORMAT_RETRIES`; the planner refuses a
+  `dor-semantic-parse.sh` without `dor_semantic_format_step` (ticket-auto-pipeline
+  < 0.120.0).
+- **Corpus ratchet.** With a stub agent that writes the unmutated block back, every
+  `bullets`/`casing`/`wrap` case of the rehearsal corpus now reaches `ok` with the same
+  codes: harmless flips 285 → 0, and all 6 `known.tsv` rows are removed. Every harmful
+  case still ends `PARSE_INVALID`. The ratchet self-test now plants its own failing case.
+- **Gate change (runbook §2).** `dor/20-28` give the same codes as on main. A separate
+  reviewer checked the retry and guard for fail-open paths and reproduced seven; all are
+  fixed with must-fail tests (an shfmt-mangled `--spawned` lookup that let an empty retry
+  loop, the two readers seeing different blocks, content invented behind a slip, values
+  past the code/anchor not compared, an original overwritten mid-retry, a forgeable
+  restored key, the wrong duplicate restored). This resets the dispatch rehearsal clean
+  counter.
+- Tests: `test-dor-semantic-format-retry.sh` (ticket-auto),
+  `test-planner-semantic-format-retry.sh` (planner, both callers through the spawn list).
+
 ## ticket-planner 0.47.1 (2026-11-15) — seam-gate-safety G3: gate ledger seed (data only)
 
 - **`ticket-planner/gates/gate-ledger.tsv`** records every gate fire seen in dispatch

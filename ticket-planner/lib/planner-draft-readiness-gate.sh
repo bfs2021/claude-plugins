@@ -298,9 +298,20 @@ planner_draft_readiness_next() {
     [ "$emitted" -lt "$max" ] || break
     dir="${root}/${slug}"
     tid=$(_planner_draft_tid "$slug")
-    local attempt
+    local attempt fl="" k aw
     attempt=$(($(_planner_draft_attempts "$init" "$slug" "$hash") + 1))
-    if [ ! -s "${dir}/scan-result.txt" ]; then
+    # A format retry asked for by apply (seam-gate-safety G6): the agent
+    # gets the original block, never the body.
+    for k in scan audit; do
+      if aw=$(dor_semantic_format_awaiting "${dir}/${k}-result.txt"); then
+        fl+="${slug}"$'\t'"format"$'\t'"${PLANNER_DRAFT_AGENT_TYPE}"$'\t'"${aw%%$'\t'*}"$'\t'"${aw#*$'\t'}"$'\n'
+      fi
+    done
+    if [ -n "$fl" ]; then
+      out+="$fl"
+      # Every spawn counts toward PLANNER_DRAFT_SPAWN_BUDGET.
+      [ "$(printf '%s' "$fl" | grep -c .)" -lt 2 ] || emitted=$((emitted + 1))
+    elif [ ! -s "${dir}/scan-result.txt" ]; then
       # After a revision (or any edit) the rescan is scoped to the changed
       # sections, as Refinement scopes its rescans.
       local cs
@@ -354,6 +365,7 @@ _planner_draft_fail() {
   reason=$(printf '%s' "${reason:-unknown}" | tr '\t\r\n' '   ' | cut -c1-300)
   printf 'attempt %s: %s\n' "$n" "$reason" >"${dir}/last-failure"
   for f in scan-result audit-result; do
+    dor_semantic_format_clear "${dir}/${f}.txt" --all
     if [ -f "${dir}/${f}.txt" ]; then
       mv -f "${dir}/${f}.txt" "${dir}/${f}.rejected.txt"
     fi
@@ -364,6 +376,33 @@ _planner_draft_fail() {
       >"${dir}/semantic.json"
     planner_draft_readiness_verdict_write "$init" "$slug" "$hash" "${DOR_SEMANTIC_EVALUATOR:-}" unavailable
   fi
+}
+
+# _pdl_format_steps <INIT> <slug> <dir> <spawned-assoc-name>
+# dor_semantic_format_step on both result files. rc 1 while a retry waits
+# (the next spawn list carries it); rc 0 otherwise — the block parses now,
+# or it does not and parsing below fails the attempt. An exhausted retry
+# writes `META|harness-error|fail|<ticket> FORMAT_RETRY_EXHAUSTED <field>`.
+# Slice 3 (D4) will route that line to the harness-error path; until then
+# the attempt fails exactly as before.
+_pdl_format_steps() {
+  local init="$1" slug="$2" dir="$3" k r fk out rc wait=0
+  local -n _sp="$4"
+  for k in scan audit; do
+    r="${dir}/${k}-result.txt"
+    local -a fa=(--kind "$k" --result-file "$r")
+    [ "$k" = "audit" ] && fa+=(--det-result "${dir}/dor-result.json")
+    # The key in a variable: shfmt reads `a[x-y]` as arithmetic.
+    fk="${r%.txt}.format-result.txt"
+    [ -n "${_sp[$fk]:-}" ] && fa+=(--spawned)
+    rc=0
+    out=$(dor_semantic_format_step "${fa[@]}" 2>/dev/null) || rc=$?
+    case "$rc" in
+    4) wait=1 ;;
+    5) planner_state_write "$init" "META" "harness-error" "fail" "$(_planner_draft_tid "$slug") FORMAT_RETRY_EXHAUSTED ${out#exhausted }" ;;
+    esac
+  done
+  [ "$wait" -eq 0 ]
 }
 
 # _pdl_parse_one <parser> scan|audit <dir>
@@ -409,10 +448,16 @@ planner_draft_readiness_apply() {
     return 1
   }
   [ -n "$refresh" ] || refresh=$(planner_draft_readiness_refresh "$init") || return 1
-  local -A failed=()
+  local -A failed=() fspawned=()
   if [ -f "${root}/.pending" ]; then
     while IFS=$'\t' read -r slug kind type pf rf; do
       [ -n "$slug" ] || continue
+      # A format retry that wrote nothing is the retry's own failure
+      # (dor_semantic_format_step --spawned), not a failed attempt.
+      if [ "$kind" = "format" ]; then
+        fspawned[$rf]=1
+        continue
+      fi
       [ -s "$rf" ] || failed[$slug]="${failed[$slug]:+${failed[$slug]}, }no ${kind} result written"
     done <"${root}/.pending"
     rm -f "${root}/.pending"
@@ -425,6 +470,10 @@ planner_draft_readiness_apply() {
       continue
     fi
     [ -s "${dir}/scan-result.txt" ] && [ -s "${dir}/audit-result.txt" ] || continue
+    # A format slip is re-serialised first (seam-gate-safety G6): a draft
+    # waiting on a retry stays stale; an exhausted retry is a harness error
+    # line, then the attempt fails below as it always did.
+    _pdl_format_steps "$init" "$slug" "$dir" fspawned || continue
     local scan_json audit_json eval_json verdict=ready
     if ! scan_json=$(_pdl_parse_one "$parse" scan "$dir"); then
       _planner_draft_fail "$init" "$slug" "$hash" "$scan_json"

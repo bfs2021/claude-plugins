@@ -68,7 +68,8 @@ PLANNER_DRAFT_GENERATED_TOKEN="DRAFT-GENERATED"
 # spec's directory. The spawn requests (scan-result.request.json,
 # audit-result.request.json — dor_semantic_prompt writes them) go with their
 # result files, so a revert restores a matching pair.
-PLANNER_DRAFT_RESULT_FILES="verdict dor-result.json scan-result.txt audit-result.txt semantic.json scan-result.request.json audit-result.request.json"
+# The format retry's files (seam-gate-safety G6) travel with the results.
+PLANNER_DRAFT_RESULT_FILES="verdict dor-result.json scan-result.txt audit-result.txt semantic.json scan-result.request.json audit-result.request.json scan-result.format.json audit-result.format.json scan-result.format-prompt.txt audit-result.format-prompt.txt scan-result.format-result.txt audit-result.format-result.txt scan-result.format-original.txt audit-result.format-original.txt scan-result.last-failure.json audit-result.last-failure.json scan-result.format-restored.json audit-result.format-restored.json"
 
 # ── Layout ────────────────────────────────────────────────────────────────
 

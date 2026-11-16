@@ -2,7 +2,8 @@ fleet-controller/skills/fleet-controller/SKILL.md	9277	145
 fleet-controller/skills/fleet-env-check/SKILL.md	4151	60
 fleet-controller/skills/fleet-features/SKILL.md	5462	55
 grill-me/skills/grill-me/SKILL.md	14428	282
-ticket-auto-pipeline/agents/dor-semantic-agent.md	1444	8
+# allow-growth: seam-gate-safety G6 — the agent must know a format retry reads no file and changes no finding, code, quote or verdict (0.120.0)
+ticket-auto-pipeline/agents/dor-semantic-agent.md	1711	10
 ticket-auto-pipeline/agents/guidance-extractor-agent.md	898	2
 ticket-auto-pipeline/agents/ticket-appraise-agent.md	659	2
 ticket-auto-pipeline/agents/ticket-gate-reconcile-agent.md	818	2

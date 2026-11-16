@@ -781,8 +781,11 @@ dor_semantic_findings() {
   local dims_with_findings=""
   local jq_args=() filter="[" first=1 i
   for ((i = 0; i < n_findings; i++)); do
-    local code quote quote_b detail dim severity verified nq nqb
+    local code quote quote_b detail dim severity verified nq nqb restored
     code=$(echo "$scan_json" | jq -r ".findings[$i].code")
+    # A finding bash put back after a format retry dropped it (seam-gate-
+    # safety G6) keeps the mark; its quote is checked like any other.
+    restored=$(echo "$scan_json" | jq -r "if .findings[$i].restored == true then \"true\" else \"false\" end")
     quote=$(echo "$scan_json" | jq -r ".findings[$i].quote")
     quote_b=$(echo "$scan_json" | jq -r ".findings[$i].quote_b // empty")
     detail=$(echo "$scan_json" | jq -r ".findings[$i].detail // empty")
@@ -800,10 +803,10 @@ dor_semantic_findings() {
 
     jq_args+=(--arg "code${i}" "$code" --arg "dim${i}" "$dim" --arg "sev${i}" "$severity"
       --arg "quote${i}" "$quote" --arg "quoteb${i}" "$quote_b" --arg "detail${i}" "$detail"
-      --argjson "verified${i}" "$verified")
+      --argjson "verified${i}" "$verified" --argjson "restored${i}" "$restored")
     [ "$first" -eq 1 ] || filter="$filter,"
     first=0
-    filter="$filter{code:\$code${i},dimension:\$dim${i},severity:\$sev${i},quote:\$quote${i},quote_b:(if \$quoteb${i}==\"\" then null else \$quoteb${i} end),detail:\$detail${i},verified:\$verified${i}}"
+    filter="$filter({code:\$code${i},dimension:\$dim${i},severity:\$sev${i},quote:\$quote${i},quote_b:(if \$quoteb${i}==\"\" then null else \$quoteb${i} end),detail:\$detail${i},verified:\$verified${i}}+(if \$restored${i} then {restored:true} else {} end))"
   done
   filter="$filter]"
 

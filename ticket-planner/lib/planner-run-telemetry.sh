@@ -238,7 +238,7 @@ _prt_phase_records() {
     # A goldfish lens (`lens: <INIT>`, planner-goldfish-review) runs before
     # the Review agent and belongs to Review.
     def spawn_target($a):
-      ($a.description | capture("^(?<k>scan|audit|revise|lens): (?<id>\\S+)$")) as $m
+      ($a.description | capture("^(?<k>scan|audit|format|revise|lens): (?<id>\\S+)$")) as $m
         | if $m.k == "lens" then (if $m.id == $init then "Review" else null end)
           elif ($tids | index($m.id)) then "Refinement"
           elif ($slugs | index($m.id)) then "DraftReadiness" else null end;
