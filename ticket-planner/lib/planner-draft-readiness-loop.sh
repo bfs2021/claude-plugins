@@ -69,6 +69,11 @@ planner_draft_readiness_config_check() {
     echo "planner-draft-readiness: PLANNER_DRAFT_DEMOTE_CEILING must be a number from 0 to 1, got '$c'" >&2
     return 1
   }
+  local f="${DOR_SEMANTIC_FORMAT_RETRIES-1}"
+  [[ "$f" =~ ^[0-5]$ ]] || {
+    echo "planner-draft-readiness: DOR_SEMANTIC_FORMAT_RETRIES must be an integer from 0 to 5, got '$f'" >&2
+    return 1
+  }
 }
 
 # Revision rounds per spec; an invalid value reads as 0 (halt-only) so a

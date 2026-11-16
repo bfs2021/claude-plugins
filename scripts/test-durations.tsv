@@ -50,6 +50,7 @@ bash ticket-auto-pipeline/lib/tests/test-verify-worktree.sh	15.0
 bash fleet-controller/lib/tests/test-fleet-intervene.sh	14.8
 bash ticket-planner/lib/tests/test-planner-testdata-implied.sh	14.5
 bash ticket-auto-pipeline/lib/tests/test-dor-semantic-testdata.sh	13.9
+bash ticket-planner/lib/tests/test-planner-semantic-format-retry.sh	13.9
 python3 -m pytest fleet-controller/fleetd/tests/test_phase_dispatch.py -v	12.7
 bash ticket-auto-pipeline/lib/tests/test-ticket-create.sh	12.6
 bash ticket-auto-pipeline/lib/tests/test-dor-section-staleness.sh	12.2
@@ -69,6 +70,7 @@ bash ticket-planner/lib/tests/test-planner-consensus-gate.sh	7.2
 bash grill-me/lib/tests/test-grill-hold.sh	7.1
 bash ticket-auto-pipeline/lib/tests/test-seed-precheck.sh	7.0
 bash ticket-auto-pipeline/lib/tests/test-run-summary.sh	6.9
+bash ticket-auto-pipeline/lib/tests/test-dor-semantic-format-retry.sh	6.9
 bash ticket-planner/lib/tests/test-planner-doctor.sh	6.8
 bash fleet-controller/lib/tests/test-detect-epic-branch-ready.sh	6.5
 bash fleet-controller/lib/tests/test-fleet-detect-new.sh	6.5

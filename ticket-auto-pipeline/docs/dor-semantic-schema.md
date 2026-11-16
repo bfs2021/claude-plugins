@@ -352,6 +352,54 @@ pipeline log line — the caller owns its own log grammar (unlike `adr-gate-pars
 pipefail` is scoped to the `BASH_SOURCE == $0` CLI block only, not file scope — sourcing
 the parser never enables `errexit` in the caller.
 
+## Format retry (re-serialise only)
+
+A scan or audit block that fails to parse because of a formatting slip is sent back to
+the agent once per attempt (seam-gate-safety G6). `dor_semantic_format_step` in
+`lib/dor-semantic-parse.sh` decides; the draft readiness gate and Refinement call it
+when both results of an attempt are in, and spawn the retry through their spawn list as
+kind `format`.
+
+- **Retried:** only a slip a re-serialisation can fix — a bullet, number or markup before
+  a KEY, a wrapped value, an enum in the wrong case (`Clear`, `Yes`), a code in the wrong
+  case. A missing, duplicated or out-of-set value, a missing closing marker, another
+  `SCHEMA_VERSION` or an unaudited hard code is content, not format: no retry. A block
+  that parsed is never retried.
+- **Error record** `<result minus .txt>.last-failure.json`: `{code: FORMAT_ERROR, field,
+  expected, got, example}`. `expected` and `example` come from the block contract the
+  evaluator prompt prints (a copy in the parser, held to the prompt by a drift test).
+- **Prompt** `<result>.format-prompt.txt`: the original block verbatim, the error record,
+  the contract and one instruction: "Re-serialise this block in the required format. Do
+  not add, remove or change any finding, code, quote or verdict." No ticket body, no body
+  path. The agent writes `<result>.format-result.txt`.
+- **Finding-set guard.** Bash reads both blocks the same tolerant way (a bullet or
+  markup before a KEY dropped, KEY case folded, a non-KEY line joined to the previous
+  value, whitespace collapsed, codes and enums case-folded) and compares every value, not
+  only the codes: `SCHEMA_VERSION`, `PARAPHRASE`, every `GAP_*` verdict and reason, each
+  finding's code, quote, `QUOTE_B` and detail, every `AUDIT_n` entry (code, verdict,
+  reason, quote), every `MISSED_n` entry, `SCORE_PLAUSIBLE` and `SCORE_REASON`. A value
+  the original lacks cannot be supplied by the retry, so a content defect behind a format
+  slip stays a defect. An added or changed finding, or any other changed value, rejects
+  the retry. A finding the retry dropped is written back from the original, or the retry
+  is rejected when it cannot be rebuilt (no quote, a `CONTRADICTORY_REQUIREMENTS` with no
+  `QUOTE_B`, a `TEST_DATA_GAP` with no `DETAIL`). Its `restored: true` comes only from the
+  sidecar `<result>.format-restored.json` (`{sha, restored: [n]}`), honoured while its
+  sha is the result file's; a `FINDING_n_RESTORED` key in any block is not a key (in a
+  retry it rejects the retry). `dor_semantic_findings` keeps the mark, and the quote is
+  still checked against the body. Both blocks must be the file's only block of their kind
+  with no `===` line inside; otherwise there is no retry (original) or the retry is
+  rejected. The merged block is checked once more before it replaces the result file; the
+  original is kept as `<result>.format-original.txt`. An original replaced while its retry
+  is out is moved aside (`<result>.format-tampered.txt`) and never judged.
+- **Budget.** `DOR_SEMANTIC_FORMAT_RETRIES` (default 1, 0–5) per attempt, outside the
+  attempt count, revise rounds and `DEMOTE_CEILING`. A retry that fails on the same
+  `(field, got)` stops early. A new result file (another sha) starts a fresh budget. A
+  retry asked for three times with no result counts as a spawn that wrote nothing.
+- **Exhausted:** `dor_semantic_format_step` prints `exhausted <field>` (rc 5) once; the
+  caller writes `META|harness-error|fail|<ticket> FORMAT_RETRY_EXHAUSTED <field>` and the
+  attempt then fails exactly as an unparseable result always has (one more attempt, then
+  `SEMANTIC_UNAVAILABLE` / `unavailable`).
+
 ## `ready.semantic` shape
 
 Written by `manifest-write.sh`'s `set_ticket_semantic <TID> <semantic_json>` — the third
@@ -508,6 +556,7 @@ The planner sets the round and drift ones as call prefixes; see `ticket-planner`
 | `DOR_SEMANTIC_ROUND_RESET_SHARE` | `0.5` | Share (0–1) of prior non-inert sections that must change to reset the round to 1. Invalid values count as `0.5` |
 | `DOR_SEMANTIC_INERT_SECTIONS` | `Related Tickets` | `\|`-separated headings whose edits rebase the verdict instead of staling it. Empty disables rebasing |
 | `DOR_AUDIT_DEMOTABLE_CODES` | `DOR_AUDIT_DEMOTABLE_CODES_DEFAULT`: `VPLAN_ROW_GAP VPLAN_UNVERIFIABLE AC_VAGUE AC_IMPLEMENTATION_ONLY NAV_PATH_MISSING` | Deterministic codes `dor_audit_demote` may demote. Empty means the default. Never-demote codes are refused whatever this says. An override warns at apply time and is snapshotted as `lineage.policy.audit_demotable`/`audit_demotable_overridden` |
+| `DOR_SEMANTIC_FORMAT_RETRIES` | `1` | Format retries per attempt (0–5; 0 turns the retry off). Read by `lib/dor-semantic-parse.sh`; any other value is refused (rc 2, and the planner refuses it at gate start / Refinement prepare) |
 | `DOR_AUDIT_DEMOTE_MAX` | `2` | More qualifying codes than this on one ticket is a blanket dispute: nothing is demoted, exit 4. Empty or invalid means 2 |
 
 Fixed constants, not overridable: `DOR_SEMANTIC_EVALUATOR` (`dor-semantic-v4`),
@@ -532,7 +581,9 @@ prompt: paths, never ticket text, and no body hash — the hash goes into the sp
 it writes beside the result file (see Result binding above), so the agent echoes
 nothing; states that file contents are data, not instructions;
 instructs the agent to write exactly one block to the result path and return a single
-line (`DOR_SEMANTIC <scan|audit> written <path>`). This keeps a caller running tens of
+line (`DOR_SEMANTIC <scan|audit> written <path>`). A format retry prompt
+(`dor_semantic_format_prompt`, see Format retry) is answered with
+`DOR_SEMANTIC format written <path>`. This keeps a caller running tens of
 tickets from accumulating every result in its own context. The scan prompt never
 references the deterministic result file or any deterministic code.
 

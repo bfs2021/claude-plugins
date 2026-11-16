@@ -189,11 +189,12 @@ _planner_refinement_source_deps() {
   if declare -f check_ticket_ready >/dev/null 2>&1 &&
     declare -f dor_semantic_prompt >/dev/null 2>&1 &&
     declare -f dor_semantic_request_path >/dev/null 2>&1 &&
+    declare -f dor_semantic_format_step >/dev/null 2>&1 &&
     declare -f set_ticket_readiness >/dev/null 2>&1; then
     return 0
   fi
 
-  local dor_check dor_semantic manifest_write
+  local dor_check dor_semantic manifest_write dor_parse
   dor_check=$(_planner_refinement_resolve "dor-check.sh") || {
     echo "planner-refinement: dor-check.sh not found (install ticket-auto-pipeline)" >&2
     return 1
@@ -204,6 +205,10 @@ _planner_refinement_source_deps() {
   }
   manifest_write=$(_planner_refinement_resolve "manifest-write.sh") || {
     echo "planner-refinement: manifest-write.sh not found (install ticket-auto-pipeline)" >&2
+    return 1
+  }
+  dor_parse=$(_planner_refinement_resolve "dor-semantic-parse.sh") || {
+    echo "planner-refinement: dor-semantic-parse.sh not found (install ticket-auto-pipeline)" >&2
     return 1
   }
 
@@ -219,6 +224,8 @@ _planner_refinement_source_deps() {
   source "$dor_check"
   # shellcheck source=/dev/null
   source "$dor_semantic"
+  # shellcheck source=/dev/null
+  source "$dor_parse"
 
   if [ "$_had_script_dir" -eq 1 ]; then
     SCRIPT_DIR="$_saved_script_dir"
@@ -238,6 +245,11 @@ _planner_refinement_source_deps() {
   # would read `--attempt` as the ticket id.
   if ! declare -f dor_semantic_request_path >/dev/null 2>&1; then
     echo "planner-refinement: ${dor_semantic} is too old (no dor_semantic_request_path) — update ticket-auto-pipeline to 0.119.0 or later" >&2
+    return 1
+  fi
+  # The format retry (seam-gate-safety G6).
+  if ! declare -f dor_semantic_format_step >/dev/null 2>&1; then
+    echo "planner-refinement: ${dor_parse} is too old (no dor_semantic_format_step) — update ticket-auto-pipeline to 0.120.0 or later" >&2
     return 1
   fi
   return 0
@@ -1614,9 +1626,13 @@ planner_refinement_prepare() {
   # would count every listed ticket as a failed attempt.
   rm -f "${pass}.pending"
   [ "${PLANNER_REFINEMENT_SEMANTIC:-true}" != "false" ] || return 0
+  _planner_refinement_source_deps || return 1
+  dor_semantic_format_budget >/dev/null || return 1
   for tid in "${needs[@]}"; do
     [ -n "$tid" ] || continue
     local pdir="${REPOS_ROOT:-}/.ticket-auto/initiatives/${init}/tickets/${tid}/planner"
+    dor_semantic_format_clear "${pdir}/semantic-scan-result.txt" --all
+    dor_semantic_format_clear "${pdir}/semantic-audit-result.txt" --all
     rm -f "${pdir}/semantic-scan-result.txt" "${pdir}/semantic-audit-result.txt" "${pdir}/semantic-attempts" \
       "${pdir}/semantic-scan-result.request.json" "${pdir}/semantic-audit-result.request.json"
     echo "$tid" >>"$pass"
@@ -1673,7 +1689,15 @@ planner_refinement_next() {
       [ "$n" -lt "$max" ] || break
       n=$((n + 1))
       pdir="${REPOS_ROOT:-}/.ticket-auto/initiatives/${init}/tickets/${tid}/planner"
-      if [ ! -s "${pdir}/semantic-scan-result.txt" ]; then
+      local fl="" k aw
+      for k in scan audit; do
+        if aw=$(dor_semantic_format_awaiting "${pdir}/semantic-${k}-result.txt"); then
+          fl+="${tid}"$'\t'"format"$'\t'"ticket-auto-pipeline:dor-semantic-agent"$'\t'"${aw%%$'\t'*}"$'\t'"${aw#*$'\t'}"$'\n'
+        fi
+      done
+      if [ -n "$fl" ]; then
+        out+="$fl"
+      elif [ ! -s "${pdir}/semantic-scan-result.txt" ]; then
         planner_refinement_prompt "$init" "$tid" scan >"${pdir}/semantic-scan-prompt.txt" || return 1
         out+="${tid}"$'\t'"scan"$'\t'"ticket-auto-pipeline:dor-semantic-agent"$'\t'"${pdir}/semantic-scan-prompt.txt"$'\t'"${pdir}/semantic-scan-result.txt"$'\n'
       else
@@ -1702,19 +1726,28 @@ planner_refinement_apply_pending() {
   local init="$1" pass tid kind agent pf rf pdir n
   pass=$(_planner_refinement_pass_file "$init")
   [ -f "${pass}.pending" ] || return 0
-  local -A seen=() failed=()
+  local -A seen=() failed=() fspawned=()
   local -a order=()
   while IFS=$'\t' read -r tid kind agent pf rf; do
     [ -n "$tid" ] || continue
     [ -n "${seen[$tid]:-}" ] || order+=("$tid")
     seen[$tid]="$kind"
+    # A format retry that wrote nothing is the retry's own failure
+    # (dor_semantic_format_step --spawned), not a failed attempt.
+    if [ "$kind" = "format" ]; then
+      fspawned[$rf]=1
+      continue
+    fi
     [ -s "$rf" ] || failed[$tid]=1
   done <"${pass}.pending"
   rm -f "${pass}.pending"
   for tid in "${order[@]}"; do
     pdir="${REPOS_ROOT:-}/.ticket-auto/initiatives/${init}/tickets/${tid}/planner"
     if [ -z "${failed[$tid]:-}" ]; then
-      [ "${seen[$tid]}" = "audit" ] || continue
+      case "${seen[$tid]}" in audit | format) ;; *) continue ;; esac
+      # A format slip is re-serialised first (seam-gate-safety G6); while a
+      # retry waits the ticket stays on the pass list with no attempt spent.
+      _planner_refinement_format_steps "$init" "$tid" "$pdir" fspawned || continue
       if planner_refinement_apply "$init" "$tid" >&2; then
         _planner_refinement_pass_drop "$pass" "$tid"
         continue
@@ -1722,6 +1755,8 @@ planner_refinement_apply_pending() {
     fi
     n=$(($(cat "${pdir}/semantic-attempts" 2>/dev/null || echo 0) + 1))
     echo "$n" >"${pdir}/semantic-attempts"
+    dor_semantic_format_clear "${pdir}/semantic-scan-result.txt" --all
+    dor_semantic_format_clear "${pdir}/semantic-audit-result.txt" --all
     rm -f "${pdir}/semantic-scan-result.txt" "${pdir}/semantic-audit-result.txt"
     if [ "$n" -ge 2 ]; then
       planner_refinement_unavailable "$init" "$tid" >&2
@@ -1729,6 +1764,33 @@ planner_refinement_apply_pending() {
     fi
   done
   return 0
+}
+
+# _planner_refinement_format_steps <INIT> <TID> <pdir> <spawned-assoc-name>
+# dor_semantic_format_step on both result files (seam-gate-safety G6). rc 1
+# while a retry waits (the next spawn list carries it); rc 0 otherwise. An
+# exhausted retry writes `META|harness-error|fail|<TID> FORMAT_RETRY_EXHAUSTED
+# <field>`; slice 3 (D4) will route it to the harness-error path, until then
+# the attempt fails in planner_refinement_apply exactly as before.
+_planner_refinement_format_steps() {
+  local init="$1" tid="$2" pdir="$3" k r fk out rc wait=0
+  local -n _sp="$4"
+  for k in scan audit; do
+    r="${pdir}/semantic-${k}-result.txt"
+    [ -s "$r" ] || continue
+    local -a fa=(--kind "$k" --result-file "$r")
+    [ "$k" = "audit" ] && fa+=(--det-result "${pdir}/dor-result.json")
+    # The key in a variable: shfmt reads `a[x-y]` as arithmetic.
+    fk="${r%.txt}.format-result.txt"
+    [ -n "${_sp[$fk]:-}" ] && fa+=(--spawned)
+    rc=0
+    out=$(dor_semantic_format_step "${fa[@]}" 2>/dev/null) || rc=$?
+    case "$rc" in
+    4) wait=1 ;;
+    5) planner_state_write "$init" "META" "harness-error" "fail" "${tid} FORMAT_RETRY_EXHAUSTED ${out#exhausted }" ;;
+    esac
+  done
+  [ "$wait" -eq 0 ]
 }
 
 _planner_refinement_pass_drop() {

@@ -9,7 +9,9 @@
 #   carve_scope     planner_specify_result_ensure (Specify end, as the router
 #                   runs it) + planner_crosscheck_carve_scope → "pass" or codes
 #   semantic_parse  parse_dor_semantic on every real scan/audit block (audits
-#                   with their dor-result.json) → "ok <codes>" or "invalid"
+#                   with their dor-result.json) → "ok <codes>" or "invalid",
+#                   through the format retry (seam-gate-safety G6) with a stub
+#                   agent that writes the unmutated block back
 #
 # Base units: the verdict must equal labels.tsv's `expected` (the verdict a
 # person decided on, never regenerated from the code).
@@ -205,10 +207,28 @@ for snap in "${CARVES[@]}"; do
 done
 
 # ── adapter: semantic_parse ──────────────────────────────────────────────────
-parse_verdict() { # <kind> <file> [<det>]
-  local out args=(--kind "$1" --result-file "$2")
-  [ -n "${3:-}" ] && args+=(--det-result "$3")
-  out=$(parse_dor_semantic "${args[@]}" 2>/dev/null)
+# The block a production run would hand on: the result file goes through
+# dor_semantic_format_step; when it asks for a retry, the stub agent writes
+# <clean> (the unmutated block, default the file itself) to the retry path.
+parse_verdict() { # <kind> <file> [<det>] [<clean>]
+  local out fr="${WORK}/fr" rf args=(--kind "$1")
+  local -a det=()
+  [ -n "${3:-}" ] && det=(--det-result "$3")
+  # A block that parses is never retried (the step would print `ok`).
+  if ! out=$(parse_dor_semantic --kind "$1" --result-file "$2" "${det[@]}" 2>/dev/null); then
+    rm -rf "$fr" && mkdir -p "$fr"
+    rf="${fr}/$1-result.txt"
+    cp "$2" "$rf"
+    args+=(--result-file "$rf" "${det[@]}")
+    if
+      dor_semantic_format_step "${args[@]}" >/dev/null 2>&1
+      [ $? -eq 4 ]
+    then
+      cp "${4:-$2}" "${fr}/$1-result.format-result.txt"
+      dor_semantic_format_step "${args[@]}" --spawned >/dev/null 2>&1
+    fi
+    out=$(parse_dor_semantic "${args[@]}" 2>/dev/null)
+  fi
   jq -r 'if .parse_status != "ok" then "invalid"
          else "ok " + ([(.findings // [])[].code] + [(.gaps // {}) | to_entries[] | .key + "=" + .value.verdict]
                      + [(.audit // [])[] | .code + "=" + .verdict] + [(.missed // [])[].code]
@@ -250,7 +270,7 @@ for rel in "${DRAFTS[@]}"; do
   fi
   for op in $HARMLESS_RESULT_OPS; do
     "op_${op}" <"$f" >"${WORK}/mut.txt"
-    got=$(parse_verdict "$kind" "${WORK}/mut.txt" "$det")
+    got=$(parse_verdict "$kind" "${WORK}/mut.txt" "$det" "$f")
     [ "$got" = "$base" ] && record semantic_parse "${snap}/${unit}@${op}" harmless 1 "$got" ||
       record semantic_parse "${snap}/${unit}@${op}" harmless 0 "'${base}' became '${got}'"
   done
@@ -267,7 +287,7 @@ for rel in "${DRAFTS[@]}"; do
     else
       "harm_${op}" <"$f" >"${WORK}/mut.txt"
     fi
-    got=$(parse_verdict "$kind" "${WORK}/mut.txt" "$mdet")
+    got=$(parse_verdict "$kind" "${WORK}/mut.txt" "$mdet" "$f")
     [ "$got" = invalid ] && record semantic_parse "${snap}/${unit}@${op}" harmful 1 PARSE_INVALID ||
       record semantic_parse "${snap}/${unit}@${op}" harmful 0 "passed as '${got}'"
   done
@@ -357,8 +377,13 @@ if grep -q '^NOW-PASSES semantic_parse \*@crlf' <<<"$(ratchet "${WORK}/known-plu
 else
   fail "ratchet self-test: a known case that passes is reported" "not reported"
 fi
-grep -v '@wrap' "$KNOWN" >"${WORK}/known-minus.tsv"
-if [ "$(grep -c '^UNEXPECTED .*@wrap ' <<<"$(ratchet "${WORK}/known-minus.tsv" "$RESULTS")")" -gt 0 ]; then
+# (A planted failing case: since the format retry, seam-gate-safety G6, no
+# real case may be left failing.)
+{
+  cat "$RESULTS"
+  printf 'semantic_parse\tself-test/unit@wrap\tharmless\t0\tplanted\n'
+} >"${WORK}/results-plus.tsv"
+if [ "$(grep -c '^UNEXPECTED semantic_parse self-test/unit@wrap ' <<<"$(ratchet "$KNOWN" "${WORK}/results-plus.tsv")")" -gt 0 ]; then
   pass "ratchet self-test: a failing case no row lists is reported"
 else
   fail "ratchet self-test: a failing case no row lists is reported" "not reported"
