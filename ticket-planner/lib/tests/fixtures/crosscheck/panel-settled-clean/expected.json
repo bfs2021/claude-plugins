@@ -1,0 +1,10 @@
+{
+  "blocking": 0,
+  "warn": 0,
+  "accepted": 0,
+  "log_lines": [
+    "META|panel|done|abcdef012345 qa-engineer findings=2 bm=QA-1 blockers=-",
+    "META|panel|done|abcdef012345 security findings=1 bm=SEC-1 blockers=SEC-1"
+  ],
+  "notes": "planner-persona-panel: every blocker and major panel finding has a disposition, the security blocker is accepted, and both seats have a status line. The spec carries a ## Review Trail section, which no family reads as behaviour text. Clean."
+}

@@ -556,6 +556,30 @@
       "docs": "ticket-planner/docs/ticket-planner.md"
     },
     {
+      "name": "PLANNER_PHASE_PERSONAS",
+      "plugin": "ticket-planner",
+      "default": "false",
+      "on_value": "true",
+      "category": "feature",
+      "summary": "Each authoring phase reads as one job function: Appraisal the product owner, Discovery the analyzer, Architecture the architect, Specify the developer for the stack, Epic and Ticket Generation the technical writer.",
+      "requires": [],
+      "recommend": "situational",
+      "why": "Adds the persona text of ticket-auto-pipeline (about 1-3 KB) to six phase prompts; no extra agent. When the persona files cannot be found the prompts stay as they are and one META|persona|skip line says so. Enable on one initiative and compare the artifacts first.",
+      "docs": "ticket-planner/docs/ticket-planner.md"
+    },
+    {
+      "name": "PLANNER_PERSONA_PANEL",
+      "plugin": "ticket-planner",
+      "default": "false",
+      "on_value": "true",
+      "category": "feature",
+      "summary": "Before Review, a panel of persona reviewers (product owner, architect, QA, plus security and a developer when the plan calls for them) reads the proposal in parallel; Consensus settles their findings.",
+      "requires": [],
+      "recommend": "situational",
+      "why": "Three to five extra agent spawns per proposal version, in parallel, and a longer Consensus. Only a security or product-owner blocker that Consensus does not accept in full stops the plan for a person. PLANNER_PANEL_SEATS narrows the panel; PLANNER_PANEL_TIMEOUT (seconds, default 600) bounds each spawn.",
+      "docs": "ticket-planner/docs/ticket-planner.md"
+    },
+    {
       "name": "PLANNER_REFINEMENT_SEMANTIC",
       "plugin": "ticket-planner",
       "default": "true",
