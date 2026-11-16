@@ -19,7 +19,8 @@ ticket-planner/
   agents/draft-revise-agent.md    # Tool-limited (Read, Write) spec revise agent — draft readiness gate
   agents/goldfish-review-agent.md # Tool-limited (Read, Grep, Glob, Write) context-withheld reviewer — goldfish lens
   lib/                            # Shared bash libraries (54 files)
-  lib/tests/                      # Test suites (88 files; corpus/ holds scrubbed real planner output, seam-bash-derives — harvested by scripts/corpus-harvest.sh, scrubbed by scripts/corpus-scrub.sh, checked by test-corpus-privacy.sh (private names come from the local, uncommitted ~/.config/claude-plugins/corpus-private-names), replayed by test-planner-corpus.sh and test-planner-corpus-replay.sh with labels.tsv and the known.tsv ratchet)
+  gates/gate-ledger.tsv           # Labelled record of every gate fire in rehearsal iters 01–10 (seam-gate-safety G3; data only, nothing gates on it); gate-ledger-summary.sh counts it and lists G4 demotion candidates; checked by test-planner-gate-ledger.sh and test-corpus-privacy.sh
+  lib/tests/                      # Test suites (89 files; corpus/ holds scrubbed real planner output, seam-bash-derives — harvested by scripts/corpus-harvest.sh, scrubbed by scripts/corpus-scrub.sh, checked by test-corpus-privacy.sh (private names come from the local, uncommitted ~/.config/claude-plugins/corpus-private-names), replayed by test-planner-corpus.sh and test-planner-corpus-replay.sh with labels.tsv and the known.tsv ratchet)
   docs/                           # Architecture and reference docs
   README.md                       # Marketplace entry point
   plugin-overview.md              # Maintainer-facing design doc

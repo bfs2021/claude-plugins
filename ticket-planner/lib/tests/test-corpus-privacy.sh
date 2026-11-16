@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # test-corpus-privacy.sh — the corpus of real planner output sits in a public
 # repository (seam-bash-derives slice 5). This gate fails on any file, or file
-# name, under a `*/lib/tests/corpus/` directory that holds:
+# name, under a `*/lib/tests/corpus/` directory, or a plugin's `gates/` directory
+# (the labelled gate ledger, seam-gate-safety G3), that holds:
 #   - a tracker issue id (<KEY>-<n>, any key but the scrub's TKT) or a
 #     linear.app URL
 #   - a real initiative id (INIT-<ts>-<n> whose timestamp is not the scrub's
@@ -102,7 +103,7 @@ echo "=== corpus privacy (seam-bash-derives) ==="
 if [ -n "${CORPUS_PRIVACY_DIRS:-}" ]; then
   read -r -a DIRS <<<"$CORPUS_PRIVACY_DIRS"
 else
-  mapfile -t DIRS < <(find "$REPO_ROOT" -maxdepth 5 -name .git -prune -o -type d -path '*/lib/tests/corpus' -print | sort)
+  mapfile -t DIRS < <(find "$REPO_ROOT" -maxdepth 5 -name .git -prune -o -type d \( -path '*/lib/tests/corpus' -o -path '*/gates' \) -print | sort)
 fi
 
 echo "--- every corpus directory is clean ---"

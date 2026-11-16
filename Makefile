@@ -343,6 +343,7 @@ test-planner:
 	bash ticket-planner/lib/tests/test-planner-crosscheck-propagation.sh
 	bash ticket-planner/lib/tests/test-planner-corpus.sh
 	bash ticket-planner/lib/tests/test-corpus-privacy.sh
+	bash ticket-planner/lib/tests/test-planner-gate-ledger.sh
 	bash ticket-planner/lib/tests/test-planner-corpus-replay.sh
 	bash ticket-planner/lib/tests/test-planner-crosscheck-bypass.sh
 	bash ticket-planner/lib/tests/test-planner-crosscheck-contracts.sh
