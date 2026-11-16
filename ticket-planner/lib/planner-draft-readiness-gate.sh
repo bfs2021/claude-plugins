@@ -65,6 +65,28 @@ PLANNER_DRAFT_AGENT_TYPE="ticket-auto-pipeline:dor-semantic-agent"
 # Agent attempts per draft and body hash before its verdict is `unavailable`
 # (one retry, as Refinement does — D5).
 PLANNER_DRAFT_MAX_ATTEMPTS=2
+# The codes that say the evaluator could not judge a draft (seam-gate-safety
+# D4): a harness error, never a plan defect. A draft with one is
+# `unevaluated`.
+PLANNER_DRAFT_HARNESS_CODES="SEMANTIC_UNAVAILABLE SEMANTIC_UNVERIFIED"
+
+# The draft gate's warn list. Empty or unset reads as the default (a host
+# that exports it empty must not turn every harness error into a block by
+# accident); `none` is the explicit way to make them block.
+_planner_draft_warn_codes() {
+  local w="${PLANNER_DRAFT_WARN_CODES:-SEMANTIC_UNAVAILABLE SEMANTIC_UNVERIFIED}"
+  [ "$w" != "none" ] || w=""
+  printf '%s' "$w"
+}
+
+# _planner_draft_share_exceeded <n> <m> — true when n/m is over
+# PLANNER_DRAFT_UNEVALUATED_MAX_SHARE (default 0.25). An unreadable share
+# counts as exceeded (fail closed); the config check refuses it first.
+_planner_draft_share_exceeded() {
+  local share="${PLANNER_DRAFT_UNEVALUATED_MAX_SHARE:-0.25}"
+  [[ "$share" =~ ^(0(\.[0-9]+)?|1(\.0+)?)$ ]] || return 0
+  awk -v n="$1" -v m="$2" -v s="$share" 'BEGIN { exit !(m > 0 && n / m > s) }'
+}
 
 _planner_draft_sha() {
   if command -v sha256sum >/dev/null 2>&1; then
@@ -362,6 +384,10 @@ _planner_draft_fail() {
   dir="$(planner_draft_readiness_root "$init")/${slug}"
   n=$(($(_planner_draft_attempts "$init" "$slug" "$hash") + 1))
   printf '%s %s\n' "$hash" "$n" >"${dir}/attempts"
+  if [ -s "${dir}/format-exhausted" ]; then
+    reason="$(paste -sd';' "${dir}/format-exhausted"); ${reason:-unknown}"
+    rm -f "${dir}/format-exhausted"
+  fi
   reason=$(printf '%s' "${reason:-unknown}" | tr '\t\r\n' '   ' | cut -c1-300)
   printf 'attempt %s: %s\n' "$n" "$reason" >"${dir}/last-failure"
   for f in scan-result audit-result; do
@@ -382,9 +408,10 @@ _planner_draft_fail() {
 # dor_semantic_format_step on both result files. rc 1 while a retry waits
 # (the next spawn list carries it); rc 0 otherwise — the block parses now,
 # or it does not and parsing below fails the attempt. An exhausted retry
-# writes `META|harness-error|fail|<ticket> FORMAT_RETRY_EXHAUSTED <field>`.
-# Slice 3 (D4) will route that line to the harness-error path; until then
-# the attempt fails exactly as before.
+# writes `META|harness-error|fail|<ticket> FORMAT_RETRY_EXHAUSTED <field>`
+# and records it in <dir>/format-exhausted; the attempt then fails, and
+# _planner_draft_fail puts the record in the reason. Two failed attempts make
+# the draft `unavailable`, which the gate counts as unevaluated (D4).
 _pdl_format_steps() {
   local init="$1" slug="$2" dir="$3" k r fk out rc wait=0
   local -n _sp="$4"
@@ -399,7 +426,10 @@ _pdl_format_steps() {
     out=$(dor_semantic_format_step "${fa[@]}" 2>/dev/null) || rc=$?
     case "$rc" in
     4) wait=1 ;;
-    5) planner_state_write "$init" "META" "harness-error" "fail" "$(_planner_draft_tid "$slug") FORMAT_RETRY_EXHAUSTED ${out#exhausted }" ;;
+    5)
+      planner_state_write "$init" "META" "harness-error" "fail" "$(_planner_draft_tid "$slug") FORMAT_RETRY_EXHAUSTED ${out#exhausted }"
+      printf 'FORMAT_RETRY_EXHAUSTED %s\n' "${out#exhausted }" >>"${dir}/format-exhausted"
+      ;;
     esac
   done
   [ "$wait" -eq 0 ]
@@ -508,8 +538,9 @@ planner_draft_readiness_apply() {
 
 # _planner_draft_findings <dir>
 # "<CODE>\t<quote>" per blocking finding of one draft: deterministic missing
-# codes, blocking semantic findings, unverified findings and gaps
-# (SEMANTIC_UNVERIFIED), SEMANTIC_UNAVAILABLE.
+# codes, blocking semantic findings, unverified non-advisory findings and
+# gaps (SEMANTIC_UNVERIFIED), SEMANTIC_UNAVAILABLE. An advisory finding with
+# an unverified quote is that finding's own problem (seam-gate-safety D4).
 _planner_draft_findings() {
   local dir="$1"
   [ -f "${dir}/dor-result.json" ] && jq -r '(.missing // [])[] | . + "\t"' "${dir}/dor-result.json" 2>/dev/null
@@ -518,7 +549,8 @@ _planner_draft_findings() {
     else
       ((.findings // [])[] | select(.verified == true and .severity == "blocking")
         | "\(.code)\t\((.quote // .detail // "") | tostring | gsub("[\t\r\n]"; " "))"),
-      ((.findings // [])[] | select(.verified == false) | "SEMANTIC_UNVERIFIED\t\(.code): \(.quote // "")"),
+      ((.findings // [])[] | select(.verified == false and .severity != "advisory")
+        | "SEMANTIC_UNVERIFIED\t\(.code): \(.quote // "")"),
       ((.unverified_gaps // [])[] | "SEMANTIC_UNVERIFIED\tgap: \(.)")
     end' "${dir}/semantic.json" 2>/dev/null
   return 0
@@ -532,6 +564,8 @@ _planner_draft_findings() {
 # hashes so the next run re-runs Crosscheck when a spec changed (D5).
 planner_draft_readiness_gate() {
   local init="$1" root slug hash status dir v_hash v_eval v_status total=0 blocked=0 code quote
+  local warn_codes unevaluated=0 unevaluated_slugs="" harness=""
+  warn_codes=" $(_planner_draft_warn_codes) "
   root=$(planner_draft_readiness_root "$init") || return 1
   _planner_refinement_source_deps >/dev/null || return 1
   local refresh halt=""
@@ -566,9 +600,15 @@ planner_draft_readiness_gate() {
     # the ticket again after create (block audit, iterations 01-06: none of
     # these blocks was a real defect). "no verdict for the current draft"
     # (the loop never judged it) still blocks.
-    local warn_codes=" ${PLANNER_DRAFT_WARN_CODES-SEMANTIC_UNAVAILABLE SEMANTIC_UNVERIFIED} " nblock=0
+    # A judged draft with a harness code is `unevaluated` (seam-gate-safety
+    # D4) whether that code warns or blocks; the share check below halts
+    # the run when too many are.
+    local nblock=0 harness_draft=0
     while IFS=$'\t' read -r code quote; do
       [ -n "$code" ] || continue
+      if [ "$judged" = 1 ] && [[ " ${PLANNER_DRAFT_HARNESS_CODES} " == *" ${code} "* ]]; then
+        harness_draft=1
+      fi
       quote=$(printf '%s' "$quote" | tr '\n\r"' "  '")
       if [ "$judged" = 1 ] && [[ "$warn_codes" == *" ${code} "* ]]; then
         planner_state_write "$init" "META" "draft-readiness" "warn" "${slug} ${code} \"${quote}\""
@@ -578,17 +618,32 @@ planner_draft_readiness_gate() {
       fi
     done <<<"$lines"
     [ "$nblock" -gt 0 ] && blocked=$((blocked + 1))
+    if [ "$harness_draft" = 1 ]; then
+      unevaluated=$((unevaluated + 1))
+      unevaluated_slugs+="${unevaluated_slugs:+,}${slug}"
+    fi
   done <<<"$refresh"
+
+  # Too many drafts the evaluator could not judge halt the run before any
+  # Linear write (seam-gate-safety D4); fewer are reported, never silent.
+  if [ "$unevaluated" -gt 0 ]; then
+    if _planner_draft_share_exceeded "$unevaluated" "$total"; then
+      harness="HARNESS_ERROR"
+      planner_state_write "$init" "META" "draft-readiness" "fail" "(run) HARNESS_ERROR ${unevaluated}/${total} unevaluated"
+    else
+      planner_state_write "$init" "META" "draft-readiness" "warn" "(run) UNEVALUATED ${unevaluated}/${total} ${unevaluated_slugs}"
+    fi
+  fi
 
   _pdl_spawns_close "$init"
   if [ -n "$halt" ]; then
     quote="${halt#* }"
     planner_state_write "$init" "META" "draft-readiness" "fail" "(run) ${halt%% *} \"${quote//\"/\'}\""
   fi
-  if [ "$blocked" -gt 0 ] || [ -n "$halt" ]; then
+  if [ "$blocked" -gt 0 ] || [ -n "$halt" ] || [ -n "$harness" ]; then
     _planner_draft_spec_hashes "$init" >"${root}/blocked-specs.tmp" &&
       mv -f "${root}/blocked-specs.tmp" "${root}/blocked-specs"
-    planner_state_write "$init" "META" "draft-readiness" "done" "blocked ${blocked}/${total}${halt:+ ${halt%% *}}"
+    planner_state_write "$init" "META" "draft-readiness" "done" "blocked ${blocked}/${total}${halt:+ ${halt%% *}}${harness:+ ${harness}}"
     return 3
   fi
   rm -f "${root}/blocked-specs"
@@ -600,14 +655,20 @@ planner_draft_readiness_gate() {
 }
 
 # _planner_draft_unjudged_report <run-lines>
-# The gate's non-blocking SEMANTIC_* warn lines (PLANNER_DRAFT_WARN_CODES):
-# drafts the evaluator could not judge. Prints nothing when there are none.
+# The gate's SEMANTIC_UNAVAILABLE / SEMANTIC_UNVERIFIED lines: drafts the
+# evaluator could not judge (unevaluated, seam-gate-safety D4), with the
+# run's unevaluated share. Prints nothing when there are none.
 _planner_draft_unjudged_report() {
   local lines
+  local share
   lines=$(printf '%s\n' "$1" | grep '^[^|]*|META|draft-readiness|warn|' | cut -d'|' -f5- |
-    grep -E '^[^ ]+ SEMANTIC_[A-Z_]+ ') || return 0
-  echo "Not judged by the semantic evaluator (warning only; Refinement judges these tickets after create):"
-  printf '%s\n' "$lines" | sed 's/^/  /'
+    grep -E '^[^ ]+ SEMANTIC_[A-Z_]+ ') || lines=""
+  share=$(printf '%s\n' "$1" | grep -E '^[^|]*\|META\|draft-readiness\|(warn|fail)\|\(run\) (UNEVALUATED|HARNESS_ERROR) ' |
+    tail -1 | cut -d'|' -f5- | awk '{print $3}')
+  [ -n "$lines" ] || [ -n "$share" ] || return 0
+  echo "Not judged by the semantic evaluator (harness error, not a plan defect; Refinement judges these tickets after create):"
+  [ -z "$share" ] || echo "  Unevaluated drafts: ${share} (the run halts above ${PLANNER_DRAFT_UNEVALUATED_MAX_SHARE:-0.25})"
+  [ -z "$lines" ] || printf '%s\n' "$lines" | sed 's/^/  /'
   echo ""
 }
 
@@ -653,7 +714,11 @@ planner_draft_readiness_report() {
     while read -r slug code quote; do
       if [ "$slug" != "$cur" ]; then
         echo ""
-        echo "${slug} (artifacts/specs/${slug}.md)"
+        if [ "$slug" = "(run)" ]; then
+          echo "Run-level:"
+        else
+          echo "${slug} (artifacts/specs/${slug}.md)"
+        fi
         cur="$slug"
       fi
       if [ "$quote" = '""' ] || [ -z "$quote" ]; then

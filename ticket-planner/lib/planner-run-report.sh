@@ -14,10 +14,59 @@
 # table is complete even when the Stop hook never fired; an open run stays
 # open (its summary is written by the hook or the next `begin`).
 # Read-only apart from that sync. Exit 0 printed, 1 no telemetry, 2 usage.
+#
+# Always ends with an `Unevaluated:` line (seam-gate-safety D4), printed even
+# when there is no telemetry: the drafts the latest draft gate run could not
+# judge (n/m), the epic's children carrying ready.harness_error, and the
+# `META|harness-error` lines in the state log. A run with any unevaluated
+# draft or ticket is not a clean run (runbook §5); a count that cannot be
+# read prints `unknown`, which is not clean either.
 
 _PRR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=planner-run-telemetry.sh
 source "${_PRR_DIR}/planner-run-telemetry.sh"
+
+# planner_run_unevaluated <INIT> — the `Unevaluated:` line.
+planner_run_unevaluated() {
+  local init="$1" log run drafts="0" tickets tids harness clean="yes"
+  log=$(planner_state_log "$init" 2>/dev/null) || log=""
+  if [ -n "$log" ] && [ -f "$log" ]; then
+    harness=$(grep -c '^[^|]*|META|harness-error|' "$log" 2>/dev/null) || harness=0
+    # The latest draft gate run: its `(run) UNEVALUATED|HARNESS_ERROR n/m`
+    # line, else 0 of the drafts its done line counted.
+    run=$(awk '/^[^|]*\|META\|draft-readiness\|start\|/ {buf = ""} {buf = buf $0 "\n"} END {printf "%s", buf}' "$log")
+    if grep -q '^[^|]*|META|draft-readiness|start|' "$log"; then
+      drafts=$(printf '%s' "$run" | grep -E '^[^|]*\|META\|draft-readiness\|(warn|fail)\|\(run\) (UNEVALUATED|HARNESS_ERROR) ' |
+        tail -1 | cut -d'|' -f5- | awk '{print $3}')
+      if [ -z "$drafts" ]; then
+        drafts=$(printf '%s' "$run" | grep '^[^|]*|META|draft-readiness|done|' | tail -1 | cut -d'|' -f5- |
+          awk '$2 ~ /^[0-9]+\/[0-9]+$/ {split($2, a, "/"); print "0/" a[2]}')
+        [ -n "$drafts" ] || drafts="unknown"
+      fi
+    fi
+  else
+    harness="unknown"
+  fi
+  # Tickets: Refinement's own rule (planner_refinement_unevaluated), only
+  # once an epic exists.
+  tickets=0
+  if grep -q '|EpicGen|' "$log" 2>/dev/null; then
+    tids=""
+    if { declare -f planner_refinement_unevaluated >/dev/null 2>&1 ||
+      source "${_PRR_DIR}/planner-refinement.sh" 2>/dev/null; } &&
+      _planner_refinement_source_deps 2>/dev/null; then
+      tids=$(planner_refinement_unevaluated "$init" 2>/dev/null | cut -f1 | paste -sd, -)
+      if [ -n "$tids" ]; then
+        tickets="$(awk -F, '{print NF}' <<<"$tids") (${tids})"
+      fi
+    else
+      tickets="unknown"
+    fi
+  fi
+  case "$drafts" in 0 | 0/*) ;; *) clean="no" ;; esac
+  case "$tickets" in 0) ;; *) clean="no" ;; esac
+  echo "Unevaluated: drafts ${drafts}, tickets ${tickets}, harness-error lines ${harness} — $([ "$clean" = yes ] && echo "nothing unevaluated" || echo "not a clean run")"
+}
 
 planner_run_report() {
   local init="$1" sync="${2:-sync}" dir runs
@@ -26,6 +75,7 @@ planner_run_report() {
   runs="$dir/telemetry/runs.jsonl"
   if [ ! -s "$runs" ]; then
     echo "No run telemetry for ${init} (${runs})." >&2
+    planner_run_unevaluated "$init"
     return 1
   fi
   jq -rRs --arg init "$init" --arg bash "$PLANNER_TELEMETRY_BASH_PHASES" '
@@ -61,7 +111,8 @@ planner_run_report() {
         | ([$pt, $ot] | tsum) as $tt
         | [$phases[] | . as $p | select($p.tokens == null and (($bash | split(" ") | index($p.phase)) | not)) | $p.phase] | unique as $um
         | "Cost: \(if $tt == null then "UNMEASURED" else "tokens in \($tt.input) / out \($tt.output) / cache read \($tt.cache_read) / cache write \($tt.cache_create) (phase agents + orchestrator)" end)\(if ($um | length) > 0 then "; UNMEASURED: \($um | join(", "))" else "" end)" )
-  ' "$runs"
+  ' "$runs" || return 1
+  planner_run_unevaluated "$init"
 }
 
 if [ "${BASH_SOURCE[0]}" = "$0" ]; then

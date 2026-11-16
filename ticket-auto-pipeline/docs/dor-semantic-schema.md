@@ -70,7 +70,7 @@ unaffected by `DOR_SEMANTIC_ADVISORY_CODES`:
 | Code | Meaning |
 |---|---|
 | `SEMANTIC_UNAVAILABLE` | The caller could not obtain a valid result, after its own retry. |
-| `SEMANTIC_UNVERIFIED` | A finding's quote (or a gap marked `finding`) failed the evidence check. |
+| `SEMANTIC_UNVERIFIED` | A non-advisory finding's quote (or a gap marked `finding`) failed the evidence check. |
 | `SEMANTIC_STALE` | The manifest's `body_hash` no longer matches `semantic.body_hash`. |
 
 ## Severity is decided by bash
@@ -81,9 +81,11 @@ this order: a bash-owned code is `blocking`; a code in the fixed in-code constan
 strict flag or ticket type can make it blocking, and promotion is a code change that
 removes it from the constant; otherwise a finding is `blocking` unless its code is listed
 in the space-separated env var `DOR_SEMANTIC_ADVISORY_CODES` (default empty), read the same
-way as the `DOR_STRICT_*` flags — in which case it is `advisory`. An advisory-only finding
-still goes through the quote check: a non-verbatim quote stores `verified: false` and adds
-`SEMANTIC_UNVERIFIED`, as for every code.
+way as the `DOR_STRICT_*` flags — in which case it is `advisory`. An advisory finding
+still goes through the quote check: a quote that fails it stores `verified: false` and
+`quote_check: "unverified-quote"`, but adds no `SEMANTIC_UNVERIFIED` (seam-gate-safety D4) —
+an advisory finding cannot block, so its bad quote is only that finding's problem. This
+covers the advisory-only codes and any code listed in `DOR_SEMANTIC_ADVISORY_CODES`.
 A blocking finding adds `SEMANTIC_<DIMENSION_UPPER>` (e.g. `SEMANTIC_REQUIREMENT_COMPLETENESS`)
 to `ready.missing`, de-duplicated by dimension, not by code — a waiver survives a rerun
 that names a sibling code for the same gap. Advisory findings are stored in
@@ -195,9 +197,15 @@ line; a quote spanning lines in the source is quoted from one of its lines.
 `dor_semantic_apply` normalises both the body and the quote before a substring test:
 whitespace is collapsed, smart quotes and dashes are folded to ASCII, and markdown
 emphasis markers (`*`, `_`, `` ` ``) and leading list/table markers are stripped. A
-quote that still does not match makes that finding `verified: false` and adds
-`SEMANTIC_UNVERIFIED` — a failed quote check blocks visibly rather than silently
-dropping the finding.
+quote that does not match gets a looser re-check (seam-gate-safety D4): split at every
+ellipsis (`…`, `...`), each piece trimmed of enclosing quotes, punctuation and
+whitespace, every piece found in the normalised body in order, the longest at least
+`DOR_SEMANTIC_LOOSE_QUOTE_MIN` (12) characters; case is never folded. A match stores the
+matched piece as `quote` (the agent's text as `quote_raw`) with `quote_check: "loose"`.
+A quote that still does not match makes that finding `verified: false`
+(`quote_check: "unverified-quote"`). For a finding whose severity is not `advisory`
+this adds `SEMANTIC_UNVERIFIED` next to its own `SEMANTIC_<DIMENSION>` code — a failed
+quote check blocks visibly rather than silently dropping the finding.
 
 ## Result binding and versioning
 
@@ -398,7 +406,9 @@ kind `format`.
 - **Exhausted:** `dor_semantic_format_step` prints `exhausted <field>` (rc 5) once; the
   caller writes `META|harness-error|fail|<ticket> FORMAT_RETRY_EXHAUSTED <field>` and the
   attempt then fails exactly as an unparseable result always has (one more attempt, then
-  `SEMANTIC_UNAVAILABLE` / `unavailable`).
+  `SEMANTIC_UNAVAILABLE` / `unavailable`). The planner puts the field in that attempt's
+  reason, so the end state is a harness error (seam-gate-safety G5): an unevaluated draft
+  at the draft gate, `ready.harness_error` at Refinement.
 
 ## `ready.semantic` shape
 

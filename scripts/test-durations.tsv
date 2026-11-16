@@ -20,6 +20,7 @@ bash ticket-planner/lib/tests/test-planner-cited-answers.sh	76.9
 bash scripts/tests/test-e2e-preflight.sh	72.7
 bash ticket-planner/lib/tests/test-planner-testdata-synth.sh	70.0
 bash ticket-auto-pipeline/lib/tests/test-verify-lock.sh	67.2
+bash ticket-planner/lib/tests/test-planner-semantic-harness-errors.sh	60.0
 bash ticket-auto-pipeline/lib/tests/test-dor-semantic-draft.sh	56.5
 bash grill-me/lib/tests/test-grill-telemetry.sh	50.7
 python3 -m pytest fleet-controller/fleetd/tests/test_supervisor.py -v	48.7
@@ -77,6 +78,7 @@ bash fleet-controller/lib/tests/test-fleet-detect-new.sh	6.5
 bash fleet-controller/lib/tests/test-fleet-monitor.sh	6.5
 bash fleet-controller/lib/tests/test-fleet-reconcile.sh	6.5
 bash ticket-auto-pipeline/lib/tests/test-retro-complexity-calibration.sh	6.2
+bash ticket-auto-pipeline/lib/tests/test-dor-semantic-harness.sh	6.0
 bash ticket-auto-pipeline/lib/tests/test-manifest-write.sh	5.8
 bash ticket-auto-pipeline/lib/tests/test-ticket-approve.sh	5.6
 python3 -m pytest fleet-controller/fleetd/tests/test_http_control_auth.py -v	5.6

@@ -930,7 +930,9 @@ else
   fail "planner_refinement_report: halt report carries an advisory section naming the ready child" "got: $tdg_report"
 fi
 
-# (f) a non-verbatim quote: no warn line, not ready on SEMANTIC_UNVERIFIED
+# (f) a non-verbatim quote: no warn line, and since seam-gate-safety D4 an
+# advisory code's bad quote marks only that finding — no SEMANTIC_UNVERIFIED,
+# no harness error, the ticket stays ready (it was not-ready before D4)
 TDG2_INIT="INIT-1700000006-6666"
 TDG2_EPIC="PRO-710"
 _tdg_setup "$TDG2_INIT" "$TDG2_EPIC"
@@ -943,10 +945,11 @@ _tdg_canned "$TDG2_INIT" "PRO-711" "${TMPDIR}/tdg-unverified-scan.txt" "${SEMANT
 planner_refinement_apply "$TDG2_INIT" "PRO-711" >/dev/null 2>&1 || true
 if [ "$(_tdg_warns "$TDG2_INIT")" = "0" ] &&
   get_ticket_manifest_field "PRO-711" ready 2>/dev/null |
-  jq -e '.status == "not-ready" and ((.missing // []) | index("SEMANTIC_UNVERIFIED") != null)' >/dev/null; then
-  pass "TEST_DATA_GAP: a non-verbatim quote writes no warn line and blocks on SEMANTIC_UNVERIFIED"
+  jq -e '.status == "ready" and ((.missing // []) | index("SEMANTIC_UNVERIFIED") == null)
+    and (.harness_error // null) == null and .semantic.findings[0].quote_check == "unverified-quote"' >/dev/null; then
+  pass "TEST_DATA_GAP: a non-verbatim quote writes no warn line and marks only the finding (unverified-quote)"
 else
-  fail "TEST_DATA_GAP: a non-verbatim quote writes no warn line and blocks on SEMANTIC_UNVERIFIED" \
+  fail "TEST_DATA_GAP: a non-verbatim quote writes no warn line and marks only the finding (unverified-quote)" \
     "warns=$(_tdg_warns "$TDG2_INIT") ready=$(get_ticket_manifest_field "PRO-711" ready 2>/dev/null)"
 fi
 

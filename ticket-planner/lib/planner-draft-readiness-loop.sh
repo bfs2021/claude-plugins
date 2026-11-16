@@ -69,6 +69,11 @@ planner_draft_readiness_config_check() {
     echo "planner-draft-readiness: PLANNER_DRAFT_DEMOTE_CEILING must be a number from 0 to 1, got '$c'" >&2
     return 1
   }
+  local u="${PLANNER_DRAFT_UNEVALUATED_MAX_SHARE:-0.25}"
+  [[ "$u" =~ ^(0(\.[0-9]+)?|1(\.0+)?)$ ]] || {
+    echo "planner-draft-readiness: PLANNER_DRAFT_UNEVALUATED_MAX_SHARE must be a number from 0 to 1, got '$u'" >&2
+    return 1
+  }
   local f="${DOR_SEMANTIC_FORMAT_RETRIES-1}"
   [[ "$f" =~ ^[0-5]$ ]] || {
     echo "planner-draft-readiness: DOR_SEMANTIC_FORMAT_RETRIES must be an integer from 0 to 5, got '$f'" >&2
