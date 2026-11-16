@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # test-planner-gate-ledger.sh — checks ticket-planner/gates/gate-ledger.tsv, the
-# labelled record of every gate fire in dispatch rehearsal iterations 01–10
+# labelled record of every gate fire in dispatch rehearsal iterations 01–11
 # (change seam-gate-safety, slice G3), and its read-only summary script.
 #
 #   - every row has the 15 columns, closed values and a consistent label/cause/
@@ -64,7 +64,7 @@ if [ "$n" -ge 100 ]; then pass "ledger holds the seed (${n} rows)"; else fail "l
 problems=$(awk -F'\t' '
   function bad(m) { printf "row %d (%s %s %s): %s\n", NR, $1, $4, $7, m }
   NF != 15 { bad("has " NF " fields"); next }
-  $1 !~ /^(0[1-9]|10|05b)$/ { bad("iter " $1) }
+  $1 !~ /^(0[1-9]|1[0-5]|05b)$/ { bad("iter " $1) }
   $2 !~ /^(crosscheck|draft|draft-crosscheck|draft-guard|refinement|dor-check)$/ { bad("gate " $2) }
   $3 !~ /^(-|[0-9]|[0-9]-[0-9])$/ { bad("round " $3) }
   $4 !~ /^[A-Z][A-Z0-9_]+$/ { bad("code " $4) }
@@ -77,7 +77,7 @@ problems=$(awk -F'\t' '
   $11 !~ /^(yes|partial|no|-)$/ { bad("fixed " $11) }
   $12 !~ /^(yes|no|-)$/ { bad("live " $12) }
   $13 !~ /^(-|F[0-9]+( F[0-9]+)*)$/ { bad("f_id " $13) }
-  $14 !~ /^(findings\.md|iter-(0[1-9]|10|05b)\/run-record\.md):[1-9][0-9]*$/ { bad("evidence " $14) }
+  $14 !~ /^(findings\.md|iter-(0[1-9]|1[0-5]|05b)\/run-record\.md):[1-9][0-9]*$/ { bad("evidence " $14) }
   $15 == "" { bad("empty note") }
   ($5 == "warn") != ($6 == "logged") { bad("warn class and logged outcome go together") }
   ($5 == "revert") != ($2 == "draft-guard") { bad("revert class is a draft-guard fire") }
@@ -106,8 +106,8 @@ problems=$(awk -F'\t' '
 ' "$WORK/data")
 check "deep-dive D corrections: F25 false, F43 debatable" "$problems"
 [ "$(awk -F'\t' '$13 ~ /F25|F43/' "$WORK/data" | wc -l)" -ge 2 ] && pass "F25 and F43 rows present" || fail "F25 and F43 rows present" "missing"
-problems=$(awk -F'\t' '$13 ~ /(^| )F(12|22|24|33|52|67)( |$)/ && $12 != "no" { print $1 " " $4 " " $13 " live=" $12 }' "$WORK/data")
-check "fires from fixed checker bugs (F12/F24, F22, F33, F52, F67) are not live" "$problems"
+problems=$(awk -F'\t' '$13 ~ /(^| )F(12|22|24|33|52|67|80)( |$)/ && $12 != "no" { print $1 " " $4 " " $13 " live=" $12 }' "$WORK/data")
+check "fires from fixed checker bugs (F12/F24, F22, F33, F52, F67, F80) are not live" "$problems"
 problems=$(awk -F'\t' '$4 == "DEPENDENCY_CYCLE" && $12 == "yes" { print $1 " live=yes" }' "$WORK/data")
 check "no live DEPENDENCY_CYCLE false fire" "$problems"
 
