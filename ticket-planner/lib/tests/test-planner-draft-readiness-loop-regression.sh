@@ -150,7 +150,7 @@ _pdl_missed_record "${HIST_DIR}/spec-a"
 _pdl_missed_record "${HIST_DIR}/spec-a"
 hist_report=$(_pdl_root() { echo "$HIST_DIR"; } && planner_draft_readiness_missed_report ANY)
 if [ "$(wc -l <"${HIST_DIR}/spec-a/missed-history.jsonl")" -eq 3 ] &&
-  grep -qxF '  spec-a: EDGE_CASE_GAP — gap only round one saw (from an earlier revision)' <<<"$hist_report" &&
+  grep -qxF '  spec-a: EDGE_CASE_GAP — gap only round one saw (raised on an earlier revision; not re-checked since)' <<<"$hist_report" &&
   grep -qxF '  spec-a: EDGE_CASE_GAP — gap both saw' <<<"$hist_report" &&
   grep -qxF '  spec-a: MISSING_CORE_AC — new gap' <<<"$hist_report" &&
   [ "$(printf '%s\n' "$hist_report" | grep -c 'gap both saw')" -eq 1 ]; then
@@ -166,7 +166,7 @@ fi
 } >>"${HIST_DIR}/spec-a/missed-history.jsonl"
 hist_report=$(_pdl_root() { echo "$HIST_DIR"; } && planner_draft_readiness_missed_report ANY)
 if ! grep -q $'\033' <<<"$hist_report" && ! grep -qE 'not json|array|^second line' <<<"$hist_report" &&
-  grep -qF 'forged [31m red second line (from an earlier revision)' <<<"$hist_report"; then
+  grep -qF 'forged [31m red second line (raised on an earlier revision; not re-checked since)' <<<"$hist_report"; then
   pass "a forged history line is cleaned, a malformed one skipped"
 else
   fail "missed history forged" "$hist_report"
