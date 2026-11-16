@@ -80,7 +80,11 @@
 # or `##`; at least one new or extended criterion per ASSUMED line; the id
 # names a finding of the round, and never a security-relevant one
 # (pdr_security) — a security gap is not assumed away. Rows kept from an
-# earlier round are protected by SCOPE_DROPPED. Bash, not the agent, assigns
+# earlier round are protected by SCOPE_DROPPED. An ASSUMED line may instead
+# quote such a kept row (in Scope before and after the round, not repeated
+# by a new row, at most once per round): it then claims no new row but keeps
+# every other rule, and counts toward PLANNER_DRAFT_ASSUMPTION_MAX (rehearsal
+# F58, seam-gate-safety G4). Bash, not the agent, assigns
 # the `assumed` reason class, and only for an applied round.
 #
 # Security-relevant finding (pdr_security, deterministic): its code, detail,
@@ -431,11 +435,19 @@ _pdrv_assumption_check() {
   done
   local -a new=()
   local -A old=()
+  # Rows go through the same normaliser as ASSUMED text (curly quotes,
+  # escapes), so a row and the line quoting it compare equal.
+  local -A beforeset=() afterset=()
   while IFS= read -r l; do
-    [ -n "$l" ] && old["$l"]=$((${old["$l"]:-0} + 1))
+    [ -n "$l" ] || continue
+    l=$(_pdrv_norm "$(_pdrv_quote_norm "$l")")
+    old["$l"]=$((${old["$l"]:-0} + 1))
+    beforeset["$l"]=1
   done < <(planner_draft_revise_assumptions "$before")
   while IFS= read -r l; do
     [ -n "$l" ] || continue
+    l=$(_pdrv_norm "$(_pdrv_quote_norm "$l")")
+    afterset["$l"]=1
     if [ "${old["$l"]:-0}" -gt 0 ]; then
       old["$l"]=$((${old["$l"]} - 1))
     else
@@ -454,12 +466,40 @@ _pdrv_assumption_check() {
   [ "${#new[@]}" -eq 0 ] && [ "$n" -eq 0 ] && return 0
   local blank
   blank=$(jq -r '.assumed[] | select((.assumption // "") | gsub("[\\s\"“”]"; "") == "") | .id' <<<"$disp" | head -1)
-  if [ -n "$blank" ] || [ "$n" -ne "${#new[@]}" ]; then
-    echo "ASSUMPTION_INVALID ${n} ASSUMED line(s) for ${#new[@]} new Scope assumption row(s)${blank:+ (${blank} names no assumption text)}"
+  if [ -n "$blank" ]; then
+    echo "ASSUMPTION_INVALID ${n} ASSUMED line(s) for ${#new[@]} new Scope assumption row(s) (${blank} names no assumption text)"
     return 0
   fi
-  if [ "${#new[@]}" -gt "$PLANNER_DRAFT_ASSUMPTION_MAX" ]; then
-    echo "ASSUMPTION_INVALID ${#new[@]} assumptions in one round (max ${PLANNER_DRAFT_ASSUMPTION_MAX})"
+  # Rehearsal F58: an ASSUMED line may reuse a Scope assumption row that was
+  # already in Scope before this round (an earlier round's, or the spec's
+  # own). Its text must match a row in Scope both before and after the round
+  # that no new row of this round repeats; it then claims no new row. Each
+  # kept row is reused at most once per round, and the per-round cap counts
+  # every ASSUMED line, so one row cannot answer many findings. Every other
+  # ASSUMED line still claims exactly one new row. All ASSUMED lines keep
+  # the criterion, finding-of-the-round and security rules below.
+  local -A newset=() reusedset=()
+  for l in "${new[@]}"; do newset["$l"]=1; done
+  local -a claims=()
+  local reused=0
+  while IFS= read -r l; do
+    l=$(_pdrv_norm "$(_pdrv_quote_norm "$l")")
+    if [ -n "${beforeset["$l"]:-}" ] && [ -n "${afterset["$l"]:-}" ] &&
+      [ -z "${newset["$l"]:-}" ] && [ -z "${reusedset["$l"]:-}" ]; then
+      reusedset["$l"]=1
+      reused=$((reused + 1))
+    else
+      claims+=("$l")
+    fi
+  done < <(jq -r '.assumed[].assumption' <<<"$disp")
+  if [ "${#claims[@]}" -ne "${#new[@]}" ]; then
+    local note=""
+    if [ "$reused" -gt 0 ]; then note=" (${reused} reuse an existing row)"; fi
+    echo "ASSUMPTION_INVALID ${n} ASSUMED line(s) for ${#new[@]} new Scope assumption row(s)${note}"
+    return 0
+  fi
+  if [ "$n" -gt "$PLANNER_DRAFT_ASSUMPTION_MAX" ]; then
+    echo "ASSUMPTION_INVALID ${n} assumptions in one round (max ${PLANNER_DRAFT_ASSUMPTION_MAX})"
     return 0
   fi
   local words
@@ -479,10 +519,7 @@ _pdrv_assumption_check() {
   # Every new row claimed by exactly one ASSUMED line, and vice versa.
   local want got
   want=$(printf '%s\n' "${new[@]}" | grep . | LC_ALL=C sort)
-  got=$(jq -r '.assumed[].assumption' <<<"$disp" | while IFS= read -r l; do
-    _pdrv_norm "$(_pdrv_quote_norm "$l")"
-    echo
-  done | grep . | LC_ALL=C sort)
+  got=$(printf '%s\n' "${claims[@]}" | grep . | LC_ALL=C sort)
   if [ "$want" != "$got" ]; then
     echo "ASSUMPTION_INVALID Scope assumption rows and ASSUMED dispositions do not match one to one"
     return 0

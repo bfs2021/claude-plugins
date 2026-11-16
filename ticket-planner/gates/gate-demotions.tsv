@@ -1,0 +1,29 @@
+# gate-demotions.tsv — every gate code demoted from blocking to warn on ledger
+# evidence (change seam-gate-safety, slice G4). Registry only: no gate reads
+# this file. A demotion is made in the gate's own code; this row is the record
+# that justifies it, and test-planner-gate-ledger.sh fails when a row no longer
+# does. Zero rows today: no code in gate-ledger.tsv meets the rule.
+#
+# Rule (design D3): a row needs at least one ledger fire of the same gate and
+# code labelled false with live=yes (a fire from a checker bug is fixed, not
+# demoted). A whole-code demotion (scope "code") also needs at least 2 live
+# false fires in some 10 consecutive fires of the code; otherwise only a named
+# variant the false fires share, checkable in bash (scope "variant:<NAME>"),
+# may be demoted. Never demoted: DEPENDENCY_CYCLE, NEEDS_HUMAN_DECISION and the
+# DoR presence codes pinned by ticket-auto-pipeline/lib/tests/fixtures/dor/20-28.
+# A demotion follows the dispatch-rehearsal runbook §2 freeze rules (fixture,
+# dor/20-28 still failing with the same codes, separate reviewer) and resets
+# the rehearsal clean-run counter.
+#
+# Columns (tab-separated):
+#   code         the gate code
+#   gate         as in gate-ledger.tsv (crosscheck, draft, draft-crosscheck,
+#                draft-guard, refinement, dor-check)
+#   scope        code | variant:<NAME>
+#   ledger_rows  the ledger fires that justify it, comma-separated <iter>:<unit>
+#   fixture      repository-relative path of the false-positive fixture
+#   sunset       a two-digit rehearsal iteration; when the ledger holds a fire
+#                from that iteration or later, the row is removed (the code
+#                blocks again) or renewed with new ledger evidence
+#   reviewer     who reviewed the demotion (the separate reviewer agent's run)
+code	gate	scope	ledger_rows	fixture	sunset	reviewer

@@ -951,6 +951,84 @@ else
   fail "mode" "_pdrv_acpre_mode missing"
 fi
 
+# ── seam-gate-safety G4: F58, an ASSUMED line that reuses a Scope row ─────
+# Fixture: rehearsal iteration 08, users-api, revise round 2 (scrubbed).
+# Round 1 added the Scope assumption; round 2 added two login criteria and
+# answered the new finding with ASSUMED quoting that existing row. The guard
+# counted only rows added this round and reverted it ("1 ASSUMED line(s) for
+# 0 new Scope assumption row(s)").
+echo "--- seam-gate-safety G4: F58 assumption reuse ---"
+F58="${SCRIPT_DIR}/fixtures/draft-revise/f58-assumption-reuse"
+out=$(planner_draft_revise_check_text "${F58}/before.md" "${F58}/after.md" "${F58}/revise.r2.md" "${F58}/findings.r2.json")
+[ -z "$out" ] && pass "F58: an ASSUMED line quoting an existing Scope assumption row passes" || fail "F58 reuse" "$out"
+F58W="${TMP_ROOT}/f58"
+mkdir -p "$F58W"
+F58_ASM=$(planner_draft_revise_assumptions "${F58}/before.md")
+# The same disposition quoting text no Scope row holds still fails.
+sed 's/assumption: ".*"$/assumption: "Login trims the email before the lookup."/' "${F58}/revise.r2.md" >"${F58W}/other.md"
+out=$(planner_draft_revise_check_text "${F58}/before.md" "${F58}/after.md" "${F58W}/other.md" "${F58}/findings.r2.json")
+_has "$out" ASSUMPTION_INVALID && pass "F58: an ASSUMED line matching no Scope row still fails" || fail "F58 unmatched" "$out"
+# Reusing a row the revision removed fails (the row must still be in Scope).
+grep -vxF -- "- Assumption: ${F58_ASM}" "${F58}/after.md" >"${F58W}/after-norow.md"
+out=$(planner_draft_revise_check_text "${F58}/before.md" "${F58W}/after-norow.md" "${F58}/revise.r2.md" "${F58}/findings.r2.json")
+_has "$out" ASSUMPTION_INVALID && pass "F58: reusing a Scope row the revision removed fails" || fail "F58 removed row" "$out"
+# Reuse still needs a new or extended criterion.
+out=$(planner_draft_revise_check_text "${F58}/before.md" "${F58}/before.md" "${F58}/revise.r2.md" "${F58}/findings.r2.json")
+grep -q '^ASSUMPTION_INVALID 1 ASSUMED finding(s) but 0 new or extended criteria' <<<"$out" &&
+  pass "F58: reusing a row with no new criterion fails" || fail "F58 no criterion" "$out"
+# Reuse is still bound to a finding of this round.
+jq '.[0].id = "f-other"' "${F58}/findings.r2.json" >"${F58W}/findings.json"
+out=$(planner_draft_revise_check_text "${F58}/before.md" "${F58}/after.md" "${F58}/revise.r2.md" "${F58W}/findings.json")
+grep -q '^ASSUMPTION_INVALID ASSUMED f-ca52bc41cbd2 is not a finding of this round' <<<"$out" &&
+  pass "F58: a reused assumption still names a finding of this round" || fail "F58 id" "$out"
+# A security finding still cannot be assumed away by reusing a row.
+jq '.[0].detail = "login input is rendered with innerHTML (XSS)"' "${F58}/findings.r2.json" >"${F58W}/findings-sec.json"
+out=$(planner_draft_revise_check_text "${F58}/before.md" "${F58}/after.md" "${F58}/revise.r2.md" "${F58W}/findings-sec.json")
+grep -q '^ASSUMPTION_INVALID f-ca52bc41cbd2 is a security finding' <<<"$out" &&
+  pass "F58: a reused assumption cannot answer a security finding" || fail "F58 security" "$out"
+# A new row plus a reuse in one round: the new row still needs its own ASSUMED line.
+sed "s/^- Assumption: ${F58_ASM//\//\\/}\$/&\n- Assumption: Login responses never echo the submitted password./" "${F58}/after.md" >"${F58W}/after-plus.md"
+out=$(planner_draft_revise_check_text "${F58}/before.md" "${F58W}/after-plus.md" "${F58}/revise.r2.md" "${F58}/findings.r2.json")
+_has "$out" ASSUMPTION_INVALID && pass "F58: a new row next to a reuse still needs its own ASSUMED line" || fail "F58 new+reuse" "$out"
+# A reuse and a new row in one round, each with its own ASSUMED line, pass —
+# in the C locale and in a UTF-8 one (the kept-row match must not depend on
+# the collation order).
+jq '. + [.[0] | .id = "f-second"]' "${F58}/findings.r2.json" >"${F58W}/findings2.json"
+{
+  cat "${F58}/revise.r2.md"
+  printf '%s\n' 'ASSUMED f-second — login responses — assumption: "Login responses never echo the submitted password."'
+} >"${F58W}/revise-plus.md"
+out=$(LC_ALL=C planner_draft_revise_check_text "${F58}/before.md" "${F58W}/after-plus.md" "${F58W}/revise-plus.md" "${F58W}/findings2.json")
+[ -z "$out" ] && pass "F58: a reuse plus a new row with its own ASSUMED line pass (C locale)" || fail "F58 reuse+new C" "$out"
+F58_LOC=$(locale -a 2>/dev/null | grep -iE '^[a-z]{2}_[A-Z]{2}\.utf-?8$' | head -1)
+if [ -n "$F58_LOC" ]; then
+  out=$(LC_ALL="$F58_LOC" planner_draft_revise_check_text "${F58}/before.md" "${F58W}/after-plus.md" "${F58W}/revise-plus.md" "${F58W}/findings2.json" 2>&1)
+  [ -z "$out" ] && pass "F58: a reuse plus a new row pass under ${F58_LOC}" || fail "F58 reuse+new ${F58_LOC}" "$out"
+else
+  echo "  (no non-C UTF-8 locale installed: locale case skipped)"
+fi
+# One kept row answers at most one finding per round.
+{
+  cat "${F58}/revise.r2.md"
+  sed 's/^ASSUMED f-ca52bc41cbd2/ASSUMED f-second/' "${F58}/revise.r2.md"
+} >"${F58W}/revise-twice.md"
+out=$(planner_draft_revise_check_text "${F58}/before.md" "${F58}/after.md" "${F58W}/revise-twice.md" "${F58W}/findings2.json")
+_has "$out" ASSUMPTION_INVALID && pass "F58: one kept row cannot answer two findings in a round" || fail "F58 twice" "$out"
+# A reuse counts toward the per-round assumption cap.
+F58_MAX="$PLANNER_DRAFT_ASSUMPTION_MAX"
+PLANNER_DRAFT_ASSUMPTION_MAX=0
+out=$(planner_draft_revise_check_text "${F58}/before.md" "${F58}/after.md" "${F58}/revise.r2.md" "${F58}/findings.r2.json")
+PLANNER_DRAFT_ASSUMPTION_MAX="$F58_MAX"
+grep -q '^ASSUMPTION_INVALID 1 assumptions in one round (max 0)' <<<"$out" &&
+  pass "F58: a reused assumption counts toward the per-round cap" || fail "F58 cap" "$out"
+# A row written with curly quotes matches an ASSUMED line quoting it with straight ones.
+for f in before after; do
+  sed "s/^\(- Assumption: .*\)usernames keep/\1each user’s username keeps/" "${F58}/${f}.md" >"${F58W}/curly-${f}.md"
+done
+sed "s/usernames keep/each user's username keeps/" "${F58}/revise.r2.md" >"${F58W}/curly-revise.md"
+out=$(planner_draft_revise_check_text "${F58W}/curly-before.md" "${F58W}/curly-after.md" "${F58W}/curly-revise.md" "${F58}/findings.r2.json")
+grep -q '’' "${F58W}/curly-before.md" && [ -z "$out" ] && pass "F58: a curly-quoted row matches its straight-quoted ASSUMED line" || fail "F58 curly" "$out"
+
 echo
 echo "=== Results: ${PASS} passed, ${FAIL} failed ==="
 [ "$FAIL" -eq 0 ]

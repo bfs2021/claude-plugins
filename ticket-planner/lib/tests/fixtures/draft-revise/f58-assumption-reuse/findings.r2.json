@@ -1,0 +1,15 @@
+[
+  {
+    "id": "f-ca52bc41cbd2",
+    "kind": "semantic",
+    "code": "EDGE_CASE_GAP",
+    "severity": "blocking",
+    "quote": "- Assumption: Email comparisons for duplicates and login ignore leading and trailing spaces as well as letter case, while the email is still stored as submitted and usernames keep their exact comparison.",
+    "quote_b": null,
+    "detail": "The Scope assumption extends space-insensitive email matching to login, but the only new criterion (trailing space on register) covers the duplicate check alone; logging in as \" jake@conduit.test\" (leading space) or \"jake@conduit.test \" with Jake-Pass-123 has no criterion, so an implementer who trims only inside the register path, or relies on findUserByEmail which the Technical Context describes as only ignoring letter case, would return 401 on login and still pass every test.",
+    "unit": "Scope",
+    "units": [
+      "Scope"
+    ]
+  }
+]
