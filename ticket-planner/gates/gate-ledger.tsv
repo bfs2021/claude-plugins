@@ -1,4 +1,4 @@
-# gate-ledger.tsv — every gate fire observed in dispatch rehearsal iterations 01–10
+# gate-ledger.tsv — every gate fire observed in dispatch rehearsal iterations 01–11
 # (and the 05b same-intent rerun), labelled. Change seam-gate-safety, slice G3.
 # Data only: nothing reads this file to decide a gate. gate-ledger-summary.sh
 # counts it; test-planner-gate-ledger.sh checks it.
@@ -13,7 +13,7 @@
 # Audit advisories and MISSED entries that never blocked are not rows.
 #
 # Columns (tab-separated):
-#   iter      01..10 or 05b
+#   iter      01..15 or 05b
 #   gate      crosscheck | draft | draft-crosscheck (Crosscheck re-run inside the
 #             draft gate's loop) | draft-guard (a revise guard) | refinement |
 #             dor-check (the per-iteration negative control)
@@ -168,3 +168,11 @@ iter	gate	round	code	class	outcome	unit	count	label	cause	fixed	live	f_id	eviden
 09	draft	1	MISSING_CORE_AC	block	revised	repo-docs	2	true	plan-gap	-	-	-	iter-09/run-record.md:37	resolved r2
 10	crosscheck	-	CARVE_SCOPE_LOST	block	halted	(cross-file)	1	false	checker-bug	yes	no	F67	iter-10/run-record.md:28	count read from the Specify start line; carve scope diffs bash-recorded slugs since planner 0.44.0 (seam-bash-derives slice 1)
 10	crosscheck	-	OWN_UNDECLARED_REF	warn	logged	(multiple)	7	false	format	no	yes	F40	iter-10/run-record.md:32	parameter keys in Technical Context
+11	crosscheck	-	OWN_UNDECLARED_REF	warn	logged	(multiple)	8	false	format	no	yes	F40	iter-11/run-record.md:45	parameter keys in Technical Context
+11	draft	0	MISSING_CORE_AC	block	revised	backend-scaffold	1	true	plan-gap	-	-	-	iter-11/run-record.md:33	store reset() untested, cleared r1
+11	draft	0	MISSING_CORE_AC	block	revised	frontend-scaffold	1	true	plan-gap	-	-	-	iter-11/run-record.md:34	API client untested, cleared r1
+11	draft	0	MISSING_CORE_AC	block	revised	frontend-reading-pages	2	true	plan-gap	-	-	-	iter-11/run-record.md:35	plain-text rendering, one issue fired twice; cleared r1
+11	draft	0-1	EDGE_CASE_GAP	block	revised	backend-auth	1	true	plan-gap	-	-	-	iter-11/run-record.md:36	token id reuse after restart; r1 revision reverted by the F80 false fire, assumed r2
+11	draft-guard	1	TESTDATA_REGRESSION	revert	reverted	backend-auth	1	false	checker-bug	yes	no	F80	findings.md:180	test-built token with Source — read as missing Source; the revert dropped a valid criterion; test-built data needs no Source since planner 0.52.0
+11	dor-check	-	TEST_USER_MISSING	block	expected	negative-control	1	true	negative-control	-	-	-	iter-11/run-record.md:57	planted: Test User line removed from a copy of a passing body
+11	dor-check	-	TEST_DATA_UNSOURCED	block	expected	negative-control	1	true	negative-control	-	-	-	iter-11/run-record.md:57	planted: one Source: line removed
