@@ -343,6 +343,7 @@ declare -A FIXTURE_TYPE=(
   ["24-contract-no-test-data.md"]=feature ["25-td-chore.md"]=chore
   ["26-contract-implied-miss.md"]=feature ["27-planned-all-none-miss.md"]=feature
   ["28-threshold-only-none.md"]=feature
+  ["31-test-built-contract.md"]=feature ["32-test-built-seeded-unsourced.md"]=feature
 )
 declare -A FIXTURE_STATUS=(
   ["01-excellent.md"]=ready ["02-minimal.md"]=ready ["03-missing-intent.md"]=not-ready
@@ -357,12 +358,13 @@ declare -A FIXTURE_STATUS=(
   ["24-contract-no-test-data.md"]=not-ready ["25-td-chore.md"]=ready
   ["26-contract-implied-miss.md"]=ready ["27-planned-all-none-miss.md"]=ready
   ["28-threshold-only-none.md"]=ready
+  ["31-test-built-contract.md"]=ready ["32-test-built-seeded-unsourced.md"]=not-ready
 )
 declare -A FIXTURE_HARD=(
   ["03-missing-intent.md"]=INTENT_MISSING ["05-vague-ac.md"]=AC_VAGUE ["07-fe-no-test-user.md"]=TEST_USER_MISSING
   ["08-fe-no-nav-path.md"]=NAV_PATH_MISSING ["10-bug-no-expected-actual.md"]=REPRO_NO_EXPECTED_ACTUAL
   ["21-unsourced-contract.md"]=TEST_DATA_UNSOURCED ["23-planned-contract-unsourced.md"]=TEST_DATA_UNSOURCED
-  ["24-contract-no-test-data.md"]=TEST_DATA_MISSING
+  ["24-contract-no-test-data.md"]=TEST_DATA_MISSING ["32-test-built-seeded-unsourced.md"]=TEST_DATA_UNSOURCED
 )
 declare -A FIXTURE_ADVISORY=(
   ["02-minimal.md"]=TEST_DATA_MISSING ["06-backend-no-verification.md"]=VERIFICATION_REQUIRED_NOT_SELF_VERIFYING
@@ -421,6 +423,19 @@ check_ticket_ready "FIX-10-repro" --body "$FIXTURES_DIR/10-bug-no-expected-actua
 echo "$DOR_MISSING" | jq -e 'index("REPRO_MISSING") == null' >/dev/null &&
   _pass "fixture 10: REPRO_MISSING does not fire alongside REPRO_NO_EXPECTED_ACTUAL" ||
   _fail "fixture 10 should never report REPRO_MISSING (got $DOR_MISSING)"
+
+# fixture 31 (rehearsal F80): data the test builds itself, with no Source or
+# `Source: none`, is not an unsourced need; the same body must still be a
+# contract body (its seeded row parses to a known kind). Fixture 32 is the
+# negative: a test-built cell that also names stored records stays a need.
+check_ticket_ready "FIX-31-testbuilt" --body "$FIXTURES_DIR/31-test-built-contract.md" --type feature --no-fetch || true
+grep -q TEST_DATA_UNSOURCED <<<"$DOR_MISSING $DOR_ADVISORY" &&
+  _fail "fixture 31: test-built data must not be TEST_DATA_UNSOURCED (missing=$DOR_MISSING advisory=$DOR_ADVISORY)" ||
+  _pass "fixture 31: test-built data with no/none Source is not TEST_DATA_UNSOURCED"
+check_ticket_ready "FIX-32-testbuilt" --body "$FIXTURES_DIR/32-test-built-seeded-unsourced.md" --type feature --no-fetch || true
+grep -q '2 of 4 test-data items' <<<"$(jq -r '.TEST_DATA_UNSOURCED.detail // ""' <<<"$DOR_CHECKS")" &&
+  _pass "fixture 32: a test-built cell naming stored records stays unsourced (its vplan cell and its bullet: 2 of 4)" ||
+  _fail "fixture 32: expected 2 of 4 unsourced (got $(echo "$DOR_CHECKS" | jq -c .TEST_DATA_UNSOURCED))"
 
 # fixture 17: VPLAN_MISSING must be satisfied-by-AC, never in DOR_ADVISORY.
 check_ticket_ready "FIX-17-vplan" --body "$FIXTURES_DIR/17-self-verifying-no-vplan.md" --type chore --no-fetch || true

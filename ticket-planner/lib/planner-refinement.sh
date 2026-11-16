@@ -199,6 +199,7 @@ _planner_refinement_source_deps() {
     declare -f dor_semantic_prompt >/dev/null 2>&1 &&
     declare -f dor_semantic_request_path >/dev/null 2>&1 &&
     declare -f dor_semantic_format_step >/dev/null 2>&1 &&
+    declare -f dor_semantic_format_awaiting >/dev/null 2>&1 &&
     declare -f set_ticket_harness_error >/dev/null 2>&1 &&
     declare -f set_ticket_readiness >/dev/null 2>&1; then
     return 0
@@ -1838,6 +1839,22 @@ planner_refinement_finish() {
   return 0
 }
 
+# _planner_refinement_format_deps — loads ticket-auto-pipeline's libs and
+# fails closed (rc 1, stderr) unless the format-retry functions exist. Step 1e
+# runs next and apply_pending in a fresh shell each, where nothing else has
+# sourced dor-semantic-parse.sh: both calls used to be "command not found",
+# one swallowed by an `if`, the other read as "no retry", so the G6 format
+# retry never ran in Refinement (rehearsal F71).
+_planner_refinement_format_deps() {
+  _planner_refinement_source_deps >&2 || return 1
+  local fn
+  for fn in dor_semantic_format_awaiting dor_semantic_format_step; do
+    declare -f "$fn" >/dev/null 2>&1 && continue
+    echo "planner-refinement: ${fn} is not defined (ticket-auto-pipeline's dor-semantic-parse.sh too old or not loaded)" >&2
+    return 1
+  done
+}
+
 # planner_refinement_next <INIT>
 # Applies results already on disk, then prints the next spawn list — one
 # "<TID>\t<scan|audit>\tticket-auto-pipeline:dor-semantic-agent\t<prompt-file>\t<result-file>"
@@ -1850,6 +1867,7 @@ planner_refinement_next() {
   # The spawn list is stdout's only content: anything apply prints goes to
   # stderr (dor_semantic_apply reports `round=… demoted=…` on stdout).
   planner_refinement_apply_pending "$init" >&2 || return 1
+  _planner_refinement_format_deps || return 1
   pass=$(_planner_refinement_pass_file "$init")
   max="${PLANNER_REFINEMENT_PARALLEL:-4}"
   [[ "$max" =~ ^[1-9][0-9]*$ ]] || max=4
@@ -1896,6 +1914,7 @@ planner_refinement_apply_pending() {
   local init="$1" pass tid kind agent pf rf pdir n
   pass=$(_planner_refinement_pass_file "$init")
   [ -f "${pass}.pending" ] || return 0
+  _planner_refinement_format_deps || return 1
   local -A seen=() failed=() fspawned=()
   local -a order=()
   while IFS=$'\t' read -r tid kind agent pf rf; do

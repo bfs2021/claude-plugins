@@ -319,6 +319,44 @@ else
   fail "uncovered AC" "$(cat "${TMP_ROOT}/gap.err")"
 fi
 
+echo "--- criteria that differ only in letter case are two criteria (F81) ---"
+cat >"${TMP_ROOT}/case.md" <<'SPEC'
+# case
+
+## Acceptance Criteria
+
+- [ ] `POST /api/users/login` with email `jake@conduit.test` and password `Jake-Pass-123` returns status 200.
+- [ ] `POST /api/users/login` with email `JAKE@CONDUIT.TEST` and password `Jake-Pass-123` returns status 200.
+- [ ] The Profile page shows the username
+
+## Verification Notes
+
+| Criterion | Role | Test data | Source | Expected | Verifiable |
+|---|---|---|---|---|---|
+| `POST /api/users/login` with email `jake@conduit.test` and password `Jake-Pass-123` returns status 200. | anonymous reader | 1 `user` in state registered (`jake`) | seeded-by:case | 200, lower-case login | yes |
+| `POST /api/users/login` with email `JAKE@CONDUIT.TEST` and password `Jake-Pass-123` returns status 200. | anonymous reader | 1 `user` in state registered (`jake`) | seeded-by:case | 200, upper-case login | yes |
+| the profile page shows the username | author | none | — | username shown | yes |
+SPEC
+vcase=$(planner_ticketgen_vplan "${TMP_ROOT}/case.md" 2>"${TMP_ROOT}/case.err")
+if ! grep -q 'WARNING' "${TMP_ROOT}/case.err" &&
+  grep -qE '^\| 1 \| .*jake@conduit\.test.*\| 200, lower-case login \| ✓ \|$' <<<"$vcase" &&
+  grep -qE '^\| 2 \| .*JAKE@CONDUIT\.TEST.*\| 200, upper-case login \| ✓ \|$' <<<"$vcase" &&
+  grep -qE '^\| 3 \| The Profile page shows the username \| author \|.*\| username shown \| ✓ \|$' <<<"$vcase"; then
+  pass "each case-distinct AC gets its own row, no WARNING; a case-only drift still matches its note"
+else
+  fail "case-distinct criteria" "err=$(cat "${TMP_ROOT}/case.err") vplan=$vcase"
+fi
+# Two notes whose folded key names two ACs: a case drift cannot pick one, so
+# the unmatched AC and the stray note are both reported (never a silent swap).
+sed -i 's/^| `POST \/api\/users\/login` with email `JAKE@CONDUIT.TEST`/| `POST \/api\/users\/login` with email `Jake@Conduit.Test`/' "${TMP_ROOT}/case.md"
+planner_ticketgen_vplan "${TMP_ROOT}/case.md" >/dev/null 2>"${TMP_ROOT}/case2.err"
+if grep -qF 'AC 2 has no Verification Notes entry' "${TMP_ROOT}/case2.err" &&
+  grep -qF 'matches no Acceptance Criteria line: `POST /api/users/login` with email `Jake@Conduit.Test`' "${TMP_ROOT}/case2.err"; then
+  pass "an ambiguous case-only drift is reported, not guessed"
+else
+  fail "ambiguous case drift" "$(cat "${TMP_ROOT}/case2.err")"
+fi
+
 # ── 4. Composition ───────────────────────────────────────────────────────────
 
 echo "--- composition ---"

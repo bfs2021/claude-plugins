@@ -212,5 +212,60 @@ rc=0
 DOR_SEMANTIC_FORMAT_RETRIES=9 planner_refinement_prepare "$R_INIT" >/dev/null 2>&1 || rc=$?
 [ "$rc" -eq 1 ] && pass "Refinement: prepare refuses a bad DOR_SEMANTIC_FORMAT_RETRIES" || fail "refinement knob" "rc=$rc"
 
+echo "--- Refinement: step 1b in fresh shells (rehearsal F71) ---"
+# SKILL.md step 1b/1e source only planner-refinement.sh and
+# planner-linear-api.sh (on top of the step 1 setup block: planner-state.sh,
+# planner-router.sh, planner-phase-prompts.sh), in a new shell per call. The format-retry check in
+# planner_refinement_next used to find dor_semantic_format_awaiting undefined
+# there ("command not found", swallowed), so no format row was ever emitted.
+_r_fresh() { # <function> — one step 1b/1e Bash call
+  bash -c 'for f in planner-state planner-router planner-phase-prompts planner-refinement planner-linear-api; do
+    source "$1/$f.sh" || exit 1; done && "$2" "$3"' \
+    _ "$LIB_DIR" "$1" "$R_INIT"
+}
+_r_fresh_run() {
+  local l i err="${TMP_ROOT}/fresh-stderr"
+  R_KINDS="" R_FRESH_ERR=""
+  : >"$err"
+  PLANNER_REFINEMENT_DRIFT_CHECK=false _r_fresh planner_refinement_prepare >/dev/null 2>>"$err" || return 1
+  for i in 1 2 3 4 5 6 7 8; do
+    l=$(_r_fresh planner_refinement_next 2>>"$err") || {
+      R_FRESH_ERR=$(cat "$err")
+      return 1
+    }
+    [ "$l" = "done 0" ] && break
+    R_KINDS+="$(printf '%s\n' "$l" | cut -f2 | tr '\n' ' ')"
+    _r_spawn "$l"
+    _r_fresh planner_refinement_apply_pending >/dev/null 2>>"$err"
+  done
+  R_FRESH_ERR=$(cat "$err")
+}
+# Back to the fixture body (the appended bullets above land in its Test Data
+# section) and no retry state left over from the rejected run.
+cp "${FIXTURES}/22-sourced-contract.md" "${RP}/body.md"
+rm -f "${RP}"/semantic-*
+FMT_R=clean _r_fresh_run
+if [[ " $R_KINDS" == *" format "* ]] && ! grep -q 'command not found' <<<"$R_FRESH_ERR"; then
+  pass "Refinement (fresh shells): a format row is emitted, no 'command not found'"
+else
+  fail "refinement fresh shell" "kinds=$R_KINDS stderr=$(grep -m3 'not found\|ERROR\|planner-refinement' <<<"$R_FRESH_ERR")"
+fi
+ready=$(get_ticket_manifest_field "$R_TID" ready 2>/dev/null)
+jq -e '.semantic.findings == [] and (.semantic.unavailable // false) == false' <<<"$ready" >/dev/null &&
+  pass "Refinement (fresh shells): judged on the re-serialised block" ||
+  fail "refinement fresh verdict" "kinds=$R_KINDS $(jq -c '.semantic | {unavailable, findings}' <<<"$ready")"
+
+# Fail closed: a dor-semantic-parse.sh with no dor_semantic_format_awaiting
+# halts the spawn list loudly instead of skipping the check.
+rc=0
+out=$(bash -c 'source "$1/planner-state.sh" && source "$1/planner-refinement.sh" && _planner_refinement_source_deps >/dev/null 2>&1 &&
+  unset -f dor_semantic_format_awaiting && _planner_refinement_source_deps() { return 0; } &&
+  planner_refinement_next "$2"' _ "$LIB_DIR" "$R_INIT" 2>&1) || rc=$?
+if [ "$rc" -ne 0 ] && grep -q 'dor_semantic_format_awaiting is not defined' <<<"$out"; then
+  pass "Refinement: next fails closed when dor_semantic_format_awaiting is missing"
+else
+  fail "refinement fail closed" "rc=$rc out=$out"
+fi
+
 export REPOS_ROOT="$GATE_REPOS_ROOT"
 _gate_finish 3

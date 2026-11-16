@@ -361,6 +361,42 @@ else
   fail "per-spec revert" "a=$sa b=$sb"
 fi
 
+# ── 3b. test-built data with a `—` Source is not an unowned need (F80) ────
+# Rehearsal F80: a revision added a row whose data the test builds itself (a
+# token signed in the test) with Source `—`. Crosscheck's test-data family read
+# it as "missing Source", so the guard reverted the round. The guard must not be
+# stricter than a fresh Crosscheck, and neither may flag such a row; a row that
+# names seeded records with Source `—` still must be.
+echo "--- 3b. TESTDATA_REGRESSION and test-built data (F80) ---"
+_round a-export
+sed -i 's/^- \[ \] The Export button appears on the invoice list$/&\n- [ ] Export with a token signed with the server secret whose `id` matches no stored user responds with 401/' "$A"
+printf '| Export with a token signed with the server secret whose `id` matches no stored user responds with 401 | anonymous reader | a test-built token whose `id` no stored user has | — | 401 | yes |\n' >>"$A"
+_disp a-export "$DISP_OK"
+out=$(_check "a-export")
+if ! _has "$out" TESTDATA_REGRESSION; then
+  pass "F80: a test-built token with Source — is not a TESTDATA_REGRESSION"
+else
+  fail "F80 false positive" "$out"
+fi
+cx=$(planner_crosscheck_testdata "$INIT" 2>&1)
+grep -q 'TEST_DATA_UNOWNED' <<<"$cx" && fail "F80 crosscheck" "$cx" ||
+  pass "F80: Crosscheck on the same spec text reports no TEST_DATA_UNOWNED"
+planner_draft_revise_finish "$INIT" a-export 1 t "a-export" >/dev/null
+cp "${TMP_ROOT}/a.base" "$A"
+
+_round a-export
+sed -i 's/^- \[ \] The Export button appears on the invoice list$/&\n- [ ] Export as a stored user with no invoices responds with 404/' "$A"
+printf '| Export as a stored user with no invoices responds with 404 | finance user | 1 `user` in state registered with no invoices, and a test-built token for it | — | 404 | yes |\n' >>"$A"
+_disp a-export "$DISP_OK"
+out=$(_check "a-export")
+if _has "$out" TESTDATA_REGRESSION && grep -q "TEST_DATA_UNOWNED" <<<"$out" && grep -q "missing Source" <<<"$out"; then
+  pass "F80 negative: seeded records with Source — still regress as TEST_DATA_UNOWNED (missing Source)"
+else
+  fail "F80 negative" "$out"
+fi
+planner_draft_revise_finish "$INIT" a-export 1 t "a-export" >/dev/null
+cp "${TMP_ROOT}/a.base" "$A"
+
 # ── 4. whole-workspace snapshot ───────────────────────────────────────────
 echo "--- 4. OUT_OF_SCOPE_EDIT and snapshot ---"
 _round

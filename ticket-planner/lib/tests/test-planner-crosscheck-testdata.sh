@@ -608,6 +608,65 @@ p_tg=$(planner_prompt_ticketgen "INIT-1" "an idea" "$SD" 2>/dev/null)
 assert_contains "TicketGen: Test Data Prerequisites carry Source" "$p_tg" "\`- <what>. Source: <source>\`"
 assert_contains "TicketGen: Verification Plan cell carries Source" "$p_tg" "\`<what> (Source: <source>)\`"
 
+# ── Test-built data (rehearsal F80) ───────────────────────────────────────
+# A need the test builds itself has nothing to own: no Source / `none` is
+# right for it. Naming stored records keeps it a need. ticket-auto-pipeline's
+# dor-check.sh mirrors the predicate; both must answer every case alike.
+echo "--- test-built data (F80) ---"
+_tb_dor="${LIB_DIR}/../../ticket-auto-pipeline/lib/dor-check.sh"
+_tb_dor_fn=$(sed -n '/^_dor_td_is_test_built() {$/,/^}$/p' "$_tb_dor")
+[ -n "$_tb_dor_fn" ] && eval "$_tb_dor_fn"
+while IFS='|' read -r want data; do
+  [ -n "$want" ] || continue
+  got=no
+  _planner_testdata_is_test_built "$data" && got=yes
+  dgot=no
+  declare -f _dor_td_is_test_built >/dev/null && _dor_td_is_test_built "$data" && dgot=yes
+  if [ "$got" = "$want" ] && [ "$dgot" = "$want" ]; then
+    pass "test-built=${want}: ${data}"
+  else
+    fail "test-built ${data}" "want=${want} planner=${got} dor-check=${dgot}"
+  fi
+done <<'CASES'
+yes|a test-built token whose `id` no stored user has
+yes|A token with an empty payload, built by the test
+yes|a JWT the test signs with the server secret
+yes|a payload built in the test with a malformed `exp`
+no|1 `user` in state registered (`jake`)
+no|a test-built token for 1 `user` in state registered
+no|2 `user` in state registered; a test-built token mixing their ids
+no|a test-built token for the seeded author
+no|a test-built token for an existing user
+no|a token for the registered author, built by the test
+no|an expired `jake` token
+no|a JWT signed with the server secret
+CASES
+
+TB_SD=$(new_init "INIT-TB1")
+cat >"${TB_SD}/tb.md" <<'EOF'
+# tb
+
+## Acceptance Criteria
+
+- [ ] A token whose id matches no stored user returns 401
+- [ ] A token with an empty payload returns 401
+
+## Verification Notes
+
+| Criterion | Role | Test data | Source | Expected | Verifiable |
+|---|---|---|---|---|---|
+| A token whose id matches no stored user returns 401 | reader | a test-built token whose `id` no stored user has | — | 401 | yes |
+| A token with an empty payload returns 401 | reader | a token with an empty payload, built by the test | none | 401 | yes |
+EOF
+out=$(planner_crosscheck_testdata "INIT-TB1" 2>&1)
+assert_not_contains "F80: test-built rows with Source —/none are not TEST_DATA_UNOWNED" "$out" "TEST_DATA_UNOWNED"
+cat >>"${TB_SD}/tb.md" <<'EOF'
+| A stored user with no invoices gets 404 | reader | 1 `user` in state registered with no invoices, and a test-built token for it | — | 404 | yes |
+EOF
+out=$(planner_crosscheck_testdata "INIT-TB1" 2>&1)
+assert_contains "F80 negative: seeded records with Source — stay TEST_DATA_UNOWNED" "$out" "tb.md#3 (missing Source)"
+assert_not_contains "F80 negative: only the seeded row is flagged" "$out" "tb.md#1"
+
 echo ""
 echo "=== Results: $PASS passed, $FAIL failed ==="
 [ "$FAIL" -eq 0 ]

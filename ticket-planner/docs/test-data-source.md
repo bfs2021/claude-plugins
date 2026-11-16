@@ -94,6 +94,13 @@ Writers must follow these rules:
   Verification Plan table are both `|`-delimited.
 - The kind set is **closed**. Any other kind is an error, not an extension point.
 - `Test data: none` needs no Source. `Source: none` is only valid on such a line.
+- Data the test builds itself, with no stored state behind it, also needs no Source: the
+  cell says so (`a test-built token whose id no stored user has`, `a payload built by the
+  test`, `the test signs a JWT …`), and its Source is `—` or `none`. Such a cell must not
+  also name stored records: a record count (`1 user`), `in state`, `seeded`, `existing` or
+  `registered` keeps it a real need that needs a Source. Crosscheck
+  (`_planner_testdata_is_test_built`) and ticket-auto's dor-check (`_dor_td_is_test_built`)
+  apply the same rule (rehearsal F80).
 - A numbered line may carry more than one `Test data: … Source: …` pair. Each pair is checked
   on its own. A table row carries one need.
 
