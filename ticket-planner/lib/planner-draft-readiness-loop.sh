@@ -263,7 +263,19 @@ _pdl_evaluate() {
   if [ "$max" -gt 0 ] && [ -s "${dir}/lineage.json" ]; then
     prior=$(jq -c '.' "${dir}/lineage.json" 2>/dev/null) || prior="null"
   fi
+  # A rescan scoped to the changed sections (its request records them)
+  # cannot re-raise a finding on an unchanged unit: the lineage carries a
+  # structural one instead of marking it resolved (rehearsal F85).
+  local scoped="false"
+  if ! declare -F dor_semantic_request_scoped >/dev/null; then
+    # ticket-auto-pipeline < 0.122.2: no hold, so a scoped rescan can mark an
+    # untouched contradiction resolved. Say so instead of failing quietly.
+    echo "planner-draft-readiness: ticket-auto-pipeline lib has no dor_semantic_request_scoped (< 0.122.2); scoped rescans cannot hold a contradiction (F85) — update ticket-auto-pipeline" >&2
+  elif dor_semantic_request_scoped "$(dor_semantic_request_path "${dir}/scan-result.txt")"; then
+    scoped="true"
+  fi
   built=$(DOR_SEMANTIC_MAX_ROUNDS="$max" DOR_SEMANTIC_DRIFT_DEMOTE=true \
+    DOR_SEMANTIC_SCOPED_RESCAN="$scoped" \
     DOR_SEMANTIC_ROUND_RESET_SHARE="${DOR_SEMANTIC_ROUND_RESET_SHARE:-0.5}" \
     dor_semantic_lineage_from "$prior" "$body" "$hash" "$(jq -c '.findings' <<<"$judged")" \
     "$(jq -c '.audit // []' <<<"$audit")" 2>/dev/null) || return 1

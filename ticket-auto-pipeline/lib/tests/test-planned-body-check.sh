@@ -408,6 +408,30 @@ _big_nav_rule4() {
   _has_section_nav_path "$b"
 }
 _big_layers() { [ "$(_scope_layers "$1")" = "FE " ]; }
+# ── Rehearsal F86: Layer synonyms fold onto FE / BE ───────────────────────
+_layer_body() { printf '## Scope\n\n| Layer | Service | Area |\n| -- | -- | -- |\n| %s | svc | area |\n' "$1"; }
+_layers_eq() { [ "$(_scope_layers "$(_layer_body "$1")")" = "$2 " ]; }
+_not_backend_only() { ! _scope_is_backend_only "$(_layer_body "$1")"; }
+_backend_only() { _scope_is_backend_only "$(_layer_body "$1")"; }
+for _l in FE Frontend frontend Front-end "Front end" UI Web Client; do
+  _run "F86: layer '$_l' reads as FE" _layers_eq "$_l" FE
+  _run "F86: layer '$_l' is not backend-only" _not_backend_only "$_l"
+done
+for _l in BE Backend Back-end API Server; do
+  _run "F86: layer '$_l' reads as BE" _layers_eq "$_l" BE
+  _run "F86: layer '$_l' is backend-only" _backend_only "$_l"
+done
+for _l in "Web UI" "Frontend (React)" "Frontend app" "Admin UI" "FE / BE" "Frontend and API"; do
+  _run "F86: layer '$_l' reads as FE" _layers_eq "$_l" FE
+done
+_run "F86: an unknown layer (Docs) is kept as written" _layers_eq Docs DOCS
+_run "F86: a two-word non-UI layer (Repo docs) is kept as written" _layers_eq "Repo docs" "REPO DOCS"
+_run "F86: 'Web service' is not FE" _backend_only "Web service"
+_run "F86: 'API client' is not FE" _backend_only "API client"
+_layers_empty() { [ -z "$(_scope_layers "$(_layer_body "$1")")" ]; }
+_run "F86: an unparseable non-UI cell is still ignored" _layers_empty "Infra (k8s)"
+_run "F86: Backend + Frontend rows are not backend-only" _not_backend_only $'Backend | svc | api |\n| Frontend'
+
 _run "big body (>64KB): body is actually larger than a pipe buffer" test "${#BIG_BODY}" -gt 131072
 _run "big body: AC detected under pipefail" _big_repeat _has_section_ac
 _run "big body: Test User detected under pipefail" _big_repeat _has_section_test_user

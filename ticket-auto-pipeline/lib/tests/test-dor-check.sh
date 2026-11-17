@@ -344,6 +344,7 @@ declare -A FIXTURE_TYPE=(
   ["26-contract-implied-miss.md"]=feature ["27-planned-all-none-miss.md"]=feature
   ["28-threshold-only-none.md"]=feature
   ["31-test-built-contract.md"]=feature ["32-test-built-seeded-unsourced.md"]=feature
+  ["33-frontend-layer-no-test-user.md"]=feature
 )
 declare -A FIXTURE_STATUS=(
   ["01-excellent.md"]=ready ["02-minimal.md"]=ready ["03-missing-intent.md"]=not-ready
@@ -359,12 +360,14 @@ declare -A FIXTURE_STATUS=(
   ["26-contract-implied-miss.md"]=ready ["27-planned-all-none-miss.md"]=ready
   ["28-threshold-only-none.md"]=ready
   ["31-test-built-contract.md"]=ready ["32-test-built-seeded-unsourced.md"]=not-ready
+  ["33-frontend-layer-no-test-user.md"]=not-ready
 )
 declare -A FIXTURE_HARD=(
   ["03-missing-intent.md"]=INTENT_MISSING ["05-vague-ac.md"]=AC_VAGUE ["07-fe-no-test-user.md"]=TEST_USER_MISSING
   ["08-fe-no-nav-path.md"]=NAV_PATH_MISSING ["10-bug-no-expected-actual.md"]=REPRO_NO_EXPECTED_ACTUAL
   ["21-unsourced-contract.md"]=TEST_DATA_UNSOURCED ["23-planned-contract-unsourced.md"]=TEST_DATA_UNSOURCED
   ["24-contract-no-test-data.md"]=TEST_DATA_MISSING ["32-test-built-seeded-unsourced.md"]=TEST_DATA_UNSOURCED
+  ["33-frontend-layer-no-test-user.md"]=TEST_USER_MISSING
 )
 declare -A FIXTURE_ADVISORY=(
   ["02-minimal.md"]=TEST_DATA_MISSING ["06-backend-no-verification.md"]=VERIFICATION_REQUIRED_NOT_SELF_VERIFYING

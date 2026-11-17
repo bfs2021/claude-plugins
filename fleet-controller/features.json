@@ -516,6 +516,18 @@
       "docs": "ticket-auto-pipeline/lib/dor-semantic.sh"
     },
     {
+      "name": "DOR_SEMANTIC_SCOPED_RESCAN",
+      "plugin": "ticket-auto-pipeline",
+      "default": "false",
+      "on_value": "true",
+      "category": "intentional-off",
+      "summary": "Semantic DoR lineage holds an untouched contradiction open on a scan scoped to the changed sections, instead of marking it resolved.",
+      "requires": [],
+      "recommend": "off",
+      "why": "A call prefix (rehearsal F85): dor_semantic_apply and the planner's draft gate set it per call when the scan's spawn request records changed_sections. Nothing to set on a host.",
+      "docs": "ticket-auto-pipeline/docs/dor-semantic-schema.md"
+    },
+    {
       "name": "PLANNER_REFINEMENT_AUDIT_DEMOTE",
       "plugin": "ticket-planner",
       "default": "false",

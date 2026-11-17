@@ -43,6 +43,7 @@ all-empty fixtures"), not a frozen contract.
 | 28 | `28-threshold-only-none.md` | feature | ready (also under `DOR_STRICT_TEST_DATA=true`) | — | — | requirement_completeness, contradictory_requirements, deep_scope_ambiguity | 83 |
 | 31 | `31-test-built-contract.md` | feature | ready | — | — | requirement_completeness, contradictory_requirements, deep_scope_ambiguity, edge_case_sufficiency | 83 |
 | 32 | `32-test-built-seeded-unsourced.md` | feature | not-ready | TEST_DATA_UNSOURCED | — | requirement_completeness, contradictory_requirements, deep_scope_ambiguity | 81 |
+| 33 | `33-frontend-layer-no-test-user.md` | feature | not-ready | TEST_USER_MISSING | TEST_DATA_MISSING | requirement_completeness, contradictory_requirements, deep_scope_ambiguity | 73 |
 
 ## Scenario mapping
 
@@ -78,6 +79,7 @@ all-empty fixtures"), not a frozen contract.
   `semantic/30-slip-{scan,audit}.txt` are that real scan (and its audit) with literal values and a one-character `BODY_HASH` copy slip; `semantic/30-noticket-{scan,audit}.txt` have no `TICKET` line (seam-bash-derives slice 3). `test-dor-semantic-request.sh` shows both are judged on the spawn request, not rejected.
 - **31** — rehearsal F80: a contract body with one seeded row plus two rows whose data the test builds itself — a token signed in the test with no Source (Verification Plan cell and bullet) and one with `Source: none`. Data built by the test has nothing to own, so neither is `TEST_DATA_UNSOURCED` (`_dor_td_is_test_built`, mirrored by ticket-planner's Crosscheck).
 - **32** — negative control for 31: the test-built cell also names stored records (`2 user in state registered`) and has no Source. It stays an unsourced need (vplan#2, tdp#2), so the body is not-ready on `TEST_DATA_UNSOURCED`.
+- **33** — rehearsal F86: fixture 07 with the Scope layer written `Frontend` instead of `FE`. `_scope_layers` folds `Frontend` (and `Front-end`, `UI`, `Web`, `Client`) onto `FE`, so the body is not read as backend-only and still fails on `TEST_USER_MISSING`.
 
 ## Semantic expectation (live golden sweep)
 
