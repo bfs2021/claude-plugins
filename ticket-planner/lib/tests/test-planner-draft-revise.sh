@@ -658,6 +658,11 @@ if grep -qF 'An assumption must not contradict any neighbour spec' <<<"$p" &&
 else
   fail "F84 rule" "missing"
 fi
+if grep -qF 'must not remove a value a neighbour criterion plants before its action runs;' <<<"$p"; then
+  pass "F87: a load-time default must keep a neighbour criterion's planted value"
+else
+  fail "F87 revise rule" "missing"
+fi
 
 # ── 8. planner_semantic_demote ────────────────────────────────────────────
 echo "--- 8. planner_semantic_demote ---"

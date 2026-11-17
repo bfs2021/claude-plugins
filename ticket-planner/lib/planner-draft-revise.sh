@@ -980,7 +980,9 @@ Behaviour\`, \`## Expected Behaviour\`), \`## Technical Context\`, \`## Test Use
   neighbour spec states. When the neighbours say nothing, choose the
   fail-closed default: deny access, clear the stored credential, show the
   signed-out state. When no default satisfies this, rebut the finding instead
-  and say why.
+  and say why. A default that changes stored state at page load or startup
+  must not remove a value a neighbour criterion plants before its action runs;
+  when it would, rebut instead.
 - A bash guard checks your edit. Any change outside the regions above, a dropped
   or reworded criterion, a weakening qualifier or an edit to any other file
   reverts the whole revision and spends the round.

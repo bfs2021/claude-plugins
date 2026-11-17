@@ -404,7 +404,8 @@ _prompt_has "EpicGen" "$EPICGEN_PROMPT" \
 # purpose, re-capture: printf '%s' "${SPECIFY_PROMPT//$TMP_ROOT/<REPOS_ROOT>}" | sha256sum
 # Re-captured for seam-bash-derives (status lines carry no counts).
 # Re-captured for rehearsal F89 (built-in-test rule).
-SPECIFY_PROMPT_SHA="0c37b5343c0ec5f7acb7a00b6af0993b96d3c34e76125179cfc4d326318126c4"
+# Re-captured for rehearsal F87 (shared-state lifecycle rules).
+SPECIFY_PROMPT_SHA="6e80c3995cb009a9946958e54999b97ebb2538895db865f39b1e3e7eb1ab9589"
 got_sha=$(printf '%s' "${SPECIFY_PROMPT//$TMP_ROOT/<REPOS_ROOT>}" | sha256sum | cut -d' ' -f1)
 if [ "$got_sha" = "$SPECIFY_PROMPT_SHA" ]; then
   pass "Specify prompt is byte-identical to the pre-change capture"

@@ -746,7 +746,7 @@ acpre_specify_blocks() {
 [ -f "${LIB_DIR}/planner-goldfish.sh" ] && source "${LIB_DIR}/planner-goldfish.sh"
 
 name="Specify prompt is the pre-change prompt plus the rules blocks and bullets"
-if need "$name" planner_params_prompt_rules planner_ownership_prompt_rules planner_acpre_prompt_rules && [ -f "${LIB_DIR}/planner-phase-prompts.sh" ]; then
+if need "$name" planner_params_prompt_rules planner_ownership_prompt_rules planner_acpre_prompt_rules planner_lifecycle_prompt_rules && [ -f "${LIB_DIR}/planner-phase-prompts.sh" ]; then
   source "${LIB_DIR}/planner-phase-prompts.sh"
   sp=$(planner_prompt_specify "INIT-TEST" "an idea" "/repos/.ticket-auto/initiatives/INIT-TEST")
   sp="${sp//$REPOS_ROOT/<REPOS_ROOT>}"
@@ -766,6 +766,13 @@ if need "$name" planner_params_prompt_rules planner_ownership_prompt_rules plann
   if [ -n "$f89_rule" ] && [ -n "$f89_bullet" ]; then
     sp=$(_strip_inserted_blocks "$sp" "inline:"$'\n'"${f89_rule}"$'\n' "inline:"$'\n'"${f89_bullet}")
   fi
+  # The shared-state lifecycle rules (rehearsal F87) came after F89: they sit
+  # directly after the precondition rules; strip them first, after checking
+  # they are there exactly once in that place.
+  if [[ "$sp" == *"$(planner_acpre_prompt_rules)"$'\n'"$(planner_lifecycle_prompt_rules)"$'\n\n### Confidence signals'* ]]; then
+    pass "F87: Specify lifecycle rules follow the precondition rules, before Confidence signals"
+  else fail "F87: Specify lifecycle rules follow the precondition rules" "not adjacent"; fi
+  sp=$(_strip_inserted_blocks "$sp" "$(planner_lifecycle_prompt_rules)")
   own_specify_blocks
   acpre_specify_blocks
   st=$(_strip_inserted_blocks "$sp" "$(planner_params_prompt_rules)" "$SPECIFY_BULLET" "${ACPRE_BLOCKS[@]}" "${OWN_BLOCKS[@]}")
@@ -805,14 +812,38 @@ if need "$name" planner_params_prompt_rules planner_ownership_prompt_rules plann
   else fail "Specify ownership bullet follows the Test Data Provided bullet" "not adjacent"; fi
 fi
 
+# Rehearsal F87: the lifecycle rules name the owner contract, keep the
+# ownership tables as they are, and make a planted value survive load time.
+name="F87: lifecycle rules state the owner contract, the tables and reachability"
+if need "$name" planner_lifecycle_prompt_rules planner_lifecycle_consensus_rule; then
+  lr=$(planner_lifecycle_prompt_rules)
+  ok=1
+  for frag in 'what it returns when the' 'keeps its `## Reads` row (Source `spec`)' 'adds no `## Writes` row' \
+    'when it runs relative to the' '**Reachability.**' 'after the page has loaded, replace the stored' 'Navigation path cell'; do
+    grep -qF -- "$frag" <<<"$lr" || {
+      ok=0
+      echo "    missing: $frag"
+    }
+  done
+  # The rule must not suggest wording that FORWARD_REF reads as a promise.
+  grep -qiE 'see `|lands in|delivered by|additive to' <<<"$lr" && ok=0
+  grep -qF 'planted value still holds' <<<"$(planner_lifecycle_consensus_rule)" || ok=0
+  [ "$ok" = 1 ] && pass "$name" || fail "$name" "fragment missing or forward-ref wording"
+fi
+
 name="Consensus prompt is the pre-change prompt plus the rule blocks"
-if need "$name" planner_params_consensus_rule planner_ownership_consensus_rule planner_acpre_consensus_rule planner_goldfish_consensus_rule planner_prompt_consensus; then
+if need "$name" planner_lifecycle_consensus_rule planner_params_consensus_rule planner_ownership_consensus_rule planner_acpre_consensus_rule planner_goldfish_consensus_rule planner_prompt_consensus; then
   cp=$(planner_prompt_consensus "INIT-TEST" "an idea" "/repos/.ticket-auto/initiatives/INIT-TEST")
   cp="${cp//$REPOS_ROOT/<REPOS_ROOT>}"
   cp=$(_seam_revert "$cp")
   # Sibling rules: stripped first, as for Specify above.
   _sib_sec=$(planner_sibling_citation_consensus_section "INIT-TEST")
   cp=$(_strip_inserted_blocks "$cp" "$(planner_sibling_blocker_rule)" "inline:${_sib_sec//$REPOS_ROOT/<REPOS_ROOT>}"$'\n\n')
+  # The lifecycle rule (rehearsal F87) came after the sibling rules.
+  if [[ "$cp" == *"$(planner_acpre_consensus_rule)"$'\n'"$(planner_lifecycle_consensus_rule)"$'\n'* ]]; then
+    pass "F87: Consensus lifecycle rule follows the precondition rule"
+  else fail "F87: Consensus lifecycle rule follows the precondition rule" "not adjacent"; fi
+  cp=$(_strip_inserted_blocks "$cp" "$(planner_lifecycle_consensus_rule)")
   GOLDFISH_BLOCKS=("$(planner_goldfish_consensus_rule)")
   ct=$(_strip_inserted_blocks "$cp" "${GOLDFISH_BLOCKS[@]}" "$(planner_params_consensus_rule)" "$(planner_acpre_consensus_rule)" "$(planner_ownership_consensus_rule)")
   got=$(_sha "$ct")
