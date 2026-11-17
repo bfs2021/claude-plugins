@@ -46,6 +46,10 @@ _source_if_missing "planner_params_prompt_rules" \
 # The Specify and Consensus Writes/Reads wording (planner-crosscheck-ownership, D15).
 _source_if_missing "planner_ownership_prompt_rules" \
   "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/planner-spec-ownership.sh"
+# The shared-state lifecycle wording (rehearsal F87) lives in the same file;
+# checked on its own name so an older copy sourced first is replaced.
+_source_if_missing "planner_lifecycle_prompt_rules" \
+  "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/planner-spec-ownership.sh"
 
 # The Specify and Consensus Preconditions wording (planner-ac-code-precondition, D12).
 _source_if_missing "planner_acpre_prompt_rules" \
@@ -1164,6 +1168,7 @@ planner_testdata_no_tests_rule "${initiative_id}" && echo " — no-tests rule ac
 \`\`\`
 $(planner_ownership_prompt_rules)
 $(planner_acpre_prompt_rules)
+$(planner_lifecycle_prompt_rules)
 
 ### Confidence signals (RAW VALUES ONLY — do NOT compute confidence)
 
@@ -1425,6 +1430,7 @@ sweep would misread.
 $(planner_params_consensus_rule)
 $(planner_ownership_consensus_rule)
 $(planner_acpre_consensus_rule)
+$(planner_lifecycle_consensus_rule)
 $(planner_sibling_blocker_rule)
 4. Write a consensus digest to ${state_dir}/artifacts/consensus.md:
    - **Findings Addressed** — one \`### <id> — <severity> — <title> — <disposition>\`

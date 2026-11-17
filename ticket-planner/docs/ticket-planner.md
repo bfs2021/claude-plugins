@@ -692,6 +692,24 @@ whether transition states exist or form a valid state machine; whether the `fire
 ACs state idempotency; ordering between writers of different fields of one entity; AC
 numbers against seed or test data.
 
+**Shared state lifecycle (rehearsal F87).** The tables name one owner per key, but not when
+the owner writes, checks or removes the state. In rehearsal iterations 13 and 15 a frontend
+shell cleared a rejected sign-in token at page load, while the editor ticket's "rejected
+token on submit" criteria planted that token and loaded the page, so they passed without
+testing anything. `planner_lifecycle_prompt_rules` (Specify, after the precondition rules)
+and `planner_lifecycle_consensus_rule` (Consensus step 3) ask for:
+
+- an owner contract: lifecycle, interface (setter arguments, getter freshness) and, for a
+  shared module, its failure result;
+- readers that keep their `spec` Read, add no Write, and restate no rule of their own;
+- guards that say when they run relative to the owner's load-time check;
+- criteria whose planted value survives load time ("after the page has loaded, replace the
+  stored token …"), with that order in the Navigation path cell.
+
+The draft revise prompt's neighbour rule adds one sentence: a load-time default must not
+remove a value a neighbour criterion plants. These are prompt rules only. No Crosscheck code
+checks reachability, because it is semantic and a false block costs a rehearsal run.
+
 ### AC preconditions: the Preconditions table
 
 planner-ac-code-precondition. It applies to initiatives whose state.log holds

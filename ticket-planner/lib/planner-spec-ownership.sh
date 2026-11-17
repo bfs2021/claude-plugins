@@ -176,6 +176,57 @@ planner_ownership_consensus_rule() {
 RULE
 }
 
+# planner_lifecycle_prompt_rules — the shared-state lifecycle and
+# reachability rules (rehearsal F87). A separate block rendered after the
+# precondition rules in the Specify prompt, so the earlier prompt pins hold
+# when it is stripped. It never asks for a Writes or Reads change: the
+# ownership tables stay as planner_ownership_prompt_rules defines them.
+planner_lifecycle_prompt_rules() {
+  cat <<'RULES'
+
+### Shared state and shared modules (rehearsal F87)
+
+Some state or code is used by two or more specs: a stored sign-in token, a
+session, a stored preference, a cache entry, a shared request wrapper or
+client module. Each has one owner spec: for stored state, the spec with its
+`## Writes` row; for a module, the spec that creates it.
+
+- **The owner states the whole contract** in its behaviour section: when the
+  state is written, when it is checked, when it is removed, and what a page
+  already shown or a request in flight does when it is removed; the exact
+  interface other specs call (what a setter takes, whether a getter reads the
+  stored value fresh each time); and, for a module, what it returns when the
+  call fails (no response, a body that is not JSON, a 5xx status).
+- **Every other spec** that uses it keeps its `## Reads` row (Source `spec`)
+  and adds no `## Writes` row for it. When it sets or clears the state, say it
+  calls the owner's function, in the owner's words, and never state a
+  different rule. Say which owner spec defines the rule in Technical Context.
+- **A guard or check** that reads the state says when it runs relative to the
+  owner's own load-time or startup check: before it, after it, or again after
+  it, and what the user then sees.
+- **Reachability.** For every criterion whose Given plants a value in shared
+  state (an invalid, expired, rejected or stale token, a missing session, a
+  changed preference), check what the owner's load-time or startup behaviour
+  does to that value before the criterion's action runs. When it removes or
+  changes the value first, the criterion passes without testing anything. Plant
+  the value where it survives ("after the page has loaded, replace the stored
+  token with `not-a-jwt`, then submit the form") and write that order in the
+  row's Navigation path cell, or test the case through the owner's own
+  behaviour.
+RULES
+}
+
+# planner_lifecycle_consensus_rule — the matching Consensus rule (F87),
+# rendered after the precondition rule in step 3.
+planner_lifecycle_consensus_rule() {
+  cat <<'RULE'
+   When an edit changes how shared state or a shared module is written,
+   checked, removed or called, update the owner spec's rule and every other
+   spec's criterion whose setup depends on it in the same edit, so each such
+   criterion's planted value still holds when its action runs.
+RULE
+}
+
 planner_ownership_spec_checked() {
   [ -f "$1" ] || return 1
   [ "$(basename "$1")" = "INDEX.md" ] && return 1
