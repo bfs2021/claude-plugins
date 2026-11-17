@@ -718,6 +718,16 @@ planner_draft_readiness_report() {
           echo "Run-level:"
         else
           echo "${slug} (artifacts/specs/${slug}.md)"
+          if _pdl_synth_spec "$init" "$slug" 2>/dev/null; then
+            local consumers
+            consumers=$(_pdl_synth_consumers "$init" "$slug")
+            echo "  Synthesized by Crosscheck (testdata-synth) and rewritten on every Crosscheck run: editing this spec does not last, and the gate does not revise it."
+            if [ -n "$consumers" ]; then
+              echo "  Fix the Source: generate rows in the Verification Notes of ${consumers} — data the test builds itself is \"built in the test: <what>\" with Source —."
+            else
+              echo "  No consumer is recorded in artifacts/testdata-synth.json. Fix the consumer's Source: generate rows, or accept if the finding is in the template itself."
+            fi
+          fi
         fi
         cur="$slug"
       fi

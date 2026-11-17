@@ -632,6 +632,8 @@ yes|a test-built token whose `id` no stored user has
 yes|A token with an empty payload, built by the test
 yes|a JWT the test signs with the server secret
 yes|a payload built in the test with a malformed `exp`
+yes|built in the test: an Express app whose only route GET /boom throws
+yes|built in the test: a test app with one route `GET /boom` that throws `new Error('boom')`
 no|1 `user` in state registered (`jake`)
 no|a test-built token for 1 `user` in state registered
 no|2 `user` in state registered; a test-built token mixing their ids
@@ -666,6 +668,35 @@ EOF
 out=$(planner_crosscheck_testdata "INIT-TB1" 2>&1)
 assert_contains "F80 negative: seeded records with Source — stay TEST_DATA_UNOWNED" "$out" "tb.md#3 (missing Source)"
 assert_not_contains "F80 negative: only the seeded row is flagged" "$out" "tb.md#1"
+
+# F89: Specify is told how to write in-test fixtures, and its own example is
+# accepted by both test-built checks (prompt and checkers stay in step).
+f89_prompt=$(planner_prompt_specify "INIT-1" "an idea" "$SD")
+assert_contains "F89: Specify prompt has the built-in-test rule" "$f89_prompt" "**Built in the test (rehearsal F89).**"
+assert_contains "F89: Specify constraints forbid generate for in-test data" "$f89_prompt" "with Source \`—\`, never \`generate\`."
+f89_example=$(grep -o 'built in the test: an Express app[^`]*' <<<"$f89_prompt" | head -1)
+if [ -n "$f89_example" ] && _planner_testdata_is_test_built "$f89_example" &&
+  { ! declare -f _dor_td_is_test_built >/dev/null || _dor_td_is_test_built "$f89_example"; }; then
+  pass "F89: the prompt's example passes both test-built checks"
+else
+  fail "F89 example" "example='${f89_example}'"
+fi
+F89_SD=$(new_init "INIT-F89")
+cat >"${F89_SD}/scaffold.md" <<'EOF'
+# scaffold
+
+## Acceptance Criteria
+
+- [ ] `GET /boom` on a test app whose only route throws returns status 500
+
+## Verification Notes
+
+| Criterion | Role | Test data | Source | Expected | Verifiable |
+|---|---|---|---|---|---|
+| `GET /boom` on a test app whose only route throws returns status 500 | developer | built in the test: a test app with one route `GET /boom` that throws `new Error('boom')` | — | status 500 | yes |
+EOF
+out=$(planner_crosscheck_testdata "INIT-F89" 2>&1)
+assert_not_contains "F89: an in-test fixture app with Source — is not TEST_DATA_UNOWNED" "$out" "TEST_DATA_UNOWNED"
 
 echo ""
 echo "=== Results: $PASS passed, $FAIL failed ==="

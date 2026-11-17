@@ -115,7 +115,7 @@ Warnings count too (added 2026-11-15, seam plan G7):
 
 Then run the holdout idea once. A class B or C failure there means the fixes overfit to the main idea. Report it; don't loop on it.
 
-**Cap:** 15 full runs per idea (raised from 6 on 2026-11-07 and from 10 on 2026-11-15, because a late failure would have left no room for the two consecutive clean runs above). Preflight-only and `replan` reruns don't count toward the cap. At the cap, stop and report what remains.
+**Cap:** 17 full runs per idea (raised from 6 on 2026-11-07, from 10 on 2026-11-15 and from 15 on 2026-11-17, because a late failure would have left no room for the two consecutive clean runs above). Preflight-only and `replan` reruns don't count toward the cap. At the cap, stop and report what remains.
 
 ## 6. Cleanup
 

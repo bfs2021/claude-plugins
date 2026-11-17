@@ -64,7 +64,7 @@ if [ "$n" -ge 100 ]; then pass "ledger holds the seed (${n} rows)"; else fail "l
 problems=$(awk -F'\t' '
   function bad(m) { printf "row %d (%s %s %s): %s\n", NR, $1, $4, $7, m }
   NF != 15 { bad("has " NF " fields"); next }
-  $1 !~ /^(0[1-9]|1[0-5]|05b)$/ { bad("iter " $1) }
+  $1 !~ /^(0[1-9]|1[0-7]|05b)$/ { bad("iter " $1) }
   $2 !~ /^(crosscheck|draft|draft-crosscheck|draft-guard|refinement|dor-check)$/ { bad("gate " $2) }
   $3 !~ /^(-|[0-9]|[0-9]-[0-9])$/ { bad("round " $3) }
   $4 !~ /^[A-Z][A-Z0-9_]+$/ { bad("code " $4) }
@@ -77,7 +77,7 @@ problems=$(awk -F'\t' '
   $11 !~ /^(yes|partial|no|-)$/ { bad("fixed " $11) }
   $12 !~ /^(yes|no|-)$/ { bad("live " $12) }
   $13 !~ /^(-|F[0-9]+( F[0-9]+)*)$/ { bad("f_id " $13) }
-  $14 !~ /^(findings\.md|iter-(0[1-9]|1[0-5]|05b)\/run-record\.md):[1-9][0-9]*$/ { bad("evidence " $14) }
+  $14 !~ /^(findings\.md|iter-(0[1-9]|1[0-7]|05b)\/run-record\.md):[1-9][0-9]*$/ { bad("evidence " $14) }
   $15 == "" { bad("empty note") }
   ($5 == "warn") != ($6 == "logged") { bad("warn class and logged outcome go together") }
   ($5 == "revert") != ($2 == "draft-guard") { bad("revert class is a draft-guard fire") }

@@ -606,6 +606,27 @@ _pdl_revert_regression() {
 
 # ── Revise round: plan and spawn (D8 step 3) ──────────────────────────────
 
+# _pdl_synth_spec <INIT> <slug> — rc 0 when the spec is a Crosscheck-synthesized
+# test-data spec (rehearsal F90). testdata-synth rewrites such a spec from its
+# template on every Crosscheck run, and the loop re-runs Crosscheck after each
+# round, so a revision of it is always erased. It is never revised: its
+# blockers stay blocking and the report names the consumer specs to fix.
+_pdl_synth_spec() {
+  local spec
+  spec=$(_pdrv_spec "$1" "$2") || return 1
+  [ -f "$spec" ] && grep -qF -- "${PLANNER_TESTDATA_SYNTH_MARKER:-<!-- planner:testdata-synth v1 -->}" "$spec"
+}
+
+# _pdl_synth_consumers <INIT> <slug> — the consumer slugs testdata-synth.json
+# records for a synthesized spec, comma-separated (empty when unknown).
+_pdl_synth_consumers() {
+  local sd side
+  sd=$(_pdrv_state_dir "$1") || return 0
+  side="${sd}/artifacts/testdata-synth.json"
+  [ -f "$side" ] || return 0
+  jq -r --arg s "$2" '[(.td_specs // [])[] | select(.slug == $s) | (.consumers // [])[]] | unique | join(",")' "$side" 2>/dev/null || true
+}
+
 # Is <slug> due a revision? Prints its round number N.
 _pdl_due() {
   local init="$1" slug="$2" hash="$3" max="$4" root dir v_hash v_eval v_status cls used spec
@@ -615,6 +636,7 @@ _pdl_due() {
   [ -f "${dir}/verdict" ] && read -r v_hash v_eval v_status <"${dir}/verdict"
   [ "$v_hash" = "$hash" ] && [ "$v_eval" = "${DOR_SEMANTIC_EVALUATOR:-}" ] && [ "$v_status" = "blocked" ] || return 1
   [ -f "${dir}/semantic.json" ] || return 1
+  _pdl_synth_spec "$init" "$slug" && return 1
   cls=$(planner_draft_revise_classify "${dir}/semantic.json" "${dir}/dor-result.json") || return 1
   [ "$(jq '.revisable | length' <<<"$cls")" -gt 0 ] || return 1
   used=$(planner_draft_revise_rounds_used "$init" "$slug")
@@ -930,6 +952,9 @@ _pdl_converge() {
     [ "$v_status" = "unavailable" ] && continue
     [ -s "${dir}/semantic.json" ] || continue
     [ "$(planner_draft_revise_rounds_used "$init" "$slug")" -gt 0 ] || continue
+    # A synth-marked spec's revisions were erased by testdata-synth (F90; rounds
+    # from before that fix): nothing was fixed, so nothing is demoted.
+    _pdl_synth_spec "$init" "$slug" && continue
 
     map=$(_pdl_reason_map "$init" "$slug") || continue
     sem=$(cat "${dir}/semantic.json")
@@ -1054,7 +1079,11 @@ planner_draft_readiness_history_report() {
     [ -n "$h" ] || continue
     [ "$printed" -eq 1 ] || echo "Revision history:"
     printed=1
-    echo "  ${slug}: ${h}"
+    if _pdl_synth_spec "$init" "$slug"; then
+      echo "  ${slug}: ${h} — erased: Crosscheck re-synthesized this test-data spec after each round"
+    else
+      echo "  ${slug}: ${h}"
+    fi
     printf '%s\n' "$run" | grep -E "^[^|]*\|META\|draft-revise\|info\|${slug} REBUTTAL " | cut -d'|' -f5- |
       sed "s/^${slug} REBUTTAL /    rebutted: /"
     printf '%s\n' "$run" | grep -E "^[^|]*\|META\|draft-readiness\|info\|${slug} DEMOTED " | cut -d'|' -f5- |
