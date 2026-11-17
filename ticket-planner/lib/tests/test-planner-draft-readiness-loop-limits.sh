@@ -15,6 +15,8 @@
 #     same unit: `drift`
 #  9. spawn budget halts before spawning
 #  10. MAX_ROUNDS=0 is halt-only; an invalid value is refused
+#  11. a synth-marked test-data spec is never revised; the report names
+#      its consumer specs (rehearsal F90)
 #  12. (every file) no Linear call, no ticket manifest, no snapshot left
 #      behind
 #
@@ -140,6 +142,60 @@ fi
 rc=0
 PLANNER_DRAFT_REVISE_MAX_ROUNDS=x planner_draft_readiness_begin "$INIT" >/dev/null 2>&1 || rc=$?
 [ "$rc" -eq 1 ] && pass "a non-integer MAX_ROUNDS is refused (rc 1)" || fail "max validate" "rc=$rc"
+
+# ── 11. a synthesized test-data spec is never revised (rehearsal F90) ────
+echo "--- 11. synth-marked spec is not revised ---"
+_setup INIT-L11
+printf '\n<!-- planner:testdata-synth v1 -->\n' >>"${SPECS}/b-api.md"
+printf '{"version":1,"edges":[],"overrides":[],"td_specs":[{"slug":"b-api","consumers":["a-schema"],"keys":[],"kind":"single","dispatched":false}]}\n' \
+  >"${IDIR}/artifacts/testdata-synth.json"
+export FINDINGS_b_api="EDGE_CASE_GAP|Export responds with 200"
+_gate
+if [ "$GATE_RC" -eq 3 ] && [ "$REVISES" -eq 0 ] && [ ! -e "${DR}/b-api/findings.r1.json" ] &&
+  [ ! -e "${DR}/b-api/revise.r1.status" ] && ! grep -q '|META|draft-revise|' "$LOG" &&
+  _run_lines | grep -q '|META|draft-readiness|fail|b-api EDGE_CASE_GAP "Export responds with 200"'; then
+  pass "no revise round for a synth-marked spec; its fixable finding halts"
+else
+  fail "synth no-revise" "rc=$GATE_RC revises=$REVISES $(_run_lines | tail -3)"
+fi
+report=$(planner_draft_readiness_report "$INIT")
+if grep -q 'Synthesized by Crosscheck (testdata-synth)' <<<"$report" &&
+  grep -q 'Verification Notes of a-schema' <<<"$report"; then
+  pass "halt report says the spec is synthesized and names its consumer"
+else
+  fail "synth report" "$report"
+fi
+# A synth spec revised before the F90 fix (round files on disk) is not
+# demoted at loop close: those revisions were erased, nothing was fixed.
+_setup INIT-L11c
+printf '\n<!-- planner:testdata-synth v1 -->\n' >>"${SPECS}/b-api.md"
+mkdir -p "${DR}/b-api"
+echo applied >"${DR}/b-api/revise.r1.status"
+export FINDINGS_b_api="EDGE_CASE_GAP|Export responds with 200"
+_gate
+if [ "$GATE_RC" -eq 3 ] && [ "$REVISES" -eq 0 ] &&
+  jq -e '[.findings[] | select(.code == "EDGE_CASE_GAP" and .severity == "blocking" and (.demoted // null) == null)] | length == 1' "${DR}/b-api/semantic.json" >/dev/null &&
+  ! grep -q '|META|draft-readiness|info|b-api DEMOTED ' "$LOG"; then
+  pass "pre-fix rounds on a synth spec: no demotion at loop close, the finding still halts"
+else
+  fail "synth pre-fix rounds" "rc=$GATE_RC revises=$REVISES $(jq -c .findings "${DR}/b-api/semantic.json" 2>/dev/null)"
+fi
+report=$(planner_draft_readiness_report "$INIT")
+if grep -q 'b-api: 1 revision(s): applied — erased: Crosscheck re-synthesized' <<<"$report" &&
+  grep -q 'No consumer is recorded in artifacts/testdata-synth.json' <<<"$report"; then
+  pass "history marks the pre-fix revision erased; no-sidecar note"
+else
+  fail "synth pre-fix report" "$report"
+fi
+# Control: the same finding on an unmarked spec is revised.
+_setup INIT-L11b
+export FINDINGS_b_api="EDGE_CASE_GAP|Export responds with 200"
+_gate
+if [ "$REVISES" -ge 1 ] && ! grep -q 'Synthesized by Crosscheck' <<<"$(planner_draft_readiness_report "$INIT")"; then
+  pass "control: an unmarked spec with the same finding is revised, no synth note"
+else
+  fail "synth control" "revises=$REVISES"
+fi
 
 _loop_side_effects
 _loop_finish

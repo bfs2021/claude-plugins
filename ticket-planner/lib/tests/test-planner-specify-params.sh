@@ -759,6 +759,13 @@ if need "$name" planner_params_prompt_rules planner_ownership_prompt_rules plann
   sp=$(_strip_inserted_blocks "$sp" \
     "inline:"$'source "${CLAUDE_PLUGIN_ROOT}/lib/planner-crosscheck-codespan.sh"\nplanner_crosscheck_codespan "INIT-TEST"\n' \
     "inline:"$'\nA `CODE_SPAN_EDGE_SPACE` line means an inline code value starts and ends\nwith a space, which markdown drops: quote the value inside the span\n(`"  a b "`) so the spaces a test depends on survive.\n')
+  # The built-in-test rule (rehearsal F89) came after the code-span lint:
+  # strip its paragraph and its Constraints bullet the same way.
+  f89_rule=$(sed -n '/^\*\*Built in the test (rehearsal F89)\.\*\*/,/asks for a Source\.$/p' <<<"$sp")
+  f89_bullet=$(sed -n '/^- Data the test builds in-process/,/never `generate`\.$/p' <<<"$sp")
+  if [ -n "$f89_rule" ] && [ -n "$f89_bullet" ]; then
+    sp=$(_strip_inserted_blocks "$sp" "inline:"$'\n'"${f89_rule}"$'\n' "inline:"$'\n'"${f89_bullet}")
+  fi
   own_specify_blocks
   acpre_specify_blocks
   st=$(_strip_inserted_blocks "$sp" "$(planner_params_prompt_rules)" "$SPECIFY_BULLET" "${ACPRE_BLOCKS[@]}" "${OWN_BLOCKS[@]}")

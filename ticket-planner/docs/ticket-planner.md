@@ -1256,6 +1256,17 @@ its result files as `*-result.rejected.txt`.
   demotion: rebutted (one round, the spec is unchanged) or still unfixed after the round
   budget, it keeps blocking and the gate halts. Only the finding's first anchor (`unit`)
   is read, so a quote that also touches another section counts as one criterion.
+- **Synthesized test-data specs are never revised (rehearsal F90).** A spec carrying the
+  `planner:testdata-synth` marker is rewritten from its template by every Crosscheck
+  run, and the loop re-runs Crosscheck after each round, so any revision of it would be
+  erased while the history said `applied`. The loop gives such a spec no revise round:
+  its blockers stay blocking (nothing is demoted, since no round ran) and the gate
+  halts. The halt report says the spec is synthesized and names its consumer specs from
+  `artifacts/testdata-synth.json`: the fix is their `Source: generate` rows, usually data
+  the test builds itself, written `built in the test: <what>` with Source `—` (F89).
+  A finding in the synthesis template itself has no spec-side fix: accept it with
+  `--accept DRAFT_NOT_READY`. Revision rounds a spec had before this rule (an older
+  planner) are listed as erased and demote nothing.
 - **Reason class per finding.** At the end of the loop every demoted finding records why
   it was not fixed, judged per finding: `assumed`, `rebutted`, `revised`, `reverted` or
   `failed` from the rounds the finding was given to (highest of that order wins), else

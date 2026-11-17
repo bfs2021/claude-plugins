@@ -100,7 +100,10 @@ Writers must follow these rules:
   also name stored records: a record count (`1 user`), `in state`, `seeded`, `existing` or
   `registered` keeps it a real need that needs a Source. Crosscheck
   (`_planner_testdata_is_test_built`) and ticket-auto's dor-check (`_dor_td_is_test_built`)
-  apply the same rule (rehearsal F80).
+  apply the same rule (rehearsal F80). An in-process fixture (a stub app or route, a mock,
+  a token, a payload) is this kind of data: Specify writes it `built in the test: <what>`
+  with Source `—`, never `generate`, which would make Crosscheck synthesize a seed ticket
+  for records that do not exist (rehearsal F89).
 - A numbered line may carry more than one `Test data: … Source: …` pair. Each pair is checked
   on its own. A table row carries one need.
 

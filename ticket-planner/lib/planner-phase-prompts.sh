@@ -1134,6 +1134,15 @@ contract: docs/test-data-source.md):
   unowned need, writes the test-data spec that seeds it and links the consumers.
   Do not write a test-data spec of your own for these needs.
 
+**Built in the test (rehearsal F89).** Something the test constructs in-process and
+throws away — a stub app or route, a fake server, a mock, a signed token, a request
+payload — is not stored data, and nothing seeds it. Write its Test data cell as
+\`built in the test: <what>\` (for example \`built in the test: an Express app whose only
+route GET /boom throws\`) and its Source cell as \`—\`. Never \`generate\` for it:
+\`generate\` makes Crosscheck synthesize a seed ticket for records that do not exist.
+Keep that cell free of digits before a word and of the words seed, seeded, existing
+and registered — those mean stored data, and the check then asks for a Source.
+
 **Cited artifacts discovery.md lists as NOT FOUND** (#504): quote the artifact's
 name in backticks in the Test data text, exactly as discovery.md spells it, and
 set its Source to \`generate\` — never \`exists:\` or \`external:\`. Nobody has said yet
@@ -1281,6 +1290,8 @@ On failure, write \`fail\` instead of \`done\`.
   \`## Test Data Inventory\` entities in backticks; \`none\` only when no data must
   exist beforehand. An unowned need is \`Source: generate\` — never hand-write a
   test-data spec for it.
+- Data the test builds in-process (stub app, route, mock, token, payload) is
+  \`built in the test: <what>\` with Source \`—\`, never \`generate\`.
 - Signals must be raw values from Discovery, not fabricated. Do NOT compute Confidence.
 - The description in each spec is the actual Linear ticket body — be precise.
 - Every spec's Signals carries \`Kind\` and \`Serves\`/\`Enables\`; every business spec
