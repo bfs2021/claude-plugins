@@ -193,6 +193,7 @@ test-lib:
 	bash ticket-auto-pipeline/lib/tests/test-dor-audit-demotion.sh
 	# planner-draft-readiness S1
 	bash ticket-auto-pipeline/lib/tests/test-dor-semantic-draft.sh
+	bash ticket-auto-pipeline/lib/tests/test-dor-semantic-scoped-carry.sh
 	# seam-bash-derives slice 3
 	bash ticket-auto-pipeline/lib/tests/test-dor-semantic-request.sh
 	# seam-gate-safety G6

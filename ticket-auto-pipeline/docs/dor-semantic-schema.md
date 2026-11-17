@@ -218,7 +218,8 @@ quote check blocks visibly rather than silently dropping the finding.
 field: `TICKET` and `BODY_HASH` are bash facts. `dor_semantic_prompt` writes
 `<result-file minus .txt>.request.json` beside each result file
 (`dor_semantic_request_path`) — `{version: 1, kind, ticket, body_hash, attempt,
-result_file}`, `body_hash` = `_dor_body_hash` of the body when the prompt was built,
+result_file}`, plus `changed_sections` (an array of headings) on a scoped scan
+(rehearsal F85; `dor_semantic_request_scoped <request>` tests for it), `body_hash` = `_dor_body_hash` of the body when the prompt was built,
 written atomically, no request when the body file is missing. `dor_semantic_findings`
 and `dor_semantic_apply` take the two request paths as optional trailing arguments
 and bind each result to its request:
@@ -289,7 +290,23 @@ another evaluator — drafts and their import run in one planner run.
   `first_round` copied); `drift` when the id is new, the round is 2 or more, every
   unit is unchanged since the prior lineage, and none of them holds a finding that
   persisted from it; `new` otherwise, and always for an unverified finding. After
-  a reset nothing is carried. `lineage.resolved` lists the prior ids now absent.
+  a reset nothing is carried. `lineage.resolved` lists the prior ids now absent,
+  except the ones held by a scoped rescan (below).
+- **Held on a scoped rescan** (rehearsal F85). With `DOR_SEMANTIC_SCOPED_RESCAN=true`
+  (set by `dor_semantic_apply` and the planner's draft gate when the scan request
+  records `changed_sections`), a prior verified, still-blocking finding whose code is
+  in the constant `DOR_SEMANTIC_HOLD_CODES` (`CONTRADICTORY_REQUIREMENTS`), that the
+  scan did not raise and whose units are all unchanged, is carried forward from its
+  stored `carry` copy (`lineage: "carried"`, `carried_unseen: true`) and listed in
+  `lineage.held` instead of `resolved`. The scan was told to report only on the
+  changed sections, so it could not re-raise it, and two quoted requirements that
+  both still stand still disagree; only an edit to one of its own units clears it.
+  No other code is held: a `MISSING_CORE_AC` or `INTENT_AC_MISMATCH` quoting Proposed
+  Behaviour is fixed by adding a criterion, so its unit stays unchanged when it is
+  resolved. Each such entry of `lineage.findings` stores
+  `carry: {code, dimension, severity, quote, detail[, quote_b][, quote_check]}`; a
+  demoted finding gets none, so it is never brought back as blocking, and a lineage
+  written before this rule has none and holds nothing.
 - **Demotion.** A blocking finding whose code is not in
   `DOR_SEMANTIC_STRUCTURAL_CODES` (default `NEEDS_HUMAN_DECISION
   CONTRADICTORY_REQUIREMENTS UNSTATED_DEPENDENCY INTENT_AC_MISMATCH`) is stored
@@ -313,7 +330,8 @@ another evaluator — drafts and their import run in one planner run.
                 "units": ["Acceptance Criteria/ac:1a2b3c4d"],
                 "first_round": 1, "lineage": "carried"}],
   "resolved": [],
-  "counts": {"new": 0, "carried": 1, "drift": 0, "resolved": 0, "unverified": 0},
+  "held": [],
+  "counts": {"new": 0, "carried": 1, "drift": 0, "resolved": 0, "held": 0, "unverified": 0},
   "first_audit": {"body_hash": "sha256:…", "evaluator": "dor-semantic-v4", "audit": []},
   "policy": {"structural": ["NEEDS_HUMAN_DECISION", "…"], "overridden": false,
              "drift_demote": false, "max_rounds": null, "round_reset_share": 0.5,
@@ -329,7 +347,8 @@ applied for a body hash; a later audit on the same hash leaves it unchanged.
 **Scoped rescan.** `dor_semantic_prompt scan … --changed-sections "<h1|h2…>"` lists
 the changed sections under `**Changed sections**` and asks for findings about them, or
 about their conflicts with the rest, quoting the changed section first. The scan stays
-blind to the deterministic result.
+blind to the deterministic result. The request records the sections, and the lineage
+then holds structural findings on unchanged units (see "Held on a scoped rescan").
 
 ## `--det-result` file shape
 

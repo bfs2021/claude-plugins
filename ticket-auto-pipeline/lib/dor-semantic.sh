@@ -163,6 +163,9 @@ DOR_SEMANTIC_COMPATIBLE_EVALUATORS="dor-semantic-v3"
 # means this default. An override warns on stderr at apply time and is
 # snapshotted into ready.lineage.policy.
 DOR_SEMANTIC_STRUCTURAL_CODES_DEFAULT="NEEDS_HUMAN_DECISION CONTRADICTORY_REQUIREMENTS UNSTATED_DEPENDENCY INTENT_AC_MISMATCH"
+# Codes a scoped rescan holds while their units are unchanged (F85). A
+# constant. Other codes can be answered by text added elsewhere.
+DOR_SEMANTIC_HOLD_CODES="CONTRADICTORY_REQUIREMENTS"
 
 # Audit-dispute demotion (planner-refinement-convergence D5), shipped dark:
 # nothing here runs unless a caller invokes dor_audit_demote, which the
@@ -530,11 +533,16 @@ _dor_semantic_lineage() {
 #     changed unit stays blocking.
 # Unverified findings are never touched by this policy. The policy snapshot
 # gains `prior_passed: true` only when it is on.
+#
+# Scoped rescan (rehearsal F85, DOR_SEMANTIC_SCOPED_RESCAN=true): a
+# DOR_SEMANTIC_HOLD_CODES finding the scan did not raise, on unchanged units,
+# is held (lineage.held), not resolved. See dor-semantic-schema.md.
 dor_semantic_lineage_from() {
   local prior="${1:-null}" body="$2" hash="$3" findings="$4" audit="${5:-[]}" migrated_from="${6:-}"
   [ -n "$prior" ] || prior="null"
 
-  local sec units policy prior_passed="false"
+  local sec units policy prior_passed="false" scoped="false"
+  if [ "${DOR_SEMANTIC_SCOPED_RESCAN:-false}" = "true" ]; then scoped="true"; fi
   sec=$(_dor_section_hashes "$body") || return 1
   units=$(_dor_unit_hashes "$body") || return 1
   policy=$(_dor_semantic_policy) || return 1
@@ -579,8 +587,10 @@ dor_semantic_lineage_from() {
     --argjson sec "$sec" --argjson units "$units" --arg hash "$hash" \
     --arg evaluator "$DOR_SEMANTIC_EVALUATOR" --argjson policy "$policy" \
     --argjson first_audit_new "$first_audit_new" --arg migrated_from "$migrated_from" \
-    --argjson prior_passed "$prior_passed" \
+    --argjson prior_passed "$prior_passed" --argjson scoped "$scoped" \
+    --arg hold "$DOR_SEMANTIC_HOLD_CODES" \
     '($policy.inert) as $inert
+     | ($hold | split(" ") | map(select(. != ""))) as $hold
      | ($policy.structural) as $structural
      | ($policy.max_rounds // 0) as $max
      | ($prior | if . == null then null elif (.evaluator // "") != $evaluator then null else . end) as $p
@@ -614,7 +624,20 @@ dor_semantic_lineage_from() {
           elif $prior_by_id[.id] != null then
             . + {lineage: (if $same_hash then ($prior_by_id[.id].lineage // "carried") else "carried" end),
                  first_round: ($prior_by_id[.id].first_round // $r.round), persisted: true}
-          else . end] as $pass1
+          else . end] as $pass1_seen
+     # F85: a scoped scan cannot re-raise a finding on unchanged units; hold it.
+     | ([$pass1_seen[] | select(.verified == true) | .id]) as $seen_ids
+     | (if $scoped and $pl != null then
+          [($pl.findings // [])[]
+           | select(.carry != null)
+           | . as $pf
+           | select(($seen_ids | index($pf.id)) == null)
+           | select(($hold | index($pf.code)) != null)
+           | select(((.units // []) | length) > 0 and ((.units // []) | all(unchanged(.))))
+           | .carry + {id: .id, unit: .unit, units: .units, verified: true, lineage: "carried",
+                       first_round: (.first_round // $r.round), persisted: true, carried_unseen: true}]
+        else [] end) as $held
+     | ($pass1_seen + $held) as $pass1
      | ([$pass1[] | select(.persisted == true) | .units[]] | unique) as $open_units
      # Pass 2: drift or new for the rest.
      | [$pass1[]
@@ -645,11 +668,20 @@ dor_semantic_lineage_from() {
           round: $r.round, reset: $r.reset, evaluator: $evaluator, body_hash: $hash,
           section_hashes: $sec, units: $units,
           findings: [$out[] | select(.verified == true)
-                     | {id, code, unit, units, first_round, lineage}],
+                     | {id, code, unit, units, first_round, lineage}
+                       # Carry copy: holdable and still blocking only.
+                       + (.code as $fc | if ($hold | index($fc)) != null and .severity == "blocking"
+                          then {carry: (. as $o | first($pass1[] | select(.id == $o.id))
+                                        | {code, dimension, severity, quote, detail}
+                                          + (if .quote_b != null then {quote_b} else {} end)
+                                          + (if .quote_check != null then {quote_check} else {} end))}
+                          else {} end)],
           resolved: $resolved,
+          held: [$held[] | .id],
           counts: {
             new: ([$out[] | select(.verified == true and .lineage == "new")] | length),
             carried: ([$out[] | select(.lineage == "carried")] | length),
+            held: ($held | length),
             drift: ([$out[] | select(.lineage == "drift")] | length),
             resolved: ($resolved | length),
             unverified: ([$out[] | select(.verified != true)] | length)},
@@ -698,8 +730,10 @@ dor_semantic_apply() {
   unverified_gaps=$(echo "$judged" | jq -c '.unverified_gaps')
 
   # Identity, lineage, rounds and demotion (planner-refinement-convergence).
-  local built lineage_json
-  built=$(_dor_semantic_lineage "$tid" "$body" "$real_hash" "$findings_json" \
+  # F85: a scoped scan's lineage holds an untouched contradiction.
+  local built lineage_json scoped="false"
+  if dor_semantic_request_scoped "$scan_req"; then scoped="true"; fi
+  built=$(DOR_SEMANTIC_SCOPED_RESCAN="$scoped" _dor_semantic_lineage "$tid" "$body" "$real_hash" "$findings_json" \
     "$(echo "$audit_json" | jq -c '.audit // []')") || {
     echo "dor-semantic: failed to compute finding lineage" >&2
     return 1
@@ -724,14 +758,15 @@ dor_semantic_request_path() {
   printf '%s.request.json\n' "${1%.txt}"
 }
 
-# _dor_semantic_request_write <kind> <tid> <body-file> <result-file> <attempt>
+# _dor_semantic_request_write <kind> <tid> <body-file> <result-file> <attempt> [<changed-sections>]
 # The spawn request (seam-bash-derives slice 3): {version, kind, ticket,
-# body_hash, attempt, result_file}, written atomically beside the result
+# body_hash, attempt, result_file}, plus `changed_sections` (an array) when
+# the scan was scoped (rehearsal F85), written atomically beside the result
 # file. Bash knows TICKET and BODY_HASH at spawn time, so the evaluator
 # never copies them. A missing body writes no request and drops an older
 # one. rc 1 when the request cannot be written.
 _dor_semantic_request_write() {
-  local kind="$1" tid="$2" body_file="$3" result_file="$4" attempt="$5" req hash=""
+  local kind="$1" tid="$2" body_file="$3" result_file="$4" attempt="$5" changed="${6:-}" req hash=""
   req=$(dor_semantic_request_path "$result_file")
   rm -f "$req"
   [ -f "$body_file" ] || return 0
@@ -739,12 +774,22 @@ _dor_semantic_request_write() {
   [ -n "$hash" ] || return 0
   [[ "$attempt" =~ ^[1-9][0-9]*$ ]] || attempt=1
   if ! jq -nc --arg k "$kind" --arg t "$tid" --arg h "$hash" --argjson n "$attempt" --arg r "$result_file" \
-    '{version: 1, kind: $k, ticket: $t, body_hash: $h, attempt: $n, result_file: $r}' >"${req}.tmp" ||
+    --arg cs "$changed" \
+    '{version: 1, kind: $k, ticket: $t, body_hash: $h, attempt: $n, result_file: $r}
+     + ([$cs | split("|")[] | gsub("^\\s+|\\s+$"; "") | select(. != "")] as $l
+        | if ($l | length) > 0 then {changed_sections: $l} else {} end)' >"${req}.tmp" ||
     ! mv -f "${req}.tmp" "$req"; then
     rm -f "${req}.tmp"
     echo "dor-semantic: cannot write the spawn request $req" >&2
     return 1
   fi
+}
+
+# dor_semantic_request_scoped <request-file> — rc 0 when the scan request
+# records a non-empty changed_sections list (F85).
+dor_semantic_request_scoped() {
+  [ -n "${1:-}" ] && [ -f "$1" ] || return 1
+  jq -e 'type == "object" and .kind == "scan" and ((.changed_sections // []) | length) > 0' "$1" >/dev/null 2>&1
 }
 
 # _dor_semantic_req_field <request-file> <field> — a string field of a JSON
@@ -1313,7 +1358,7 @@ dor_semantic_prompt() {
   # agent's block: findings binds the result to them, and checks the body
   # still hashes as it did here (seam-bash-derives slice 3).
   if [ -n "$result_file" ]; then
-    _dor_semantic_request_write "$kind" "$tid" "$body_file" "$result_file" "$attempt" || return 1
+    _dor_semantic_request_write "$kind" "$tid" "$body_file" "$result_file" "$attempt" "$changed_sections" || return 1
   fi
 
   local data_block

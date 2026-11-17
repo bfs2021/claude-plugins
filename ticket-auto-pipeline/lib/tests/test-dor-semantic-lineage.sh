@@ -217,7 +217,7 @@ _apply "LIN-1" "[$(_f EDGE_CASE_GAP "Save button stores the handover"),$(_f AC_N
 [ "$(_sev LIN-1 AC_NOT_TESTABLE)" = "blocking" ] && [ "$(_dem LIN-1 AC_NOT_TESTABLE)" = "none" ] &&
   _pass "drift: not demoted when DOR_SEMANTIC_DRIFT_DEMOTE is unset (library default)" ||
   _fail "drift: should stay blocking by default (got $(_sev LIN-1 AC_NOT_TESTABLE))"
-_ready LIN-1 | jq -e '.lineage.counts == {new: 2, carried: 1, drift: 1, resolved: 0, unverified: 0}' >/dev/null &&
+_ready LIN-1 | jq -e '.lineage.counts == {new: 2, carried: 1, held: 0, drift: 1, resolved: 0, unverified: 0}' >/dev/null &&
   _pass "lineage: counts recorded" ||
   _fail "lineage: counts wrong (got $(_ready LIN-1 | jq -c .lineage.counts))"
 

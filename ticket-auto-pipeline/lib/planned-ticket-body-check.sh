@@ -254,6 +254,16 @@ _has_section_scope() {
 
 # _scope_layers <body> — space-separated, deduplicated, uppercased Layer
 # values from the body's Scope table. Empty if no Scope table is present.
+# Layer names are folded onto the canonical tokens (rehearsal F86: a planner
+# body that wrote `Frontend` was read as backend-only, so its Test User and
+# Navigation Path checks were skipped), case-insensitively, in this order:
+#   1. a whole cell FRONTEND, FRONT-END, FRONT END, UI, WEB or CLIENT → FE;
+#      BACKEND, BACK-END, BACK END, API or SERVER → BE;
+#   2. any cell holding the word FE, FRONTEND, FRONT-END, FRONT END or UI
+#      (`Web UI`, `Frontend (React)`, `Frontend and API`) → FE;
+#   3. a cell of one word, or two joined by `-` or a space, is kept as written;
+#   4. any other cell is ignored, as before.
+# Rule 2 only ever adds FE, which can only make a body stricter.
 _scope_layers() {
   local body="$1"
   local section_content
@@ -262,9 +272,18 @@ _scope_layers() {
   else
     section_content="$body"
   fi
-  grep -oP '^\s*\|\s*\K[A-Za-z]+(?=\s*\|)' <<<"$section_content" 2>/dev/null |
-    grep -viP '^layer$' |
-    tr '[:lower:]' '[:upper:]' | sort -u | tr '\n' ' '
+  grep -oP '^\s*\|\s*\K[^|]*?(?=\s*\|)' <<<"$section_content" 2>/dev/null |
+    LC_ALL=C awk '{
+      u = toupper($0)
+      sub(/^[ \t]+/, "", u); sub(/[ \t]+$/, "", u)
+      if (u == "" || u == "LAYER") next
+      if (u ~ /^(FRONTEND|FRONT-END|FRONT END|UI|WEB|CLIENT)$/) { print "FE"; next }
+      if (u ~ /^(BACKEND|BACK-END|BACK END|API|SERVER)$/) { print "BE"; next }
+      p = " " u " "
+      if (p ~ /[^A-Z0-9](FE|FRONTEND|FRONT-END|FRONT END|UI)[^A-Z0-9]/) { print "FE"; next }
+      if (u ~ /^[A-Z]+$/ || u ~ /^[A-Z]+[- ][A-Z]+$/) print u
+    }' |
+    sort -u | tr '\n' ' '
 }
 
 # _scope_is_backend_only <body> — true when the body's Scope table lists at
