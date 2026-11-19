@@ -29,6 +29,8 @@
 #   4. IMPLEMENT: return-completeness-check.sh --repos-root R; when the status
 #      is not `complete`, writes
 #        META|gate-warn|info|RETURN_INCOMPLETE — <REASON> (unchecked=U/T, artifact=A)
+#      or, when no plan artifact matched (a lookup miss, not unchecked boxes),
+#        META|gate-warn|info|RETURN_CHECK_UNRESOLVED — NO_PLAN_ARTIFACT_FOUND (...)
 #      Warn-only (Phase 1): never changes RESULT=. Prints
 #      RETURN_COMPLETENESS_STATUS=<status>.
 #
@@ -214,7 +216,11 @@ _rs_post_spawn() {
     _rcc_out=$(bash "$_RS_DIR/return-completeness-check.sh" "$_rs_tid" \
       --repos-root "$_rs_repos_root" --log-file "$_rs_log_file") || true
     eval "$_rcc_out" 2>/dev/null || true
-    if [ "${RETURN_COMPLETENESS_STATUS:-complete}" != "complete" ]; then
+    if [ "${REASON:-}" = "NO_PLAN_ARTIFACT_FOUND" ]; then
+      # A lookup miss, not unchecked boxes: a separate code so inspect-verifiers
+      # does not read it as incomplete_implementation.
+      _rs_plog META gate-warn info "RETURN_CHECK_UNRESOLVED — NO_PLAN_ARTIFACT_FOUND (no tasks.md or simple-fix.md matched under ${_rs_repos_root:-?})"
+    elif [ "${RETURN_COMPLETENESS_STATUS:-complete}" != "complete" ]; then
       _rs_plog META gate-warn info "RETURN_INCOMPLETE — ${REASON:-unknown} (unchecked=${UNCHECKED_COUNT:-?}/${TOTAL_COUNT:-?}, artifact=${ARTIFACT_TYPE:-?})"
     fi
     printf 'RETURN_COMPLETENESS_STATUS=%s\n' "${RETURN_COMPLETENESS_STATUS:-complete}"
