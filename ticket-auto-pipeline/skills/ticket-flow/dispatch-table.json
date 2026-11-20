@@ -586,8 +586,7 @@
         "lib:skill-preamble-auto.md",
         "home:pipeline-log-format.md",
         "plugin:skills/ticket-setup/SKILL.md",
-        "plugin:skills/ticket-setup/references/project-init.md",
-        "home:app-knowledge/SKILL.md"
+        "plugin:skills/ticket-setup/references/project-init.md"
       ]
     },
     "ticket-retro": {
@@ -607,7 +606,6 @@
         "lib:skill-preamble-auto.md",
         "home:pipeline-log-format.md",
         "plugin:docs/phase-result-schema.md",
-        "home:app-knowledge/SKILL.md",
         "plugin:skills/nav-hints/SKILL.md",
         "plugin:skills/ticket-flow/SKILL.md"
       ]

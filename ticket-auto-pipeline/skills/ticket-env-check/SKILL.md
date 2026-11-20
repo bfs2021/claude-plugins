@@ -83,6 +83,8 @@ Vars that require **manual setup** (secrets — cannot discover):
 | missing | `GITHUB_PERSONAL_ACCESS_TOKEN` | GitHub → Settings → Developer settings → Personal access tokens |
 | warn | `TICKET_AUTONOMY` | Set to `auto`, `semi-auto`, or `manual` in `settings.local.json` |
 
+**Linear labels.** With `LINEAR_API_KEY` loaded, the check also reports `LINEAR_TEAM` and one `label:<name>` row per label the board driver projects (`needs-info`, `needs-adr`, `rejected`, `reviewed`). The driver never creates a label, so a missing one makes that event's board projection fail. If any `label:` row is `missing`, ask: **"N Linear label(s) missing in team {TEAM}: {names}. Create them?"** On yes, re-run Step 1's block with `--create-labels` added to the `bash "$ENV_CHECK"` call and show the `label:` rows again. That is the only write this skill makes, and only after the user agrees. A `LINEAR_TEAM` `warn` means several teams are visible: the user sets `LINEAR_TEAM_ID` (key, name or id).
+
 If the user agrees to discovery, run the relevant discovery commands for each discoverable var. Present each candidate value and ask the user to confirm before applying. **Do NOT write to files** — the user handles the actual edits.
 
-**DO NOT write any files.** This skill is read-only. The user decides what to set and where.
+**DO NOT write any files.** Apart from label creation the user agreed to, this skill is read-only. The user decides what to set and where.

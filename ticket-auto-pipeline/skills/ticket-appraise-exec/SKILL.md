@@ -339,7 +339,7 @@ After derivation (full success or partial with override), append a `## Verificat
 
 ### Wiki ingestion — Role Scope Registry
 
-After writing the verification plan, append role scope findings to `app-knowledge/SKILL.md` under a `## Role Scope Registry` section. This builds a cumulative knowledge base for future appraisals.
+After writing the verification plan, append role scope findings to `{TICKETS_ROOT}/app-knowledge.md` under a `## Role Scope Registry` section. This builds a cumulative knowledge base for future appraisals.
 
 **Entry format:**
 ```markdown
@@ -350,11 +350,11 @@ After writing the verification plan, append role scope findings to `app-knowledg
 - **Date:** {today}
 ```
 
-**Section creation:** If `app-knowledge/SKILL.md` does not contain a `## Role Scope Registry` section, create it at the end of the file before appending the entry.
+**Section creation:** If the file or its `## Role Scope Registry` is missing, create it at the end of the file before appending the entry.
 
 **Duplicate handling:** If a prior role scope entry exists for the same ticket ID (re-appraisal), strike through the old entry (`~~...~~`) and append the new entry below it.
 
-**Non-blocking:** Wiki write failure is non-blocking. If `app-knowledge/SKILL.md` cannot be written (permissions, disk full), log a warning and continue:
+**Non-blocking:** Wiki write failure is non-blocking. If `app-knowledge.md` cannot be written (permissions, disk full), log a warning and continue:
 ```bash
 bash ~/.claude/skills/lib/plog.sh EXEC verify-plan-derived skip "Wiki write failed: {reason} — continuing"
 ```
