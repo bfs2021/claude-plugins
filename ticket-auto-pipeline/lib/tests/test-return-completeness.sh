@@ -258,6 +258,36 @@ test_whole_id_simple_fix_not_matched_by_longer_id() {
   return $rc
 }
 
+# WIL-184: the change dir lives under a tickets root that is not a git repo.
+test_tasks_found_in_non_git_tickets_root() {
+  _setup
+  local change_dir="$_root/tickets/openspec/changes/test-40-add-thing"
+  mkdir -p "$change_dir"
+  printf '%s\n' "- [x] 1.1 a" "- [x] 1.2 b" >"$change_dir/tasks.md"
+  _run_check "TEST-40"
+  local rc=0
+  [ "$RCC_EXIT" -eq 0 ] && [ "$ARTIFACT_TYPE" = "openspec" ] &&
+    [ "$TASKS_FILE" = "$change_dir/tasks.md" ] && [ "$TOTAL_COUNT" -eq 2 ] || rc=1
+  [ "$rc" -eq 0 ] || echo "rc=$RCC_EXIT type=$ARTIFACT_TYPE file=$TASKS_FILE" >&2
+  _teardown
+  return $rc
+}
+
+# A git repo's change dir still wins over a non-git one for the same ticket.
+test_git_repo_tasks_preferred_over_non_git() {
+  _setup
+  _write_tasks "TEST-41" "- [x] 1.1 in repo"
+  local other="$_root/tickets/openspec/changes/test-41-other"
+  mkdir -p "$other"
+  printf '%s\n' "- [ ] 1.1 elsewhere" >"$other/tasks.md"
+  _run_check "TEST-41"
+  local rc=0
+  [ "$RCC_EXIT" -eq 0 ] && [ "$TASKS_FILE" = "$_repo/openspec/changes/test-41--fix-thing/tasks.md" ] || rc=1
+  [ "$rc" -eq 0 ] || echo "rc=$RCC_EXIT file=$TASKS_FILE" >&2
+  _teardown
+  return $rc
+}
+
 # ── Verifier-result recording (GitHub #598) ───────────────────────────────────
 # Each runs the script from this checkout's lib (CLAUDE_SKILLS_LIB) with the
 # caller's LOG_FILE/TAP_LOG unset, as in the router shell after #575.
@@ -393,6 +423,37 @@ test_refresh_still_incomplete_stays_failing() {
   }
 }
 
+# WIL-184: a plan that cannot be found records WARN, so it never arms the
+# verdict gate; a malformed plan (no Completion Checklist) still records BLOCK.
+test_no_plan_records_warn_not_block() {
+  _setup
+  local log="$_ws/NOPE-1-pipeline.log"
+  _rcc_logged "$log" "NOPE-1"
+  local j live
+  j=$(_latest_rc "$log")
+  # shellcheck source=/dev/null
+  live=$(source "$LIB_DIR/verifier-result.sh" && verifier_latest_verdict "$log")
+  _teardown
+  [ "$RCC_EXIT" -eq 2 ] && [ "$(jq -r .verdict <<<"$j")" = "WARN" ] && [ -z "$live" ] || {
+    echo "rc=$RCC_EXIT live='$live' record=$j" >&2
+    return 1
+  }
+}
+
+test_missing_checklist_still_records_block() {
+  _setup
+  _write_simple_fix "TEST-42" "$(printf '# Simple Fix\n## Summary\nNo checklist.\n')"
+  local log="$_ws/TEST-42-pipeline.log"
+  _rcc_logged "$log" "TEST-42"
+  local j
+  j=$(_latest_rc "$log")
+  _teardown
+  [ "$RCC_EXIT" -eq 2 ] && [ "$(jq -r .verdict <<<"$j")" = "BLOCK" ] || {
+    echo "rc=$RCC_EXIT record=$j" >&2
+    return 1
+  }
+}
+
 # ── Runner ─────────────────────────────────────────────────────────────────────
 
 echo "=== return-completeness-check.sh unit tests ==="
@@ -415,6 +476,10 @@ _run "#598 B: no pipeline log is loud, not silent" test_no_log_is_loud
 _run "#598 A: --refresh PASS supersedes stale FAIL" test_refresh_supersedes_stale_fail
 _run "#598 A: --refresh no-op when latest is PASS" test_refresh_noop_when_latest_passes
 _run "#598 A: --refresh keeps FAIL when boxes stay open" test_refresh_still_incomplete_stays_failing
+_run "WIL-184: tasks.md found under a non-git tickets root" test_tasks_found_in_non_git_tickets_root
+_run "WIL-184: git repo change dir preferred over non-git" test_git_repo_tasks_preferred_over_non_git
+_run "WIL-184: no plan found records WARN, gate stays unarmed" test_no_plan_records_warn_not_block
+_run "WIL-184: missing Completion Checklist still records BLOCK" test_missing_checklist_still_records_block
 
 echo ""
 echo "=== $PASS passed, $FAIL failed ==="

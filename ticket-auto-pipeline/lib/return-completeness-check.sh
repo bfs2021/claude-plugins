@@ -76,6 +76,22 @@ EOF
 # Mirrors the CHANGE_DIR pattern used inline by ticket-appraise-exec, but
 # generalized across every repo under REPOS_ROOT since this script runs
 # router-side (bash-only, no per-repo cwd).
+#
+# Candidate roots: every git repo (a .git entry, depth <= 3) first, then any
+# other directory holding openspec/changes at the same depth. ticket-appraise-exec
+# writes the change dir under the tickets root, which need not be a git repo;
+# searching git repos only reported NO_PLAN_ARTIFACT_FOUND for a plan that was
+# on disk (WIL-184).
+_rcc_candidate_roots() {
+  local repos_root="$1"
+  {
+    find "$repos_root" -maxdepth 3 -name ".git" -printf '%h\0' 2>/dev/null || true
+    find "$repos_root" -maxdepth 4 \( -name node_modules -o -name .git \) -prune -o \
+      -type d -path '*/openspec/changes' -printf '%h\0' 2>/dev/null |
+      while IFS= read -r -d '' _os; do printf '%s\0' "$(dirname "$_os")"; done || true
+  } | awk 'BEGIN { RS = "\0"; ORS = "\0" } NF && !seen[$0]++'
+}
+
 _find_tasks_file() {
   local ticket_id="$1" repos_root="$2"
   local repo change_dir
@@ -89,7 +105,7 @@ _find_tasks_file() {
         return 0
       fi
     done
-  done < <(find "$repos_root" -maxdepth 3 -name ".git" -printf '%h\0' 2>/dev/null || true)
+  done < <(_rcc_candidate_roots "$repos_root")
 
   return 1
 }
@@ -164,7 +180,14 @@ _emit() {
     criteria_total="$TOTAL_COUNT"
     [ "$criteria_total" -eq 0 ] && criteria_total=1
   elif [ "${RETURN_COMPLETENESS_STATUS:-error}" = "error" ]; then
-    verdict="BLOCK"
+    # A plan that cannot be found says nothing about the work, so it is WARN:
+    # a BLOCK here outlived later VERIFY/PR-REVIEW passes and the verdict gate
+    # refused pr-review-pass-done (WIL-184). A malformed plan still BLOCKs.
+    if [ "${REASON:-}" = "NO_PLAN_ARTIFACT_FOUND" ]; then
+      verdict="WARN"
+    else
+      verdict="BLOCK"
+    fi
     criteria_met=0 criteria_total=1
   fi
 
