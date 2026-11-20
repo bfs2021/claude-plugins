@@ -15,13 +15,14 @@
 #   the double-count rule (migrations and payment paths are Reversibility).
 #   Writes or replaces the section as heading + Score/Weighted score/Axes
 #   fired/Reason, the shape get_complexity (notes-parse.sh) reads.
-#   Prints COMPLEXITY=, WEIGHTED=, AXES= (the plog message parts).
+#   Prints COMPLEXITY=, WEIGHTED=, AXES= and SCORE_TEXT= (the plog message
+#   parts; SCORE_TEXT is the score phrase both plog lines print verbatim).
 # blast: Step 2.8 write-back. Runs get_blast_radius_override; on `complex`
 #   adds blast-radius:3 and 3 to the weighted score (`n/a` counts as 0),
 #   escalates a simple Score and appends the reason. A BLAST_ADDITIVE_SKIP adds
 #   the `**blast-radius:** additive` line. Idempotent. No `## Blast Radius`
 #   section, or BLAST_OVERRIDE=none with no skip, leaves the file untouched.
-#   Prints the parser's three lines plus COMPLEXITY= and WEIGHTED=.
+#   Prints the parser's three lines plus COMPLEXITY=, WEIGHTED= and SCORE_TEXT=.
 # Exit codes: 0 ok, 2 usage / refused axes, 12 notes.md missing.
 set -eo pipefail
 
@@ -50,6 +51,19 @@ _cs_replace() {
 
 # _cs_field <section-text> <key>: value of `**<key>:** value`.
 _cs_field() { sed -n "s/^\*\*$2:\*\* \{0,1\}//p" <<<"$1" | head -1 | tr -d '\r'; }
+
+# _cs_score_text <score-word> <weighted-number> <axes>: the score phrase both
+# plog lines (complexity-sweep done, appraise done) print via SCORE_TEXT —
+# one code path, so the sweep and phase-done lines report the same numbers.
+# Once blast has added its axis, the sweep part and the override are shown
+# additively; a bare N/3 no longer reads like a maximum of 3.
+_cs_score_text() {
+  if grep -q 'blast-radius:3' <<<"$3"; then
+    printf '%s, score: %s (sweep) + 3 (blast-radius) = %s, axes: %s' "$1" "$(($2 - 3))" "$2" "$3"
+  else
+    printf '%s, score: %s/3, axes: %s' "$1" "$2" "$3"
+  fi
+}
 
 cmd="${1:-}"
 td="${2:-}"
@@ -111,7 +125,8 @@ write)
   printf '## Complexity\n**Score:** %s\n**Weighted score:** %s (threshold 3)\n**Axes fired:** %s\n**Reason:** %s\n' \
     "$score" "$total" "$rendered" "$reason" >"$block"
   _cs_replace "$notes" "$block"
-  printf 'COMPLEXITY=%s\nWEIGHTED=%s\nAXES=%q\n' "$score" "$total" "$rendered"
+  printf 'COMPLEXITY=%s\nWEIGHTED=%s\nAXES=%q\nSCORE_TEXT=%s\n' \
+    "$score" "$total" "$rendered" "$(_cs_score_text "$score" "$total" "$rendered")"
   ;;
 blast)
   [ $# -eq 0 ] || _cs_usage
@@ -151,7 +166,14 @@ blast)
     } >"$block"
     _cs_replace "$notes" "$block"
   fi
-  printf 'COMPLEXITY=%s\nWEIGHTED=%s\n' "${score%% *}" "${weighted%% *}"
+  _cs_cls="${score%% *}"
+  _cs_wnum="${weighted%% *}"
+  if [[ "$_cs_wnum" =~ ^[0-9]+$ ]]; then
+    _cs_text="$(_cs_score_text "$_cs_cls" "$_cs_wnum" "$axes")"
+  else
+    _cs_text="$_cs_cls, score: ${weighted:-n/a}, axes: $axes"
+  fi
+  printf 'COMPLEXITY=%s\nWEIGHTED=%s\nSCORE_TEXT=%s\n' "$_cs_cls" "$_cs_wnum" "$_cs_text"
   ;;
 *) _cs_usage ;;
 esac

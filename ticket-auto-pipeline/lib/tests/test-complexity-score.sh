@@ -218,6 +218,43 @@ test_usage_exit_2() {
   [ "$rc" -eq 2 ]
 }
 
+# ── SCORE_TEXT: one code path formats both plog lines ────────────────────────
+test_write_score_text_matches_sweep_format() {
+  _setup_notes
+  local out
+  out=$(bash "$CS" write "$TMP" --axes reversibility:auth --reason "R.") || return 1
+  grep -qx 'SCORE_TEXT=complex, score: 3/3, axes: reversibility:3 (auth)' <<<"$out"
+}
+
+test_blast_score_text_shows_additive_override() {
+  _scored reversibility:auth-rule '| `a` | LOW | 5 callers | 0 indirect | none | modifying |\n' || return 1
+  local out
+  out=$(bash "$CS" blast "$TMP") || return 1
+  grep -qx 'SCORE_TEXT=complex, score: 3 (sweep) + 3 (blast-radius) = 6, axes: reversibility:3 (auth-rule), blast-radius:3' <<<"$out"
+}
+
+test_blast_score_text_no_override_matches_sweep_format() {
+  _scored multi-service '| `a` | MEDIUM | 2 callers | 9 indirect | Login | modifying |\n' || return 1
+  local out
+  out=$(bash "$CS" blast "$TMP") || return 1
+  grep -qx 'SCORE_TEXT=simple, score: 2/3, axes: multi-service:2' <<<"$out"
+}
+
+test_blast_score_text_idempotent_rerun_keeps_additive_form() {
+  _scored multi-service '| `a` | HIGH | 1 callers | 0 indirect | none | modifying |\n' || return 1
+  bash "$CS" blast "$TMP" >/dev/null || return 1
+  local out
+  out=$(bash "$CS" blast "$TMP") || return 1
+  grep -qx 'SCORE_TEXT=complex, score: 2 (sweep) + 3 (blast-radius) = 5, axes: multi-service:2, blast-radius:3' <<<"$out"
+}
+
+test_blast_score_text_additive_skip_keeps_plain_format() {
+  _scored multi-service '| `can()` | LOW | 23 callers | 4 indirect | none | additive |\n' || return 1
+  local out
+  out=$(bash "$CS" blast "$TMP") || return 1
+  grep -qx 'SCORE_TEXT=simple, score: 2/3, axes: multi-service:2' <<<"$out"
+}
+
 for fn in $(declare -F | awk '$3 ~ /^test_/ {print $3}'); do
   _run "$fn" "$fn"
 done
