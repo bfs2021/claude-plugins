@@ -92,7 +92,7 @@ TRACE
 ## Step 2 — Load app knowledge and credentials
 
 Read in parallel:
-1. `$HOME/.claude/skills/app-knowledge/SKILL.md` — the project's recorded roles, states, navigation patterns and quirks. It may be empty (the plugin ships a skeleton); never assume it holds role rules
+1. `{TICKETS_ROOT}/app-knowledge.md` — the project's recorded roles, states, navigation patterns and quirks. It may be missing or empty (the plugin ships a skeleton); never assume it holds role rules
 2. `{TICKETS_ROOT}/nav-hints.md` — click-by-click navigation paths for feature areas (never use `page.goto()` for in-app nav)
 3. `$HOME/.claude/skills/ticket-reproduce/credentials.md` — environment-specific passwords
 

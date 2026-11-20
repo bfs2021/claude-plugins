@@ -17,6 +17,16 @@ marketplace. Where a release also moved `ticket-planner`, `fleet-controller`, or
 > - **0.19.0 never existed.** `plugin.json` went 0.18.0 → 0.20.0. The Phase 2
 >   commit message claims `0.19.0→0.20.0`, but no 0.19.0 was ever committed.
 
+## 0.123.0 (2026-11-20) — board labels, shadowed skills, app-knowledge moves to the project
+
+- **`/ticket-env-check` now checks the four labels the Linear board driver projects** (`needs-info`, `needs-adr`, `rejected`, `reviewed`) whenever `LINEAR_API_KEY` is loaded. The driver never creates a label, so a team missing one fails that event's projection permanently. New rows: `LINEAR_TEAM` (from `LINEAR_TEAM_ID` as key, name or id, else the only visible team) and `label:<name>`. A missing label is `missing` and counts as an issue. The match is case-insensitive, the same as the driver's.
+- **`env-check.sh --create-labels` creates the missing ones**, and nothing else. The skill offers this after the table and runs it only when the user agrees. Creating a label also removes the driver's cached team copy, so the next projection sees it without waiting out the 15-minute cache.
+- New `lib/linear-labels.sh` holds the check and create logic. It also has a CLI: `linear-labels.sh check|create [--team REF]` (exit 0 all present, 1 missing or a create failed, 4 Linear unreachable).
+- `ENV_CHECK_SKIP_LINEAR=1` skips the Linear calls; `test-env-check.sh` sets it, and its label tests run against a fake curl.
+- **New SessionStart hook `hooks/unshadow-skills.sh` moves stale user-level skill copies aside.** A `~/.claude/skills/<name>/SKILL.md` named like a plugin skill runs instead of the plugin's, with no warning. Old copies kept alive by a dotfiles repo ran a September router that lacked `router-step.sh`, and it routed a 16/16 VERIFY PASS as FAIL. The hook renames each such file to `SKILL.md.shadowed-<stamp>` (never deletes), and also catches the retired name `ticket-fleet-controller`. It leaves a symlinked copy in place and reports it, and it tells you in a session message what it moved. `TICKET_UNSHADOW=warn` reports only.
+- **`/ticket-env-check` reports shadowing skills** at user and project level (`SKILL_SHADOW` rows; validate mode fails on one). **It no longer reports the token-tracker hooks as missing**: the plugin registers them in its own `plugin.json`, so no `settings.json` entry is needed.
+- **app-knowledge data moves to `{TICKETS_ROOT}/app-knowledge.md`**, beside `nav-hints.md`. The pipeline used to read and append `~/.claude/skills/app-knowledge/SKILL.md`. That was a user-level skill shadowing the plugin's `app-knowledge`, and it showed one project's knowledge in every project. ticket-verify, ticket-reproduce and ticket-appraise-exec Step 3.7 now use the project file (created on first append), and it is no longer fingerprinted as prompt material. **Upgrade:** if you had a host copy, the new hook moves it aside. Copy its text into the right project's tickets root as `app-knowledge.md`.
+
 ## 0.122.0 (2026-11-16) — verify-qa-persona: ticket-verify works as a QA engineer (opt-in)
 
 - **`persona-select.sh --phase verify`.** Emits `qa-engineer` as the base persona. A new

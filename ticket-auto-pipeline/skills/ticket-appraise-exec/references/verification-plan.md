@@ -12,7 +12,7 @@ Read only under the condition in SKILL.md Step 3 ("Reference files (load conditi
 
 1. **Ticket description and acceptance criteria** — from `context.md` or the Linear issue
 2. **Plan artifact** — `simple-fix.md` or `openspec/changes/{change-name}/design.md` + `tasks.md` + spec files
-3. **`app-knowledge/SKILL.md`** — role constraints and navigation patterns, if recorded (it may be empty)
+3. **`{TICKETS_ROOT}/app-knowledge.md`** — role constraints and navigation patterns, if recorded (may be missing)
 4. **`test-users.json`** — project-local catalog (not bundled; copy `config/test-users.example.json` to your `TICKETS_ROOT` and populate). Provides available roles and emails. If absent, role scope must be inferred from the ticket and app-knowledge.
 5. **`notes.md`** — for investigation findings (`## Initial Investigation`, `## Blast Radius`), adversarial review results, and prior art context
 
@@ -34,7 +34,7 @@ For each criterion, determine which roles are affected. Use the following hierar
 
 2. **Code path role gating** (confidence: high): If the plan artifact references auth guards, role-based UI components (`*ngIf="role..."`, `hasRole(...)`), or role-specific service methods → role scope is the roles enumerated in the code. Scope type is "role-specific".
 
-3. **App-knowledge role-based UI rules** (confidence: medium): Cross-reference the feature area against `app-knowledge/SKILL.md`. If it documents a role constraint for that feature area (e.g., "only admins can access user-permission page") → derive role scope from the known rule. Scope type is "role-specific".
+3. **App-knowledge role-based UI rules** (confidence: medium): Check the feature area against `app-knowledge.md`. If it documents a role constraint for that feature area (e.g., "only admins can access user-permission page") → derive role scope from the known rule. Scope type is "role-specific".
 
 4. **Default heuristic** (confidence: low):
    - **Infrastructure changes** (authentication, routing, database schema, shared utilities, logging, error handling) → "global" (all roles). Scope type is "global".

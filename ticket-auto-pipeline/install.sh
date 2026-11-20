@@ -28,9 +28,10 @@ for skill in "${TICKET_SKILLS[@]}"; do
   fi
 done
 
-# Also check support skills. app-knowledge is deliberately absent: the plugin
-# ships only a skeleton, and the host copy holds the project's own data (and
-# ticket-appraise-exec's Role Scope Registry appends), so it is never archived.
+# Also check support skills. app-knowledge is deliberately absent: an old host
+# copy may hold a project's own data, which belongs in that project's
+# {TICKETS_ROOT}/app-knowledge.md now. hooks/unshadow-skills.sh moves it aside
+# (renamed, never deleted) so the data can be copied over by hand.
 SUPPORT_SKILLS=(wiki-maintenance nav-hints)
 for skill in "${SUPPORT_SKILLS[@]}"; do
   if [ -d "$HOST_SKILLS/$skill" ]; then

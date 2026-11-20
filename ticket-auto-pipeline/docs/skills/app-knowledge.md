@@ -4,7 +4,7 @@
 
 ## What it does
 
-Holds one project's app knowledge: roles, state mappings, navigation patterns and quirks learned during Playwright sessions and ticket work. The plugin ships only a skeleton (environment URL placeholders, an empty `## Role Scope Registry` section and the append contract). The pipeline reads and writes the host's runtime copy at `~/.claude/skills/app-knowledge/SKILL.md`, which may be empty, so callers never assume it holds role rules. `install.sh` never offers to archive that copy.
+Holds one project's app knowledge: roles, state mappings, navigation patterns and quirks learned during Playwright sessions and ticket work. The plugin ships only a skeleton (environment URL placeholders, an empty `## Role Scope Registry` section and the append contract). The pipeline reads and writes each project's own copy at `{TICKETS_ROOT}/app-knowledge.md`, beside `nav-hints.md`. That file may be missing or empty, so callers never assume it holds role rules. Before 0.123.0 the pipeline used `~/.claude/skills/app-knowledge/SKILL.md`, a user-level skill that shadowed this plugin skill and showed one project's knowledge in every project; `hooks/unshadow-skills.sh` now moves such a copy aside (renamed, never deleted) so its text can be copied into the right project's tickets root.
 
 ## Trigger
 
@@ -22,8 +22,8 @@ Holds one project's app knowledge: roles, state mappings, navigation patterns an
 
 | Artifact | Location | Description |
 |----------|----------|-------------|
-| Role Scope Registry entries | `~/.claude/skills/app-knowledge/SKILL.md` | Appended by ticket-appraise-exec Step 3.7 |
-| Learnings | `~/.claude/skills/app-knowledge/SKILL.md` | Appended below "Append new learnings below this line" |
+| Role Scope Registry entries | `{TICKETS_ROOT}/app-knowledge.md` | Appended by ticket-appraise-exec Step 3.7 |
+| Learnings | `{TICKETS_ROOT}/app-knowledge.md` | Appended below "Append new learnings below this line" |
 
 ## How it works
 

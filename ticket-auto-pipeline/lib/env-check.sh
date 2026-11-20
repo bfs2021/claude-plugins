@@ -15,6 +15,10 @@
 #                         "LOG_DIR_ANCHOR: <value now anchored>" and exit: 0 when
 #                         the anchor holds PATH, 1 when it already names another
 #                         dir (never replaced), 2 when REPOS_ROOT is unknown.
+#   --create-labels       Create any board-projected Linear label (needs-info,
+#                         needs-adr, rejected, reviewed) the team lacks.
+# Full mode checks those labels whenever LINEAR_API_KEY is loaded (rows
+# LINEAR_TEAM and label:<name>; ENV_CHECK_SKIP_LINEAR=1 skips the check).
 # Full mode reports the anchor as the LOG_DIR_ANCHOR row; when it is absent and
 # stdin is a terminal (or ENV_CHECK_INTERACTIVE=1) it asks before anchoring
 # PROJECT_DIR/logs.
@@ -40,6 +44,7 @@ PROJECT_DIR=""
 _MODE="full"
 _EXPECTING_SUMMARY_PATH=false
 ANCHOR_PATH=""
+CREATE_LABELS=false
 _ANCHOR_FLAG=false
 _EXPECTING_ANCHOR_PATH=false
 for arg in "${@}"; do
@@ -63,6 +68,7 @@ for arg in "${@}"; do
   --summary-file) _EXPECTING_SUMMARY_PATH=true ;;
   --summary-file=*) SUMMARY_FILE="${arg#*=}" ;;
   --show) SHOW="1" ;;
+  --create-labels) CREATE_LABELS=true ;;
   --anchor-log-dir)
     _ANCHOR_FLAG=true
     _EXPECTING_ANCHOR_PATH=true
@@ -95,6 +101,30 @@ fi
 PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
 
 source "$SCRIPT_DIR/log-dir.sh"
+# skill_shadow_list / _skill_shadow_default_root: user-level SKILL.md files that
+# shadow this plugin's skills (SKILL_SHADOW row).
+source "$SCRIPT_DIR/skill-shadow.sh"
+_EC_PLUGIN_ROOT=$(_skill_shadow_default_root 2>/dev/null || true)
+
+# The plugin registers the token-tracker hooks itself (plugin.json SubagentStart
+# and SubagentStop), so an installed plugin needs no settings.json entry. Only
+# a host without the plugin manifest falls back to the settings.json check.
+_EC_PLUGIN_HOOKS=false
+if [ -n "$_EC_PLUGIN_ROOT" ] && [ -f "$_EC_PLUGIN_ROOT/.claude-plugin/plugin.json" ] &&
+  jq -e '(.hooks.SubagentStart // [] | [.[].hooks[]?.command | select(test("token-tracker-start"))] | length > 0)
+     and (.hooks.SubagentStop // [] | [.[].hooks[]?.command | select(test("token-tracker\\.sh"))] | length > 0)' \
+    "$_EC_PLUGIN_ROOT/.claude-plugin/plugin.json" >/dev/null 2>&1; then
+  _EC_PLUGIN_HOOKS=true
+fi
+
+# Prints "name|path" per shadowing SKILL.md, user level then project level.
+_ec_skill_shadows() {
+  [ -n "$_EC_PLUGIN_ROOT" ] || return 0
+  local d
+  for d in "${ENV_CHECK_USER_SKILLS_DIR:-$HOME/.claude/skills}" "$PROJECT_DIR/.claude/skills"; do
+    skill_shadow_list "$_EC_PLUGIN_ROOT" "$d" 2>/dev/null | tr '\t' '|'
+  done
+}
 
 # REPOS_ROOT for the anchor: env first, then the project's CLAUDE.md (the same
 # order ticket-preamble.sh uses).
@@ -354,12 +384,28 @@ if [ "${_MODE:-full}" = "validate" ]; then
   fi
 
   echo ""
+  say "check" "plugin skills not shadowed"
+  _shadows=$(_ec_skill_shadows)
+  if [ -z "$_EC_PLUGIN_ROOT" ]; then
+    warn "skill shadowing" "plugin root not found — not checked"
+  elif [ -z "$_shadows" ]; then
+    pass "no user- or project-level SKILL.md shadows a plugin skill"
+  else
+    while IFS='|' read -r _sn _sp; do
+      fail "SKILL.md shadows plugin skill '$_sn'" "$_sp runs instead of the plugin's — run: bash $SCRIPT_DIR/skill-shadow.sh fix (user level; the SessionStart hook does this too)"
+      failures=$((failures + 1))
+    done <<<"$_shadows"
+  fi
+
+  echo ""
   say "check" "token tracker hooks"
 
   # Check project-level settings first (preferred — scoped to this repo), then user-level
   HOOKS_FOUND=false
   HOOKS_LEVEL=""
+  $_EC_PLUGIN_HOOKS && HOOKS_FOUND=true && HOOKS_LEVEL="plugin"
   for SETTINGS_FILE in "$PROJECT_DIR/.claude/settings.json" "$HOME/.claude/settings.json"; do
+    $HOOKS_FOUND && break
     [ -f "$SETTINGS_FILE" ] || continue
     START_OK=false
     STOP_OK=false
@@ -373,7 +419,9 @@ if [ "${_MODE:-full}" = "validate" ]; then
   done
 
   if $HOOKS_FOUND; then
-    if [[ "$HOOKS_LEVEL" == "$PROJECT_DIR/.claude/settings.json" ]]; then
+    if [ "$HOOKS_LEVEL" = "plugin" ]; then
+      pass "SubagentStart → token-tracker-start.sh + SubagentStop → token-tracker.sh (registered by the plugin)"
+    elif [[ "$HOOKS_LEVEL" == "$PROJECT_DIR/.claude/settings.json" ]]; then
       pass "SubagentStart → token-tracker-start.sh + SubagentStop → token-tracker.sh (project-level — scoped to this repo)"
     else
       warn "SubagentStart → token-tracker-start.sh + SubagentStop → token-tracker.sh (user-level — fires globally, consider moving to project .claude/settings.json)"
@@ -478,6 +526,47 @@ elif result=$(find_in_settings "LINEAR_API_KEY"); then
 else
   _var "LINEAR_API_KEY" "missing" "" "settings.local.json" "Linear API key (Linear → Settings → API)"
   issues=$((issues + 1))
+fi
+
+# ── Linear board labels ─────────────────────────────────────────────────────
+# The board driver projects needs-info/needs-adr/rejected/reviewed but never
+# creates them; a missing one fails that event's projection permanently.
+# Checked once the key is loaded; created only with --create-labels.
+if [ -n "${LINEAR_API_KEY:-}" ] && [ "${ENV_CHECK_SKIP_LINEAR:-}" != "1" ] &&
+  [ -f "$SCRIPT_DIR/linear-labels.sh" ]; then
+  source "$SCRIPT_DIR/linear-labels.sh"
+  _ll_rc=0
+  _ll_team=$(linear_labels_resolve_team 2>/dev/null) || _ll_rc=$?
+  if [ "$_ll_rc" -eq 4 ]; then
+    _var "LINEAR_TEAM" "warn" "" "Linear" "teams query failed — check LINEAR_API_KEY; labels not checked"
+  elif [ "$_ll_rc" -ne 0 ]; then
+    _var "LINEAR_TEAM" "warn" "${LINEAR_TEAM_ID:-}" "settings.local.json" "team not resolved — set LINEAR_TEAM_ID (key, name or id); labels not checked"
+  else
+    _var "LINEAR_TEAM" "ok" "$_ll_team" "$([ -n "${LINEAR_TEAM_ID:-}" ] && echo settings.local.json || echo "Linear (only team)")" ""
+    _ll_rc=0
+    _ll_rows=$(linear_labels_status "$_ll_team") || _ll_rc=$?
+    if [ "$_ll_rc" -ne 0 ]; then
+      _var "LINEAR_LABELS" "warn" "" "Linear" "team label fetch failed; labels not checked"
+    else
+      _ll_made=false
+      while IFS=$'\t' read -r _ll_name _ll_id; do
+        [ -z "$_ll_name" ] && continue
+        if [ -n "$_ll_id" ]; then
+          _var "label:${_ll_name}" "ok" "$_ll_id" "Linear" ""
+        elif $CREATE_LABELS && _ll_id=$(linear_labels_create "$_ll_team" "$_ll_name" 2>/dev/null); then
+          _var "label:${_ll_name}" "ok" "$_ll_id" "Linear" "created by --create-labels"
+          _ll_made=true
+        elif $CREATE_LABELS; then
+          _var "label:${_ll_name}" "missing" "" "Linear" "absent — --create-labels could not create it"
+          issues=$((issues + 1))
+        else
+          _var "label:${_ll_name}" "missing" "" "Linear" "absent — board projection fails; re-run with --create-labels"
+          issues=$((issues + 1))
+        fi
+      done <<<"$_ll_rows"
+      $_ll_made && linear_labels_drop_driver_cache "$_ll_team"
+    fi
+  fi
 fi
 
 if [ -n "${ANTHROPIC_AUTH_TOKEN:-}" ]; then
@@ -646,12 +735,36 @@ else
   fi
 fi
 
+# ── Skill shadowing ─────────────────────────────────────────────────────────
+# A user- or project-level SKILL.md named like a plugin skill runs instead of
+# the plugin's, silently (lib/skill-shadow.sh).
+
+if [ -z "$_EC_PLUGIN_ROOT" ]; then
+  _var "SKILL_SHADOW" "warn" "" "~/.claude/skills" "plugin root not found — not checked"
+else
+  _shadows=$(_ec_skill_shadows)
+  if [ -z "$_shadows" ]; then
+    _var "SKILL_SHADOW" "ok" "none" "~/.claude/skills" ""
+  else
+    while IFS='|' read -r _sn _sp; do
+      _var "SKILL_SHADOW:${_sn}" "missing" "$_sp" "$(dirname "$(dirname "$_sp")")" "shadows the plugin skill — run: bash $SCRIPT_DIR/skill-shadow.sh fix (user level; the SessionStart hook does this too)"
+      issues=$((issues + 1))
+    done <<<"$_shadows"
+  fi
+fi
+
 # ── Hooks ───────────────────────────────────────────────────────────────────
 
 START_OK=false
 STOP_OK=false
 HOOKS_LEVEL=""
+if $_EC_PLUGIN_HOOKS; then
+  START_OK=true
+  STOP_OK=true
+  HOOKS_LEVEL="plugin"
+fi
 for SETTINGS_FILE in "$PROJECT_DIR/.claude/settings.json" "$HOME/.claude/settings.json"; do
+  [ "$HOOKS_LEVEL" = "plugin" ] && break
   [ -f "$SETTINGS_FILE" ] || continue
   jq -e '.hooks.SubagentStart // [] | [.[].hooks[]? | select(.command | test("token-tracker-start"))] | length > 0' "$SETTINGS_FILE" >/dev/null 2>&1 && START_OK=true
   jq -e '.hooks.SubagentStop // [] | [.[].hooks[]? | select(.command | test("token-tracker\\.sh"))] | length > 0' "$SETTINGS_FILE" >/dev/null 2>&1 && STOP_OK=true
@@ -662,7 +775,9 @@ for SETTINGS_FILE in "$PROJECT_DIR/.claude/settings.json" "$HOME/.claude/setting
 done
 
 if $START_OK && $STOP_OK; then
-  if [[ "$HOOKS_LEVEL" == "$PROJECT_DIR/.claude/settings.json" ]]; then
+  if [ "$HOOKS_LEVEL" = "plugin" ]; then
+    _var "HOOKS_CONFIGURED" "ok" "SubagentStart + SubagentStop" "plugin.json" "registered by the plugin"
+  elif [[ "$HOOKS_LEVEL" == "$PROJECT_DIR/.claude/settings.json" ]]; then
     _var "HOOKS_CONFIGURED" "ok" "SubagentStart + SubagentStop" "project .claude/settings.json" "token tracker hooks scoped to this repo"
   else
     _var "HOOKS_CONFIGURED" "warn" "SubagentStart + SubagentStop" "~/.claude/settings.json" "hooks fire globally — consider moving to project .claude/settings.json"

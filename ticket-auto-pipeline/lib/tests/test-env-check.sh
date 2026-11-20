@@ -29,6 +29,13 @@ mkdir -p "$ENV_CHECK_JGIT_LOCK_ROOT" "$_TEST_SCRATCH/bin"
 printf '#!/bin/sh\nexit 7\n' >"$_TEST_SCRATCH/bin/curl"
 chmod +x "$_TEST_SCRATCH/bin/curl"
 export PATH="$_TEST_SCRATCH/bin:$PATH"
+# The Linear label check calls the API whenever LINEAR_API_KEY is set; only the
+# label tests below turn it on, each against its own fake curl.
+export ENV_CHECK_SKIP_LINEAR=1
+# The skill-shadow check reads ~/.claude/skills; point it at an empty dir so
+# the developer's own skills never change a result.
+export ENV_CHECK_USER_SKILLS_DIR="$_TEST_SCRATCH/userskills"
+mkdir -p "$ENV_CHECK_USER_SKILLS_DIR"
 
 _run() {
   local name="$1"
@@ -415,6 +422,184 @@ test_summary_file_flag_writes_to_path() {
 
 FILTER="${1:-}"
 
+# ── Linear board labels ──────────────────────────────────────────────────────
+
+# Fake curl answering the three Linear calls the label check makes. The team
+# has needs-info (as "Needs-Info", to prove the case-insensitive match) and
+# reviewed. Each created label name is appended to <dir>/mutations.
+_mk_fake_linear() {
+  local dir="$1"
+  mkdir -p "$dir/bin"
+  : >"$dir/mutations"
+  {
+    echo '#!/usr/bin/env bash'
+    echo "MUT='$dir/mutations'"
+    cat <<'CURL'
+cat >/dev/null
+payload=""
+while [ $# -gt 0 ]; do
+  [ "$1" = "-d" ] && payload="$2"
+  shift
+done
+case "$payload" in
+*issueLabelCreate*)
+  name=$(printf '%s' "$payload" | jq -r '.variables.input.name')
+  echo "$name" >>"$MUT"
+  printf '{"data":{"issueLabelCreate":{"success":true,"issueLabel":{"id":"new-%s","name":"%s"}}}}\n200' "$name" "$name"
+  ;;
+*"teams("*)
+  printf '{"data":{"teams":{"nodes":[{"id":"11111111-1111-1111-1111-111111111111","key":"SUN","name":"Sun"}]}}}\n200'
+  ;;
+*"team("*)
+  printf '{"data":{"team":{"id":"t","name":"Sun","states":{"nodes":[]},"labels":{"nodes":[{"id":"L1","name":"Needs-Info","parent":null},{"id":"L4","name":"reviewed","parent":null}],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}\n200'
+  ;;
+*) printf '{}\n500' ;;
+esac
+CURL
+  } >"$dir/bin/curl"
+  chmod +x "$dir/bin/curl"
+}
+
+_label_env_check() {
+  local tmpdir="$1"
+  shift
+  PATH="$tmpdir/fake/bin:$PATH" ENV_CHECK_SKIP_LINEAR= LINEAR_RETRY_DELAYS="0 0 0" \
+    LINEAR_API_KEY=test GITHUB_PERSONAL_ACCESS_TOKEN=test \
+    bash "$LIB_DIR/env-check.sh" --mode=full "$tmpdir" "$@" 2>/dev/null || true
+}
+
+test_full_mode_reports_missing_labels() {
+  local tmpdir output rc=0
+  tmpdir=$(mktemp -d)
+  _mk_project_dir "$tmpdir"
+  _mk_fake_linear "$tmpdir/fake"
+  output=$(_label_env_check "$tmpdir")
+  {
+    grep -q '^LINEAR_TEAM|ok|11111111-1111-1111-1111-111111111111|' <<<"$output" &&
+      grep -q '^label:needs-info|ok|L1|' <<<"$output" &&
+      grep -q '^label:reviewed|ok|L4|' <<<"$output" &&
+      grep -q '^label:needs-adr|missing||' <<<"$output" &&
+      grep -q '^label:rejected|missing||' <<<"$output" &&
+      [ ! -s "$tmpdir/fake/mutations" ]
+  } || rc=1
+  rm -rf "$tmpdir"
+  return $rc
+}
+
+test_full_mode_create_labels_creates_only_missing() {
+  local tmpdir output rc=0 cache
+  tmpdir=$(mktemp -d)
+  _mk_project_dir "$tmpdir"
+  _mk_fake_linear "$tmpdir/fake"
+  mkdir -p "$tmpdir/logs"
+  cache="$tmpdir/logs/.linear-team-11111111-1111-1111-1111-111111111111.json"
+  echo '{}' >"$cache"
+  output=$(FLEET_PIPELINE_LOG_DIR="$tmpdir/logs" _label_env_check "$tmpdir" --create-labels)
+  {
+    grep -q '^label:needs-adr|ok|new-needs-adr|Linear|created by --create-labels' <<<"$output" &&
+      grep -q '^label:rejected|ok|new-rejected|' <<<"$output" &&
+      grep -q '^label:needs-info|ok|L1|' <<<"$output" &&
+      [ "$(sort "$tmpdir/fake/mutations" | tr '\n' ' ')" = "needs-adr rejected " ] &&
+      [ ! -e "$cache" ]
+  } || rc=1
+  rm -rf "$tmpdir"
+  return $rc
+}
+
+test_full_mode_labels_skipped_without_key() {
+  local tmpdir output rc=0
+  tmpdir=$(mktemp -d)
+  _mk_project_dir "$tmpdir"
+  _mk_fake_linear "$tmpdir/fake"
+  output=$(
+    unset LINEAR_API_KEY
+    PATH="$tmpdir/fake/bin:$PATH" ENV_CHECK_SKIP_LINEAR= HOME="$tmpdir" GITHUB_PERSONAL_ACCESS_TOKEN=test \
+      bash "$LIB_DIR/env-check.sh" --mode=full "$tmpdir" --create-labels 2>/dev/null || true
+  )
+  { ! grep -q '^label:\|^LINEAR_TEAM|' <<<"$output" && [ ! -s "$tmpdir/fake/mutations" ]; } || rc=1
+  rm -rf "$tmpdir"
+  return $rc
+}
+
+test_full_mode_labels_unknown_team_warns() {
+  local tmpdir output rc=0
+  tmpdir=$(mktemp -d)
+  _mk_project_dir "$tmpdir"
+  _mk_fake_linear "$tmpdir/fake"
+  output=$(LINEAR_TEAM_ID=NOPE _label_env_check "$tmpdir" --create-labels)
+  {
+    grep -q '^LINEAR_TEAM|warn|NOPE|' <<<"$output" &&
+      ! grep -q '^label:' <<<"$output" &&
+      [ ! -s "$tmpdir/fake/mutations" ]
+  } || rc=1
+  rm -rf "$tmpdir"
+  return $rc
+}
+
+test_full_mode_labels_team_by_key() {
+  local tmpdir output rc=0
+  tmpdir=$(mktemp -d)
+  _mk_project_dir "$tmpdir"
+  _mk_fake_linear "$tmpdir/fake"
+  output=$(LINEAR_TEAM_ID=sun _label_env_check "$tmpdir")
+  grep -q '^LINEAR_TEAM|ok|11111111-1111-1111-1111-111111111111|settings.local.json|' <<<"$output" || rc=1
+  rm -rf "$tmpdir"
+  return $rc
+}
+
+# ── Skill shadowing and plugin-registered hooks ─────────────────────────────
+
+test_full_mode_reports_shadowing_skill() {
+  local tmpdir output rc=0
+  tmpdir=$(mktemp -d)
+  _mk_project_dir "$tmpdir"
+  mkdir -p "$tmpdir/userskills/ticket-auto"
+  printf -- '---\nname: ticket-auto\n---\nold\n' >"$tmpdir/userskills/ticket-auto/SKILL.md"
+  output=$(ENV_CHECK_USER_SKILLS_DIR="$tmpdir/userskills" LINEAR_API_KEY=test GITHUB_PERSONAL_ACCESS_TOKEN=test \
+    bash "$LIB_DIR/env-check.sh" --mode=full "$tmpdir" 2>/dev/null || true)
+  grep -q "^SKILL_SHADOW:ticket-auto|missing|$tmpdir/userskills/ticket-auto/SKILL.md|" <<<"$output" || rc=1
+  rm -rf "$tmpdir"
+  return $rc
+}
+
+test_full_mode_shadow_ok_when_clean() {
+  local tmpdir output rc=0
+  tmpdir=$(mktemp -d)
+  _mk_project_dir "$tmpdir"
+  output=$(LINEAR_API_KEY=test GITHUB_PERSONAL_ACCESS_TOKEN=test \
+    bash "$LIB_DIR/env-check.sh" --mode=full "$tmpdir" 2>/dev/null || true)
+  grep -q '^SKILL_SHADOW|ok|none|' <<<"$output" || rc=1
+  rm -rf "$tmpdir"
+  return $rc
+}
+
+test_validate_fails_on_shadowing_skill() {
+  local tmpdir output rc=0
+  tmpdir=$(mktemp -d)
+  _mk_project_dir "$tmpdir"
+  mkdir -p "$tmpdir/.claude/skills/ticket-verify"
+  printf -- '---\nname: ticket-verify\n---\nold\n' >"$tmpdir/.claude/skills/ticket-verify/SKILL.md"
+  output=$(LINEAR_API_KEY=test GITHUB_PERSONAL_ACCESS_TOKEN=test \
+    bash "$LIB_DIR/env-check.sh" --mode=validate "$tmpdir" 2>&1) && rc=1
+  grep -q "SKILL.md shadows plugin skill 'ticket-verify'" <<<"$output" || rc=1
+  rm -rf "$tmpdir"
+  return $rc
+}
+
+test_hooks_ok_when_plugin_registers_them() {
+  local tmpdir output rc=0
+  tmpdir=$(mktemp -d)
+  _mk_project_dir "$tmpdir"
+  # No token-tracker hooks in any settings.json: the plugin's own plugin.json
+  # registers them, so this is not a missing hook.
+  echo '{"permissions":{"allow":[]}}' >"$tmpdir/.claude/settings.json"
+  output=$(HOME="$tmpdir" LINEAR_API_KEY=test GITHUB_PERSONAL_ACCESS_TOKEN=test \
+    bash "$LIB_DIR/env-check.sh" --mode=full "$tmpdir" 2>/dev/null || true)
+  grep -q '^HOOKS_CONFIGURED|ok|SubagentStart + SubagentStop|plugin.json|registered by the plugin' <<<"$output" || rc=1
+  rm -rf "$tmpdir"
+  return $rc
+}
+
 for fn in \
   test_validate_passes_all_required \
   test_validate_fails_missing_linear_key \
@@ -439,7 +624,16 @@ for fn in \
   test_validate_jgit_lock_none \
   test_validate_jgit_lock_stale_auto_cleaned \
   test_unknown_mode_exits_1 \
-  test_summary_file_flag_writes_to_path; do
+  test_summary_file_flag_writes_to_path \
+  test_full_mode_reports_missing_labels \
+  test_full_mode_create_labels_creates_only_missing \
+  test_full_mode_labels_skipped_without_key \
+  test_full_mode_labels_unknown_team_warns \
+  test_full_mode_labels_team_by_key \
+  test_full_mode_reports_shadowing_skill \
+  test_full_mode_shadow_ok_when_clean \
+  test_validate_fails_on_shadowing_skill \
+  test_hooks_ok_when_plugin_registers_them; do
   [ -z "$FILTER" ] || [[ "$fn" == *"$FILTER"* ]] || continue
   _run "$fn" "$fn"
 done

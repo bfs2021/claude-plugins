@@ -78,7 +78,7 @@ an unattended crash keeps earlier passes. The router gets the same value from `d
 Read both knowledge sources before fetching the ticket:
 
 ```bash
-cat "$HOME/.claude/skills/app-knowledge/SKILL.md"
+cat "{TICKETS_ROOT}/app-knowledge.md" 2>/dev/null
 ```
 
 Then load the project nav hints (read the file directly — this agent has no Skill tool, and Step 2a reads the same file):
@@ -87,7 +87,7 @@ Then load the project nav hints (read the file directly — this agent has no Sk
 cat "{TICKETS_ROOT}/nav-hints.md" 2>/dev/null || echo "(no nav-hints.md yet)"
 ```
 
-`app-knowledge/SKILL.md` contains business rules, role-based UI behaviour, state mappings, and navigation patterns confirmed across sessions. Use it to interpret what you see in Playwright snapshots and to derive correct navigation without guessing.
+`app-knowledge.md` contains business rules, role-based UI behaviour, state mappings, and navigation patterns confirmed across sessions. Use it to interpret what you see in Playwright snapshots and to derive correct navigation without guessing.
 
 `nav-hints.md` holds area → click-path mappings learned during previous ticket verification and reproduction sessions. **Never use direct URLs for in-app navigation** — always click through the UI because Angular loses session state on full page reload.
 

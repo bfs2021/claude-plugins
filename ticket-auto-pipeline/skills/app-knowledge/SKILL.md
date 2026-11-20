@@ -5,10 +5,10 @@ description: Reference knowledge base for the project app's business rules, user
 
 # App Knowledge — Business & System Knowledge
 
-This file is a living reference for one project's app. The pipeline reads and writes the host's
-runtime copy (`~/.claude/skills/app-knowledge/SKILL.md`); the plugin ships only this skeleton, so
-the runtime copy may be empty and must not be assumed to hold role rules. Record roles, states,
-navigation patterns and quirks there as they are learned during Playwright sessions or ticket work.
+The skeleton of one project's app knowledge. The pipeline reads and writes the project's copy,
+`{TICKETS_ROOT}/app-knowledge.md` (never `~/.claude/skills/`); it may be missing or empty, so never
+assume it holds role rules. Record roles, states, navigation patterns and quirks there as they are
+learned during Playwright sessions or ticket work.
 
 ---
 
