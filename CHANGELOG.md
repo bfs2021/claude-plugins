@@ -17,6 +17,10 @@ marketplace. Where a release also moved `ticket-planner`, `fleet-controller`, or
 > - **0.19.0 never existed.** `plugin.json` went 0.18.0 → 0.20.0. The Phase 2
 >   commit message claims `0.19.0→0.20.0`, but no 0.19.0 was ever committed.
 
+## 0.123.1 (2026-11-20) — fix the create-guard test's stdin race (#755)
+
+- **`test-ticket-create-guard.sh` no longer fails at random.** Its harness fed the hook with `printf | bash` under `pipefail`. With `TICKET_CREATE_GUARD=off` the hook exits before it reads stdin, so when the hook won the race `printf` got EPIPE and the test failed (nightly run on 2026-11-18, `test_guard_off_allowed`). The harness now passes the payload as a here-string, as `test_missing_jq_fails_open` already did. New test `test_guard_off_unread_large_payload_allowed` sends a payload larger than a pipe buffer with the guard off; the old harness fails it every time. Test-only change; the hook is unchanged.
+
 ## 0.123.0 (2026-11-20) — board labels, shadowed skills, app-knowledge moves to the project
 
 - **`/ticket-env-check` now checks the four labels the Linear board driver projects** (`needs-info`, `needs-adr`, `rejected`, `reviewed`) whenever `LINEAR_API_KEY` is loaded. The driver never creates a label, so a team missing one fails that event's projection permanently. New rows: `LINEAR_TEAM` (from `LINEAR_TEAM_ID` as key, name or id, else the only visible team) and `label:<name>`. A missing label is `missing` and counts as an issue. The match is case-insensitive, the same as the driver's.

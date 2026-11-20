@@ -11,8 +11,11 @@ PASS=0
 FAIL=0
 
 # _guard <payload> — prints the hook's stdout; the hook must always exit 0.
+# Stdin is a here-string, never `printf | bash`: the hook may exit before it
+# reads stdin (TICKET_CREATE_GUARD=off, no jq), and a writer still mid-write
+# then gets EPIPE, which pipefail turns into a spurious failure (#755).
 _guard() {
-  printf '%s' "$1" | TICKET_CREATE_GUARD="${GUARD_ENV:-on}" bash "$GUARD"
+  TICKET_CREATE_GUARD="${GUARD_ENV:-on}" bash "$GUARD" <<<"$1"
 }
 
 _bash_payload() { jq -cn --arg c "$1" '{tool_name: "Bash", tool_input: {command: $c}}'; }
@@ -96,6 +99,14 @@ test_non_json_allowed() {
 
 test_guard_off_allowed() {
   GUARD_ENV=off _allowed '{"tool_name":"mcp__linear-server__save_issue","tool_input":{"title":"x"}}'
+}
+
+# #755: with the guard off the hook exits without reading stdin. A payload
+# larger than a pipe buffer made the old `printf | bash` harness fail every
+# time (printf blocks, the reader exits, EPIPE under pipefail); a small one
+# failed only when the hook won the race. The harness must pass both.
+test_guard_off_unread_large_payload_allowed() {
+  GUARD_ENV=off _allowed "$(_bash_payload "echo $(_pad 100000)")"
 }
 
 # --- #501: prose about the Linear API must not be read as a network call ---
@@ -513,7 +524,7 @@ _guard_broken_awk() {
   d=$(mktemp -d)
   printf '#!/bin/sh\nexit 2\n' >"$d/awk"
   chmod +x "$d/awk"
-  out=$(printf '%s' "$1" | TICKET_CREATE_GUARD=on PATH="$d:$PATH" bash "$GUARD")
+  out=$(TICKET_CREATE_GUARD=on PATH="$d:$PATH" bash "$GUARD" <<<"$1")
   rm -rf "$d"
   printf '%s' "$out"
 }
@@ -654,6 +665,7 @@ for fn in \
   test_other_tool_allowed \
   test_non_json_allowed \
   test_guard_off_allowed \
+  test_guard_off_unread_large_payload_allowed \
   test_heredoc_then_gh_issue_create_allowed \
   test_gh_title_mentions_mutation_allowed \
   test_gh_pr_body_mentions_mutation_allowed \
