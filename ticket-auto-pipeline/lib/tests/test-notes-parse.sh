@@ -281,6 +281,17 @@ test_blast_below_thresholds_is_none() {
   [ "$BLAST_OVERRIDE" = "none" ] && [ -z "$BLAST_REASON" ]
 }
 
+# A flow that lists its callers in parentheses is one flow, not one per caller.
+test_blast_parenthesised_callers_are_one_flow() {
+  _blast "${_BR_HDR}| \`render()\` | LOW | 2 callers | 0 indirect | Page render (home, article, header, editor) | modifying |\n" || return 1
+  [ "$BLAST_OVERRIDE" = "none" ] && [ -z "$BLAST_REASON" ]
+}
+
+test_blast_parenthesised_callers_still_count_real_flows() {
+  _blast "${_BR_HDR}| \`a\` | LOW | 2 callers | 0 indirect | Login (form, api), Checkout | modifying |\n" || return 1
+  [ "$BLAST_OVERRIDE" = "complex" ] && [ "$BLAST_REASON" = "2 execution flows" ]
+}
+
 test_blast_reason_is_eval_safe() {
   _blast "${_BR_HDR}| \`it's; \$(touch /nonexistent-413)\` | CRITICAL | 0 callers | 0 indirect | none | modifying |\n" || return 1
   [ "$BLAST_OVERRIDE" = "complex" ] &&
@@ -372,6 +383,8 @@ for fn in \
   test_blast_additive_still_overrides_on_high_risk \
   test_blast_additive_still_overrides_on_two_flows \
   test_blast_below_thresholds_is_none \
+  test_blast_parenthesised_callers_are_one_flow \
+  test_blast_parenthesised_callers_still_count_real_flows \
   test_blast_reason_is_eval_safe \
   test_blast_takes_last_section \
   test_blast_section_absent_exit_2; do

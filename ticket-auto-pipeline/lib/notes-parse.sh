@@ -529,7 +529,10 @@ get_blast_radius_override() {
             reason = join(reason, d1 " d=1 callers (" sym ")")
         }
         if (c_f) {
-          n = split($c_f, parts, ",")
+          # A flow may list its callers in parentheses, "Render (home, article)":
+          # drop them first, or each comma inside would count as another flow.
+          fc = $c_f; gsub(/\([^)]*\)/, "", fc)
+          n = split(fc, parts, ",")
           for (j = 1; j <= n; j++) {
             f = tolower(trim(parts[j]))
             if (f == "" || f == "none" || f == "-" || f == "n/a") continue
